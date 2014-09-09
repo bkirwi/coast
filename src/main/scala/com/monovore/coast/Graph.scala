@@ -1,7 +1,5 @@
 package com.monovore.coast
 
-import rx.lang.scala.Observable
-
 case class Name[A, B](name: String)
 
 class System {
@@ -27,19 +25,19 @@ class System {
 
   sealed trait Flow[A, +B] {
 
-    def flatMap[B0](func: B => Observable[B0]): Flow[A, B0] = Transform(this, func)
+    def flatMap[B0](func: B => Seq[B0]): Flow[A, B0] = Transform(this, func)
 
     def filter(func: B => Boolean): Flow[A, B] = flatMap { a =>
-      if (func(a)) Observable.just(a) else Observable.empty
+      if (func(a)) Seq(a) else Seq.empty
     }
 
-    //  def flatMap[B](func: A => Iterable[B]): Flow[B] = Transform(this, func andThen { b => Observable.from(b) })
-    def map[B0](func: B => B0): Flow[A, B0] = flatMap(func andThen { b => Observable.just(b)})
+    //  def flatMap[B](func: A => Iterable[B]): Flow[B] = Transform(this, func andThen { b => Seq.from(b) })
+    def map[B0](func: B => B0): Flow[A, B0] = flatMap(func andThen { b => Seq(b)})
   }
 
   case class Source[A, +B](source: String) extends Flow[A, B]
 
-  case class Transform[A, +B, B0](upstream: Flow[A, B0], transformer: B0 => Observable[B]) extends Flow[A, B]
+  case class Transform[A, +B, B0](upstream: Flow[A, B0], transformer: B0 => Seq[B]) extends Flow[A, B]
 
   case class Merge[A, +B](upstreams: Seq[Flow[A, B]]) extends Flow[A, B]
 

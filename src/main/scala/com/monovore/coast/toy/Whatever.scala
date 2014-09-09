@@ -1,36 +1,25 @@
 package com.monovore.coast
 package toy
 
-import com.monovore.coast.toy.Machine.State
-import rx.lang.scala.Observable
-import shapeless.HMap
+import com.twitter.algebird.Semigroup
 
 object Whatever {
 
-  case class InputData[A,B,C,D](pending: Seq[(A,B)], whatever: (A, B) => Seq[(C, D)])
-
-  type InputFor[C,D] = {
-    type Data[A, B] = ((A, B)) => Seq[(C, D)]
-  }
+  case class Node[A, B](sources: Map[String, Any => Seq[B]])
 
   def prepare(sys: System)(graph: sys.Graph[Unit]): Machine = {
 
-    def compile[A,B](flow: sys.Flow[A,B]): NameMap[InputFor[A,B]#Data] = flow match {
-      case sys.Source(name) => {
-        NameMap.empty[InputFor[A,B]#Data].put(Name(name), { pair: (A,B) => Seq(pair) } )
-      }
-      case transform: sys.Transform[_, bT, b0T] => {
+    def compile[A,B](flow: sys.Flow[A,B]): Node[A, B] = flow match {
+      case sys.Source(name) => Node(
+        sources = Map(name -> { case b: B @unchecked => Seq(b) })
+      )
+      case sys.Transform(upstream, transform) => {
+        val compiled = compile(upstream)
 
-        val upstream: sys.Flow[A, b0T] = transform.upstream
+        val sources = compiled.sources
+          .mapValues { _ andThen { _.flatMap { b => transform(b) } } }
 
-        val compiled: NameMap[InputFor[A, b0T]#Data] = compile(upstream)
-
-        compiled
-          .mapValues(new Mapper[InputFor[A, b0T]#Data, InputFor[A, B]#Data] {
-            override def convert[C, D](in: InputFor[A, b0T]#Data[C, D]): InputFor[A, B]#Data[C,D]2 = ???
-          })
-
-        ???
+        Node(sources)
       }
       case _ => ???
     }
@@ -54,74 +43,102 @@ object Whatever {
 //      .flatMap { case (name, what) => what.keys.map { name -> _ } }
 //      .groupBy { _._1 }.mapValues { _.map { _._2 }}
 
-    val emptyState = graph.state
-      .mapValues(new Mapper[sys.Flow, Machine.State] {
-        override def convert[A, B](in: sys.Flow[A, B]) = Machine.State(input = compress(in))
+    val nodes = graph.state
+      .mapValues(new Mapper[sys.Flow, Node] {
+        override def convert[A, B](in: sys.Flow[A, B]) = {
+          compile(in)
+        }
       })
 
-    Machine(emptyState)
+    val initialState = nodes
+      .mapValues(new Mapper[Node, Machine.State] {
+        override def convert[A, B](in: Node[A, B]) = {
+          Machine.State(input = in.sources.mapValues { _ => Map.empty })
+        }
+      })
+
+    Machine(nodes, initialState)
   }
 }
 
 object Machine {
 
+  type Grouped[A,B] = Map[A, Seq[B]]
+
   case class State[A, B](
-    input: NameMap[Pairs] = NameMap.empty,
-    output: Pairs[A,B] = Seq.empty
+    input: Map[String, Map[Any, Seq[Any]]],
+    output: Map[A, Seq[B]] = Map.empty[A, Seq[B]].withDefaultValue(Seq.empty)
   ) {
-    case class Input[C,D](pending: Seq[(C,D)], whatever: (C, D) => Seq[(A, B)])
+    def source[A,B](name: Name[A,B]) = input(name.name).asInstanceOf[Map[A, Seq[B]]]
   }
 }
 
-case class Machine(state: NameMap[Machine.State]) {
+case class Machine(graph: NameMap[Whatever.Node], state: NameMap[Machine.State]) {
 
   def push[A, B](from: Name[A, B], messages: (A,B)*): Machine = {
 
+    val grouped = messages.groupByKey
+
     val withInput = state.keys.foldLeft(NameMap.empty[Machine.State]) { case (newState, name: Name[aT, bT]) =>
 
-      val nodeState = state.apply(name)
+      val nodeState = state(name)
 
-      val updated = nodeState.input.keys.foldLeft(NameMap.empty[Pairs]) {
-        case (newNodeState: NameMap[Pairs], `from`) =>
-          val pairs: Pairs[A, B] = nodeState.input.apply(from)
-          newNodeState.put(from, pairs ++ messages)
-        case (newNodeState, _) => newNodeState
-      }
+      val updated = nodeState.input
+        .map {
+          case (from.name, items) if from != name => {
+            from.name -> Semigroup.plus(items, grouped.asInstanceOf[Map[Any,Seq[Any]]])
+          }
+          case other => other
+        }
 
       newState.put(name, nodeState.copy(input = updated))
     }
 
     val withOutput = {
       val fromNode = withInput.apply(from)
-      withInput.put(from, fromNode.copy(output = fromNode.output ++ messages))
+      withInput.put(from, fromNode.copy(output = Semigroup.plus(fromNode.output, grouped).withDefaultValue(Seq.empty)))
     }
 
-    Machine(withOutput)
+    copy(state = withOutput)
   }
 
   def process: Set[Process] = {
 
-    state.keys.flatMap { case name: Name[aT, bT] =>
+    val everything = state.keys.flatMap { case name: Name[aT, bT] =>
 
       val nodeState = state(name)
 
-      nodeState.input.keys
-        .flatMap { case sourceName: Name[cT, dT] =>
+      val node: Whatever.Node[aT, bT] = graph(name)
 
-          val input = nodeState.input(sourceName)
+      for {
+        (source, pending) <- nodeState.input
+        (key, values) <- pending
+        if values.nonEmpty
+      } yield {
+        new Process {
+          def next() = {
 
-          input.headOption.map { head =>
-            val popped = state.put(name,
-              nodeState.copy(input = nodeState.input.put(sourceName, input.tail))
-            )
-            ??? // Machine(popped).push(name, head)
+            val output: Seq[(aT, bT)] = node.sources(source)(values.head).map { key.asInstanceOf[aT] -> _ }
+
+            val newPending = {
+              val tail = values.tail
+              if (tail.isEmpty) pending - key
+              else pending + (key -> values.tail)
+            }
+
+            val newState =
+              copy(state = state.put(name,
+                nodeState.copy(input = nodeState.input + (source -> newPending))
+              ))
+              .push(name, output: _*)
+
+            newState
           }
         }
-
-        ???
+      }
     }
 
-    ???
+    everything.toSet
   }
 }
 

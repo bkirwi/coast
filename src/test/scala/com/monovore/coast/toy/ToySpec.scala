@@ -28,8 +28,8 @@ class ToySpec extends Specification with ScalaCheck {
 
       val machine = Whatever.prepare(toy)(graph).push(boss, pairs: _*)
 
-      machine.state(boss).output must_== pairs
-      machine.state(mapped).input(boss) must_== pairs
+      machine.state(boss).output must_== pairs.groupByKey
+      machine.state(mapped).source(boss) must_== pairs.groupByKey
     }
 
     "run a simple graph to completion" in prop { (pairs: Seq[(Unit, Int)]) =>
@@ -39,9 +39,33 @@ class ToySpec extends Specification with ScalaCheck {
 
       Prop.forAll(complete(machine)) { completed =>
 
-        machine.state(boss).output must_== pairs
-        machine.state(mapped).input(boss) must_== Seq.empty
-        machine.state(mapped).output must_== pairs.map { case (_, n) => () -> (n+1) }
+        completed.state(boss).output must_== pairs.groupByKey
+        completed.state(mapped).source(boss) must beEmpty
+        completed.state(mapped).output must_== pairs.map { case (_, n) => () -> (n+1) }.groupByKey
+      }
+    }
+
+    "have no overlap between groups" in prop { (integers: Seq[Int]) =>
+
+      val boss = Name[Boolean, Int]("boss")
+      val mapped = Name[Boolean, Int]("mapped")
+
+      val graph = for {
+        source <- toy.source[Boolean, Int](boss.name)
+        mapped <- toy.register(mapped.name) { source.map { _ + 1 } }
+      } yield ()
+
+      val isEven = integers.map { i => (i % 2 == 0) -> i }
+
+      val machine = Whatever.prepare(toy)(graph)
+        .push(boss, isEven: _*)
+
+      Prop.forAll(complete(machine)) { completed =>
+
+        val results = completed.state(mapped).output
+
+        results(true).forall { _ % 2 != 0 } &&
+          results(false).forall { _ % 2 == 0 }
       }
     }
   }
