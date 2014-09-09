@@ -6,7 +6,7 @@ case class Name[A, B](name: String)
 
 class System {
 
-  case class Graph[A](state: Map[String, Flow[_, _]], contents: A) {
+  case class Graph[A](state: toy.NameMap[Flow], contents: A) {
 
     def map[B](func: A => B): Graph[B] = copy(contents = func(contents))
 
@@ -14,7 +14,14 @@ class System {
 
       val result = func(contents)
 
-      Graph(state ++ result.state, result.contents)
+      val updated = result.state.keys
+        .foldLeft(state) { (map, key) =>
+          key match {
+            case name: Name[aT, bT] => map.put(name, result.state.apply(name))
+          }
+        }
+
+      Graph(updated, result.contents)
     }
   }
 
@@ -47,28 +54,6 @@ class System {
   def source[A,B](name: String): Graph[Flow[A, B]] = register(name)(Source(name))
 
   def register[A, B](name: String)(flow: Flow[A, B]): Graph[Flow[A, B]] = {
-    Graph(Map(name -> flow), Source(name))
-  }
-}
-
-object TestGraph {
-
-  def main(args: Array[String]) {
-
-    val system = new System
-
-    val graph = for {
-      first <- system.source[String, Int]("ints")
-      second <- system.register("doubles") {
-        for {
-          int <- first
-          anything <- Observable.from(1 to int)
-          if int == 3
-        } yield int.toDouble
-      }
-      merged <- system.merge("both")(first, second)
-    } yield (merged)
-
-    println(graph)
+    Graph(toy.NameMap.empty.put(Name[A,B](name), flow), Source(name))
   }
 }
