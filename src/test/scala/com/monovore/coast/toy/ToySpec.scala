@@ -20,15 +20,13 @@ class ToySpec extends Specification with ScalaCheck {
     val mapped = Name[Unit, Int]("mapped")
 
     val graph = for {
-      source <- toy.source[Unit, Int](boss.name)
-      mapped <- toy.register(mapped.name) { source.map { _ + 1 } }
+      mapped <- toy.register(mapped.name) { toy.source(boss).map { _ + 1 } }
     } yield ()
 
     "feed input to a simple system" in prop { (pairs: Seq[(Unit, Int)]) =>
 
       val machine = Whatever.prepare(toy)(graph).push(boss, pairs: _*)
 
-      machine.state(boss).output must_== pairs.groupByKey
       machine.state(mapped).source(boss) must_== pairs.groupByKey
     }
 
@@ -39,7 +37,6 @@ class ToySpec extends Specification with ScalaCheck {
 
       Prop.forAll(complete(machine)) { completed =>
 
-        completed.state(boss).output must_== pairs.groupByKey
         completed.state(mapped).source(boss) must beEmpty
         completed.state(mapped).output must_== pairs.map { case (_, n) => () -> (n+1) }.groupByKey
       }
@@ -51,8 +48,7 @@ class ToySpec extends Specification with ScalaCheck {
       val mapped = Name[Boolean, Int]("mapped")
 
       val graph = for {
-        source <- toy.source[Boolean, Int](boss.name)
-        mapped <- toy.register(mapped.name) { source.map { _ + 1 } }
+        mapped <- toy.register(mapped.name) { toy.source(boss).map { _ + 1 } }
       } yield ()
 
       val isEven = integers.map { i => (i % 2 == 0) -> i }
@@ -75,9 +71,8 @@ class ToySpec extends Specification with ScalaCheck {
       val total = Name[String, Int]("total")
 
       val graph = for {
-        countsS <- toy.source[String, Int](counts.name)
         totalS <- toy.registerP("total") {
-          countsS.scanLeft(0) { _ + _ }
+          toy.source(counts).scanLeft(0) { _ + _ }
         }
       } yield ()
 

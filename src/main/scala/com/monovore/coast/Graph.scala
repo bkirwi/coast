@@ -66,7 +66,7 @@ class System {
 
 //  def source[A,B](name: Name[A,B]): Graph[Flow[A,]]
 
-  def source[A,B](name: String): Graph[Flow[A, B]] = register(name)(Source(name))
+  def source[A,B](name: Name[A,B]): Flow[A, B] = Source(name.name)
 
   def register[A, B](name: String)(flow: Flow[A, B]): Graph[Flow[A, B]] = {
     Graph(toy.NameMap.empty.put(Name[A,B](name), flow), Source(name))

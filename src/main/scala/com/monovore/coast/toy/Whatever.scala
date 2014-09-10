@@ -75,12 +75,7 @@ case class Machine(graph: NameMap[Whatever.Node], state: NameMap[Machine.State])
       newState.put(name, nodeState.copy(input = updated))
     }
 
-    val withOutput = {
-      val fromNode = withInput.apply(from)
-      withInput.put(from, fromNode.copy(output = Semigroup.plus(fromNode.output, grouped).withDefaultValue(Seq.empty)))
-    }
-
-    copy(state = withOutput)
+    copy(state = withInput)
   }
 
   def process: Set[Process] = {
@@ -99,7 +94,7 @@ case class Machine(graph: NameMap[Whatever.Node], state: NameMap[Machine.State])
         new Process {
           def next() = {
 
-            val output: Seq[(aT, bT)] = node.sources(source)(values.head).map { key.asInstanceOf[aT] -> _ }
+            val output: Seq[bT] = node.sources(source)(values.head)
 
             val newPending = {
               val tail = values.tail
@@ -109,9 +104,12 @@ case class Machine(graph: NameMap[Whatever.Node], state: NameMap[Machine.State])
 
             val newState =
               copy(state = state.put(name,
-                nodeState.copy(input = nodeState.input + (source -> newPending))
+                nodeState.copy(
+                  input = nodeState.input + (source -> newPending),
+                  output = Semigroup.plus(nodeState.output, Map(key.asInstanceOf[aT] -> output).withDefaultValue(Seq.empty))
+                )
               ))
-              .push(name, output: _*)
+              .push(name, output.map { key.asInstanceOf[aT] -> _ }: _*)
 
             newState
           }
