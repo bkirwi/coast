@@ -68,5 +68,20 @@ class ToySpec extends Specification with ScalaCheck {
           results(false).forall { _ % 2 == 0 }
       }
     }
+
+    "accumulate" in {
+
+      val counts = Name[String, Int]("counts")
+      val total = Name[String, Int]("total")
+
+      val graph = for {
+        countsS <- toy.source[String, Int](counts.name)
+        totalS <- toy.registerP("total") {
+          countsS.scanLeft(0) { _ + _ }
+        }
+      } yield ()
+
+      false
+    }
   }
 }

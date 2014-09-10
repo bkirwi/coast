@@ -24,25 +24,6 @@ object Whatever {
       case _ => ???
     }
 
-    def compress[A,B](flow: sys.Flow[A,B]): NameMap[Pairs] = flow match {
-      case sys.Source(name) => NameMap.empty.put(Name(name), Seq.empty: Pairs[A,B])
-      case sys.Transform(upstream, func) => compress(upstream)
-//        .mapValues { _ andThen {
-//        _.flatMap { case (a, b) => func(b).map { a -> _ } }
-//      } }
-//      case sys.GroupBy(upstream, groupBy: (B => A)) => source(upstream).mapValues { _ andThen {
-//        _.map { case (a, b) => groupBy(b) -> b }
-//      } }
-//      case sys.Merge(upstreams) => upstreams.map(source).foldLeft(Map.empty: Info[A, B]) { _ ++ _ }
-    }
-
-//    val compiled = graph.state.mapValues { flow => compress(flow) }
-//
-//    val notify = compiled
-//      .toSeq
-//      .flatMap { case (name, what) => what.keys.map { name -> _ } }
-//      .groupBy { _._1 }.mapValues { _.map { _._2 }}
-
     val nodes = graph.state
       .mapValues(new Mapper[sys.Flow, Node] {
         override def convert[A, B](in: sys.Flow[A, B]) = {
