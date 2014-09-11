@@ -7,7 +7,7 @@ object Whatever {
 
   case class Node[A, B](sources: Map[String, Any => Seq[B]])
 
-  def prepare(sys: System)(graph: sys.Graph[Unit]): Machine = {
+  def prepare(sys: System)(graph: sys.Graph[_]): Machine = {
 
     def compile[A,B](flow: sys.Flow[A,B]): Node[A, B] = flow match {
       case sys.Source(name) => Node(
@@ -21,7 +21,8 @@ object Whatever {
 
         Node(sources)
       }
-      case _ => ???
+      case sys.Scan(upstream, reducer, init) => ???
+      case _ => throw new RuntimeException("Implement next: " + flow)
     }
 
     val nodes = graph.state
