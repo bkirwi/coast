@@ -5,15 +5,17 @@ import com.twitter.algebird.Semigroup
 
 object Whatever {
 
+  case class Data(get: Any) { def as[A]: A = get.asInstanceOf[A] }
+
   case class Node[A, B](sources: Map[String, Any => Seq[B]])
 
-  def prepare(sys: System)(graph: sys.Graph[_]): Machine = {
+  def prepare(graph: Graph[_]): Machine = {
 
-    def compile[A,B](flow: sys.Flow[A,B]): Node[A, B] = flow match {
-      case sys.Source(name) => Node(
+    def compile[A,B](flow: Flow[A,B]): Node[A, B] = flow match {
+      case Source(name) => Node(
         sources = Map(name -> { case b: B @unchecked => Seq(b) })
       )
-      case sys.Transform(upstream, transform) => {
+      case Transform(upstream, transform) => {
         val compiled = compile(upstream)
 
         val sources = compiled.sources
@@ -21,13 +23,13 @@ object Whatever {
 
         Node(sources)
       }
-      case sys.Scan(upstream, reducer, init) => ???
+      case Scan(upstream, reducer, init) => ???
       case _ => throw new RuntimeException("Implement next: " + flow)
     }
 
     val nodes = graph.state
-      .mapValues(new Mapper[sys.Flow, Node] {
-        override def convert[A, B](in: sys.Flow[A, B]) = {
+      .mapValues(new Mapper[Flow, Node] {
+        override def convert[A, B](in: Flow[A, B]) = {
           compile(in)
         }
       })

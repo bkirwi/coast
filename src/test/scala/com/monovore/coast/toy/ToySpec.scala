@@ -14,25 +14,23 @@ class ToySpec extends Specification with ScalaCheck {
 
   "a toy graph" should {
 
-    val toy = new System
-
     val boss = Name[Unit, Int]("boss")
     val mapped = Name[Unit, Int]("mapped")
 
     val graph = for {
-      mapped <- toy.register(mapped.name) { toy.source(boss).map { _ + 1 } }
+      mapped <- Graph.register(mapped.name) { Graph.source(boss).map { _ + 1 } }
     } yield ()
 
     "feed input to a simple system" in prop { (pairs: Seq[(Unit, Int)]) =>
 
-      val machine = Whatever.prepare(toy)(graph).push(boss, pairs: _*)
+      val machine = Whatever.prepare(graph).push(boss, pairs: _*)
 
       machine.state(mapped).source(boss) must_== pairs.groupByKey
     }
 
     "run a simple graph to completion" in prop { (pairs: Seq[(Unit, Int)]) =>
 
-      val machine = Whatever.prepare(toy)(graph)
+      val machine = Whatever.prepare(graph)
         .push(boss, pairs: _*)
 
       Prop.forAll(complete(machine)) { completed =>
@@ -47,13 +45,13 @@ class ToySpec extends Specification with ScalaCheck {
       val boss = Name[Boolean, Int]("boss")
       val mapped = Name[Boolean, Int]("mapped")
 
-      val graph = toy.register(mapped.name) {
-        toy.source(boss).map { _ + 1 }
+      val graph = Graph.register(mapped.name) {
+        Graph.source(boss).map { _ + 1 }
       }
 
       val isEven = integers.map { i => (i % 2 == 0) -> i }
 
-      val machine = Whatever.prepare(toy)(graph)
+      val machine = Whatever.prepare(graph)
         .push(boss, isEven: _*)
 
       Prop.forAll(complete(machine)) { completed =>
@@ -70,8 +68,8 @@ class ToySpec extends Specification with ScalaCheck {
       val counts = Name[String, Int]("counts")
       val total = Name[String, Int]("total")
 
-      val graph = toy.register("total") {
-        toy.source(counts).scanLeft(0) { _ + _ }
+      val graph = Graph.register("total") {
+        Graph.source(counts).scanLeft(0) { _ + _ }
       }
 
       val input = for {
@@ -81,7 +79,7 @@ class ToySpec extends Specification with ScalaCheck {
 
       Prop.forAll(Gen.listOf(input)) { pairs =>
 
-        val machine = Whatever.prepare(toy)(graph)
+        val machine = Whatever.prepare(graph)
           .push(counts, pairs: _*)
 
         val groundTruth = pairs.groupByKey.mapValues { _.sum }
@@ -101,14 +99,14 @@ class ToySpec extends Specification with ScalaCheck {
       val merged = Name[String, Entity]("merged")
 
       for {
-        bucketed <- toy.register("bucketed") {
-          toy.merge(toy.source(entities), toy.source(merged))
+        bucketed <- Graph.register("bucketed") {
+          Graph.merge(Graph.source(entities), Graph.source(merged))
             .flatMap { entity =>
               Seq(entity.item -> entity)
             }
             .groupByKey
         }
-        _ <- toy.register(merged.name) {
+        _ <- Graph.register(merged.name) {
 
           bucketed
             .scanLeft(Set.empty[Entity] -> (None: Option[Entity])) { (state, next) =>
