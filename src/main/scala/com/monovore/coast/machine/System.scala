@@ -1,30 +1,77 @@
 package com.monovore.coast
 package machine
 
-class System[A, B](val state: Map[A, System.NodeState[A, B]]) {
+import com.twitter.algebird.Semigroup
 
-  def push(address: A, message: B): System[A, B] = {
+private[machine] case class Message(get: Any) { def cast[T]: T = get.asInstanceOf[T] }
+private[machine] case class State(get: Any) { def cast[T]: T = get.asInstanceOf[T] }
+private[machine] case class Key(get: Any) { def cast[T]: T = get.asInstanceOf[T] }
 
-    val newState = state(address).listeners
-      .foldLeft(state) { (state, address) =>
-        val node = state(address)
+case class Actor(
+  initialState: State,
+  push: (State -> Message) => (State -> Seq[Message])
+)
 
-        val updated = node.input.updated(None, node.input(None) :+ message)
+object Actor {
 
-        state.updated(address, node.copy(input = updated))
-      }
+  val passthrough = Actor(State(unit), { case (s, m) => s -> Seq(m) } )
 
-    new System(state)
-  }
+  case class Data[Label](state: State, input: Map[Label, Seq[Message]] = Map.empty[Label, Seq[Message]])
 }
 
-object System {
+case class System[Label](
+  nodes: Map[Label, Actor] = Map.empty[Label, Actor],
+  edges: Map[Label, Seq[Label]] = Map.empty[Label, Seq[Label]],
+  state: Map[Label, Map[Key, Actor.Data[Label]]] = Map.empty[Label, Map[Key, Actor.Data[Label]]]
+) {
 
-  case class NodeState[A,B](
-    input: Map[Option[A], Seq[B]],
-    handler: Option[Handler[A, B]],
-    listeners: Set[A]
-  )
+  def push(from: Label, partition: Key, messages: Seq[Message]): System[Label] = {
 
-  case class Handler[A, B](handler: B => (Handler[A, B] -> Map[A, Seq[B]]))
+    val newState = edges.getOrElse(from, Seq.empty)
+      .foldLeft(state) { (state, to) =>
+
+      val targetState = state.getOrElse(to, Map.empty)
+      val partitioned = targetState.getOrElse(partition, Actor.Data(state = nodes.getOrElse(to, Actor.passthrough).initialState))
+      val pushed = partitioned.copy(input = Semigroup.plus(partitioned.input, Map(from -> messages)))
+      state.updated(to, targetState.updated(partition, pushed))
+    }
+
+    copy(state = newState)
+  }
+
+  def process(actor: Label, from: Label, key: Key): (System[Label] -> Seq[Message]) = {
+
+    val updated = {
+      val node = nodes.getOrElse(actor, Actor.passthrough)
+      val actorState = state.getOrElse(actor, Map.empty)
+      val keyState = actorState.getOrElse(key, Actor.Data(node.initialState))
+      val messages = keyState.input.getOrElse(from, Seq.empty)
+
+      assuming(messages.nonEmpty) {
+
+        val (newState, output) = node.push(keyState.state, messages.head)
+
+        val newPartitionState = Actor.Data(newState, keyState.input.updated(from, messages.tail))
+
+        val tidied = copy(state = state.updated(actor, actorState.updated(key, newPartitionState)))
+
+        tidied.push(actor, key, output) -> output
+      }
+    }
+
+    updated getOrElse (this -> Seq.empty)
+  }
+
+  def poke: Set[System[Label] -> Map[Label, Map[Key, Seq[Message]]]] = {
+
+    for {
+      (label -> partitions) <- state.toSet
+      (partition -> partitionState) <- partitions
+      (from -> messages) <- partitionState.input
+      if messages.nonEmpty
+    } yield {
+      val (sent, output) = process(label, from, partition)
+      sent -> Map(label -> Map(partition -> output))
+    }
+  }
 }
