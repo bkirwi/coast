@@ -78,12 +78,12 @@ object Dot {
     val input2 = Name[String, String]("whatever-2")
 
     val graph = for {
-      great <- Graph.register("great") {
+      great <- Graph.label("great") {
         Graph.merge(Graph.source(input), Graph.source(input2))
           .map { _ + "!!!" }
           .map { _ + "???" }
       }
-      _ <- Graph.register("better") {
+      _ <- Graph.label("better") {
         Graph.merge(great, Graph.source(input))
           .map { _.reverse}
       }

@@ -13,15 +13,14 @@ class ExampleSpec extends Specification {
     val merged = Name[String, Entity]("merged")
 
     for {
-      bucketed <- Graph.register("bucketed") {
+      bucketed <- Graph.label("bucketed") {
         Graph.merge(Graph.source(entities), Graph.source(merged))
           .flatMap { entity =>
-          Seq(entity.item -> entity)
-        }
+            Seq(entity.item -> entity)
+          }
           .groupByKey
       }
-      _ <- Graph.register(merged.name) {
-
+      _ <- Graph.sink(merged) {
         bucketed
           .pool(Set.empty[Entity] -> (None: Option[Entity])) { (state, next) =>
             val (set, last) = state

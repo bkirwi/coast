@@ -75,7 +75,11 @@ object Graph {
 
   def source[A,B](name: Name[A,B]): Flow[A, B] = Source(name.name)
 
-  def register[A, B](name: String)(flow: Flow[A, B]): Graph[Flow[A, B]] = {
+  def label[A, B](name: String)(flow: Flow[A, B]): Graph[Flow[A, B]] = {
     Graph(NameMap.empty.put(Name[A,B](name), flow), Source(name))
+  }
+
+  def sink[A, B](name: Name[A, B])(flow: Flow[A, B]): Graph[Flow[A, B]] = {
+    Graph(NameMap.empty.put(name, flow), Source(name.name))
   }
 }
