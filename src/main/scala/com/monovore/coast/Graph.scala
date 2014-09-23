@@ -10,7 +10,7 @@ case class Name[A, B](name: String)
  * @param contents
  * @tparam A
  */
-case class Graph[A](state: toy.NameMap[Flow], contents: A) {
+case class Graph[A](state: NameMap[Flow], contents: A) {
 
   def map[B](func: A => B): Graph[B] = copy(contents = func(contents))
 
@@ -51,7 +51,7 @@ sealed trait Flow[A, +B] {
 
 sealed trait Pool[A, B] extends Flow[A, B] {
 //    def named(name: String): Graph[Pool[A, B]] =
-//      Graph(toy.NameMap.empty.put(Name[A,B](name), ???), ???)
+//      Graph(NameMap.empty.put(Name[A,B](name), ???), ???)
 }
 
 case class Source[A, +B](source: String) extends Flow[A, B]
@@ -73,15 +73,9 @@ object Graph {
 
   def merge[A, B](upstreams: Flow[A, B]*): Flow[A, B] = Merge(upstreams)
 
-//  def source[A,B](name: Name[A,B]): Graph[Flow[A,]]
-
   def source[A,B](name: Name[A,B]): Flow[A, B] = Source(name.name)
 
   def register[A, B](name: String)(flow: Flow[A, B]): Graph[Flow[A, B]] = {
-    Graph(toy.NameMap.empty.put(Name[A,B](name), flow), Source(name))
-  }
-
-  def registerP[A, B](name: String)(flow: Pool[A, B]): Graph[Pool[A, B]] = {
-    Graph(toy.NameMap.empty.put(Name[A,B](name), ???), ???)
+    Graph(NameMap.empty.put(Name[A,B](name), flow), Source(name))
   }
 }
