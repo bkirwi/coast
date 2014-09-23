@@ -9,12 +9,12 @@ private[machine] case class Key(get: Any) { def cast[T]: T = get.asInstanceOf[T]
 
 case class Actor(
   initialState: State,
-  push: (State -> Message) => (State -> Seq[Message])
+  push: (State, Key, Message) => (State, Map[Key, Seq[Message]])
 )
 
 object Actor {
 
-  val passthrough = Actor(State(unit), { case (s, m) => s -> Seq(m) } )
+  val passthrough = Actor(State(unit), { case (s, k, m) => s -> Map(k -> Seq(m)) } )
 
   case class Data[Label](state: State, input: Map[Label, Seq[Message]] = Map.empty[Label, Seq[Message]])
 }
@@ -39,7 +39,7 @@ case class System[Label](
     copy(state = newState)
   }
 
-  def process(actor: Label, from: Label, key: Key): (System[Label] -> Seq[Message]) = {
+  def process(actor: Label, from: Label, key: Key): (System[Label] -> Map[Key, Seq[Message]]) = {
 
     val updated = {
       val node = nodes.getOrElse(actor, Actor.passthrough)
@@ -49,29 +49,29 @@ case class System[Label](
 
       assuming(messages.nonEmpty) {
 
-        val (newState, output) = node.push(keyState.state, messages.head)
+        val (newState, output) = node.push(keyState.state, key, messages.head)
 
         val newPartitionState = Actor.Data(newState, keyState.input.updated(from, messages.tail))
 
         val tidied = copy(state = state.updated(actor, actorState.updated(key, newPartitionState)))
 
-        tidied.push(actor, key, output) -> output
+        output.foldLeft(tidied) { (tidied, kv) => tidied.push(actor, kv._1, kv._2) } -> output
       }
     }
 
-    updated getOrElse (this -> Seq.empty)
+    updated getOrElse (this -> Map.empty)
   }
 
   def poke: Seq[System[Label] -> Map[Label, Map[Key, Seq[Message]]]] = {
 
     for {
       (label -> partitions) <- state.toSeq
-      (partition -> partitionState) <- partitions
+      (key -> partitionState) <- partitions
       (from -> messages) <- partitionState.input
       if messages.nonEmpty
     } yield {
-      val (sent, output) = process(label, from, partition)
-      sent -> Map(label -> Map(partition -> output))
+      val (sent, output) = process(label, from, key)
+      sent -> Map(label -> output)
     }
   }
 }

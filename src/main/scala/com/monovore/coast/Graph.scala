@@ -39,7 +39,7 @@ sealed trait Flow[A, +B] {
 
   def map[B0](func: B => B0): Flow[A, B0] = flatMap(func andThen { b => Seq(b)})
 
-  def scanLeft[B0](init: B0)(func: (B0, B) => B0): Pool[A, B0] = Scan(this, func, init)
+  def pool[B0](init: B0)(func: (B0, B) => B0): Pool[A, B0] = Scan(this, init, func)
 
   def groupBy[A0](func: B => A0): Flow[A0, B] = GroupBy(this, func)
 
@@ -58,7 +58,7 @@ case class Source[A, +B](source: String) extends Flow[A, B]
 
 case class Transform[A, +B, B0](upstream: Flow[A, B0], transformer: B0 => Seq[B]) extends Flow[A, B]
 
-case class Scan[A, B, B0](upstream: Flow[A, B0], reducer: (B, B0) => B, init: B) extends Pool[A, B] {
+case class Scan[A, B, B0](upstream: Flow[A, B0], init: B, reducer: (B, B0) => B) extends Pool[A, B] {
   object flow extends Flow[A, B]
 }
 

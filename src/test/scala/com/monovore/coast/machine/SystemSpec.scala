@@ -31,7 +31,7 @@ class SystemSpec extends Specification {
 
       val (updated, output) = machine.process("target", "source", Key(0))
 
-      output must_== Seq(Message("payload"))
+      output must_== Map(Key(0) -> Seq(Message("payload")))
 
       updated.state("target")(Key(0)).input("source") must beEmpty
     }

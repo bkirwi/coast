@@ -69,7 +69,7 @@ class ToySpec extends Specification with ScalaCheck {
       val total = Name[String, Int]("total")
 
       val graph = Graph.register("total") {
-        Graph.source(counts).scanLeft(0) { _ + _ }
+        Graph.source(counts).pool(0) { _ + _ }
       }
 
       val input = for {
@@ -109,7 +109,7 @@ class ToySpec extends Specification with ScalaCheck {
         _ <- Graph.register(merged.name) {
 
           bucketed
-            .scanLeft(Set.empty[Entity] -> (None: Option[Entity])) { (state, next) =>
+            .pool(Set.empty[Entity] -> (None: Option[Entity])) { (state, next) =>
               val (set, last) = state
               // do merge
               (set + next) -> None

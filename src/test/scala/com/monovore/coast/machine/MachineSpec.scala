@@ -1,6 +1,7 @@
 package com.monovore.coast
 package machine
 
+import com.twitter.algebird.Semigroup
 import org.scalacheck.{Gen, Prop}
 import org.specs2.ScalaCheck
 import org.specs2.mutable._
@@ -13,6 +14,8 @@ class MachineSpec extends Specification with ScalaCheck {
   "a compiled flow" should {
 
     val integers = Name[String, Int]("integers")
+
+    val output = Name[String, Int]("output")
 
     "do a basic deterministic transformation" in {
 
@@ -33,9 +36,75 @@ class MachineSpec extends Specification with ScalaCheck {
       }
     }
 
-    "obey some functor / monad-type laws" in {
+    "support all operations" in {
 
-      val output = Name[String, Int]("output")
+      "pool" in {
+
+        val graph = Graph.register(output.name) {
+          Graph.source(integers).pool(0) { _ + _ }
+        }
+
+        prop { input: Map[String, Seq[Int]] =>
+
+          val expected = input
+            .mapValues { _.scanLeft(0)(_ + _).tail }
+            .filter { case (_ -> v) => v.nonEmpty }
+
+          val compiled = Machine.compile(graph).push(Messages.from(integers, input))
+
+          Prop.forAll(Sample.complete(compiled)) { messages =>
+            messages(output) must_== expected
+          }
+        } set (maxSize = InputSize)
+      }
+
+      "merge" in {
+
+        val integers2 = Name[String, Int]("integers-2")
+
+        val graph = Graph.register(output.name) {
+          Graph.merge(Graph.source(integers), Graph.source(integers2))
+        }
+
+        prop { (input: Map[String, Seq[Int]], input2: Map[String, Seq[Int]]) =>
+
+          val expected = Semigroup.plus(input, input2)
+            .filter { case (_ -> v) => v.nonEmpty }
+            .mapValues { _.sorted }
+
+          val compiled = Machine.compile(graph)
+            .push(Messages.from(integers, input))
+            .push(Messages.from(integers2, input2))
+
+          Prop.forAll(Sample.complete(compiled)) { messages =>
+            messages(output).mapValues { _.sorted } must_== expected
+          }
+        } set (maxSize = InputSize)
+      }
+
+      "groupBy" in {
+
+        val graph = Graph.register(output.name) {
+          Graph.source(integers).groupBy { n => (n % 2 == 0).toString }
+        }
+
+        prop { input: Map[String, Seq[Int]] =>
+
+          val expected = input.values.toSeq.flatten
+            .groupBy { n => (n % 2 == 0).toString }
+            .mapValues { _.sorted }
+
+          val compiled = Machine.compile(graph)
+            .push(Messages.from(integers, input))
+
+          Prop.forAll(Sample.complete(compiled)) { messages =>
+            messages(output).mapValues { _.sorted } must_== expected
+          }
+        } set (maxSize = InputSize)
+      }
+    }
+
+    "obey some functor / monad-type laws" in {
 
       "x.map(identity) === x" in {
 
