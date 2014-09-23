@@ -62,10 +62,10 @@ case class System[Label](
     updated getOrElse (this -> Seq.empty)
   }
 
-  def poke: Set[System[Label] -> Map[Label, Map[Key, Seq[Message]]]] = {
+  def poke: Seq[System[Label] -> Map[Label, Map[Key, Seq[Message]]]] = {
 
     for {
-      (label -> partitions) <- state.toSet
+      (label -> partitions) <- state.toSeq
       (partition -> partitionState) <- partitions
       (from -> messages) <- partitionState.input
       if messages.nonEmpty

@@ -97,6 +97,30 @@ and individual pieces of state can be referred to by the path down through the m
 This makes adding and removing keys free, but changing the overall structure or
 redefining keys is still janky.
 
+Machine Tests
+===
+
+What are you trying to prove?
+
+Flows are equivalent when they publish the same streams, and every possible output
+from one is also a possible output from the other.
+
+When testing laws, we want to declare that two flows are exactly equivalent. In
+theory, this involves generating all possible outputs for each and testing that
+they're identical; in practice we can probably get away with generating a bunch of
+random runs through the first one and testing that it's possible to get the same
+output from the second. This involves a backtracking-type search, but in the normal
+case it should be much more efficient?
+
+When testing backends, we want to assert that the output is a possible output of
+the model. This can use the same backtracking-type search above.
+
+When testing flows, we want to assert some high-level property of the model.
+Generating random runs and checking the property seems to be the thing here as well.
+
+So a) generate random runs and b) check if an output is possible, returning either a
+valid trace or an error.
+
 Principles
 ===
 
