@@ -23,7 +23,7 @@ object Machine {
 
     def compile[A, B](
       downstream: Label, 
-      flow: Flow[A, B]
+      flow: Element[A, B]
     ): (Map[Label, Actor] -> Seq[Label -> Label]) = flow match {
       case Source(name) => {
         Map.empty[Label, Actor] -> Seq(Named(name) -> downstream)
@@ -82,6 +82,7 @@ object Machine {
 
         nodes.updated(id, actor) -> (edges ++ Seq(id -> downstream))
       }
+      case PoolStream(pool) => compile(downstream, pool)
     }
 
     val (nodes, edges) = graph.state.keys.toSeq

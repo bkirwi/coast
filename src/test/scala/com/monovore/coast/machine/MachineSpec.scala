@@ -41,7 +41,7 @@ class MachineSpec extends Specification with ScalaCheck {
       "pool" in {
 
         val graph = Graph.sink(output) {
-          Graph.source(integers).pool(0) { _ + _ }
+          Graph.source(integers).pool(0) { _ + _ }.stream
         }
 
         prop { input: Map[String, Seq[Int]] =>

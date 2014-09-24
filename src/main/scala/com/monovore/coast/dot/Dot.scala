@@ -18,7 +18,7 @@ object Dot {
       (pretty) => { Label(Private(atomic.getAndIncrement), pretty) }
     }
 
-    def sources[A, B](downstream: Label, flow: Flow[A, B]): Seq[(Label, Label)] = flow match {
+    def sources[A, B](downstream: Label, flow: Element[A, B]): Seq[(Label, Label)] = flow match {
       case Source(name) => {
         val label = Label(Public(name), name)
         Seq(label -> downstream)

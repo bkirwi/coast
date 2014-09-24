@@ -27,6 +27,7 @@ class ExampleSpec extends Specification {
             // do merge
             (set + next) -> None
           }
+          .stream
           .map { _._2 }
           .flatten
       }
@@ -48,14 +49,14 @@ class ExampleSpec extends Specification {
 
     val graph = for {
 
-      peoplePool <- Graph.label("people-pool") {
+      peoplePool <- Graph.labelP("people-pool") {
         Graph.source(people)
           .map { case pair @ (_, person) => person.clubId -> pair }
           .groupByKey
           .pool(Map.empty[Int, Person]) { _ + _ }
       }
 
-      clubPool <- Graph.label("club-pool") {
+      clubPool <- Graph.labelP("club-pool") {
         Graph.source(clubs).latestOr(Club())
       }
 

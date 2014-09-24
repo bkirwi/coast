@@ -3,6 +3,7 @@ package com.monovore
 package object coast {
 
   val unit: Unit = ()
+
   def some[A](a: A): Option[A] = Some(a)
 
   type ->[A, B] = (A, B)

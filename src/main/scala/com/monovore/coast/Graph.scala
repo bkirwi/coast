@@ -10,7 +10,7 @@ case class Name[A, B](name: String)
  * @param contents
  * @tparam A
  */
-case class Graph[A](state: Map[String, Flow[_, _]], contents: A) {
+case class Graph[A](state: Map[String, Element[_, _]], contents: A) {
 
   def map[B](func: A => B): Graph[B] = copy(contents = func(contents))
 
@@ -25,7 +25,9 @@ case class Graph[A](state: Map[String, Flow[_, _]], contents: A) {
   }
 }
 
-sealed trait Flow[A, +B] {
+sealed trait Element[A, +B]
+
+sealed trait Flow[A, +B] extends Element[A, B] {
 
   def flatMap[B0](func: B => Seq[B0]): Flow[A, B0] = Transform(this, func)
 
@@ -47,20 +49,33 @@ sealed trait Flow[A, +B] {
   def flatten[B0](implicit func: B => Traversable[B0]) = this.flatMap(func andThen { _.toSeq })
 }
 
-sealed trait Pool[A, B] extends Flow[A, B]
-
 case class Source[A, +B](source: String) extends Flow[A, B]
 
 case class Transform[A, +B, B0](upstream: Flow[A, B0], transformer: B0 => Seq[B]) extends Flow[A, B]
-
-case class Scan[A, B, B0](upstream: Flow[A, B0], init: B, reducer: (B, B0) => B) extends Pool[A, B] {
-  object flow extends Flow[A, B]
-}
 
 case class Merge[A, +B](upstreams: Seq[Flow[A, B]]) extends Flow[A, B]
 
 case class GroupBy[A, B, A0](upstream: Flow[A0, B], groupBy: B => A) extends Flow[A, B]
 
+case class PoolStream[A, B](pool: Pool[A, B]) extends Flow[A, B]
+
+
+sealed trait Pool[A, B] extends Element[A, B] {
+
+  def init: B
+
+  def stream: Flow[A, B] = PoolStream(this)
+
+  def map[B0](function: B => B0): Pool[A, B0] = Mapped(this, function)
+}
+
+case class Static[A, B](init: B, name: String) extends Pool[A, B]
+
+case class Scan[A, B, B0](upstream: Flow[A, B0], init: B, reducer: (B, B0) => B) extends Pool[A, B]
+
+case class Mapped[A, B, B0](upstream: Pool[A, B0], mapper: B0 => B) extends Pool[A, B] {
+  def init: B = mapper(upstream.init)
+}
 
 object Graph {
 
@@ -70,6 +85,10 @@ object Graph {
 
   def label[A, B](name: String)(flow: Flow[A, B]): Graph[Flow[A, B]] = {
     Graph(Map(name -> flow), Source(name))
+  }
+
+  def labelP[A, B](name: String)(flow: Pool[A, B]): Graph[Pool[A, B]] = {
+    Graph(Map(name -> flow), Static(flow.init, name))
   }
 
   def sink[A, B](name: Name[A, B])(flow: Flow[A, B]): Graph[Unit] = {
