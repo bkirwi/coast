@@ -79,7 +79,7 @@ object Graph {
     Graph(NameMap.empty.put(Name[A,B](name), flow), Source(name))
   }
 
-  def sink[A, B](name: Name[A, B])(flow: Flow[A, B]): Graph[Flow[A, B]] = {
-    Graph(NameMap.empty.put(name, flow), Source(name.name))
+  def sink[A, B](name: Name[A, B])(flow: Flow[A, B]): Graph[Unit] = {
+    Graph(NameMap.empty.put(name, flow), ())
   }
 }
