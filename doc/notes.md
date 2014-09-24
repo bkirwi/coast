@@ -36,6 +36,34 @@ Doing the grouping on the downstream end would involve reading all partitions,
 so this needs to happen upstream. Without reading the downstream state, though,
 it can't ensure that it's written each element to the stream exactly once.
 
+In a distributed flow, regrouping is also the only operation that forces
+messages across the wire. This implies that we can get away with only requiring
+labels for regrouped streams. (Of course, more labels can be added to taste.)
+The label doesn't really need to be applied right away -- but it needs to be there
+before any accumulating happens.
+
+This can be managed by tracking the 'regrouped' status in the types. In the same
+way Finagle does the ServiceBuilder et al, `coast` can set a type-level flag when
+grouping happens and use it to control which options are available.
+
+Sinks
+===
+
+A 'sink' is an exported queue, and as such, we'd like to ensure that:
+- our writes to it are exactly-once
+- it contains no 'metadata', just the keys and values we intend
+
+This is a bit tricky! Here's the best I have so far:
+
+Assume the incoming stream is deterministic. We can look at the output stream, and
+see what the latest offset we wrote is. We then replay the input stream from the
+beginning. For every message in the output, we drop and increment until we reach the
+last point that we can find downstream; we then continue to write to the stream as
+normal.
+
+If the input *isn't* deterministic, it seems the best `coast` can do is at-least-once, Samza
+style. For now, we can assume that all the nondeterminism is from grouping and merges, and
+stick this in the types as well.
 
 State
 ===
