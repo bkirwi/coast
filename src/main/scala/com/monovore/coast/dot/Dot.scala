@@ -36,7 +36,7 @@ object Dot {
     val chain = graph.state.keys
       .flatMap { name =>
         val flow = graph.state(name)
-        sources(Label(Public(name.name), name.name), flow)
+        sources(Label(Public(name), name), flow)
       }
 
     val nodes = chain

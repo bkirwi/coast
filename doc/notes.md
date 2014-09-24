@@ -165,3 +165,8 @@ Principles
 - Transparent: It should be simple to see the mapping between the user's flow
   and the compiled version, at least in a black-box way.
 
+Blockers
+===
+
+- Syntax for keyed joins, access to partition key
+- Minimal required labelling

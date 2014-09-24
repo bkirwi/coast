@@ -84,12 +84,12 @@ object Machine {
       }
     }
 
-    val (nodes, edges) = graph.state.keys
+    val (nodes, edges) = graph.state.keys.toSeq
       .map { key =>
 
         val flow = graph.state(key)
 
-        val (nodes, edges) = compile(Named(key.name), flow)
+        val (nodes, edges) = compile(Named(key), flow)
 
         nodes -> edges
       }

@@ -10,7 +10,7 @@ case class Name[A, B](name: String)
  * @param contents
  * @tparam A
  */
-case class Graph[A](state: NameMap[Flow], contents: A) {
+case class Graph[A](state: Map[String, Flow[_, _]], contents: A) {
 
   def map[B](func: A => B): Graph[B] = copy(contents = func(contents))
 
@@ -18,14 +18,10 @@ case class Graph[A](state: NameMap[Flow], contents: A) {
 
     val result = func(contents)
 
-    val updated = result.state.keys
-      .foldLeft(state) { (map, key) =>
-        key match {
-          case name: Name[aT, bT] => map.put(name, result.state.apply(name))
-        }
-      }
+    if (state.keySet.filter(result.state.keySet).nonEmpty)
+      throw new IllegalArgumentException("Reused name binding!")
 
-    Graph(updated, result.contents)
+    Graph(state ++ result.state, result.contents)
   }
 }
 
@@ -51,10 +47,7 @@ sealed trait Flow[A, +B] {
   def flatten[B0](implicit func: B => Traversable[B0]) = this.flatMap(func andThen { _.toSeq })
 }
 
-sealed trait Pool[A, B] extends Flow[A, B] {
-//    def named(name: String): Graph[Pool[A, B]] =
-//      Graph(NameMap.empty.put(Name[A,B](name), ???), ???)
-}
+sealed trait Pool[A, B] extends Flow[A, B]
 
 case class Source[A, +B](source: String) extends Flow[A, B]
 
@@ -68,8 +61,6 @@ case class Merge[A, +B](upstreams: Seq[Flow[A, B]]) extends Flow[A, B]
 
 case class GroupBy[A, B, A0](upstream: Flow[A0, B], groupBy: B => A) extends Flow[A, B]
 
-//  case class Fold[A, B, B0](upstream: Flow[A, B0], init: B, fold: (B, B0) => B) extends Flow[A, B]
-
 
 object Graph {
 
@@ -78,10 +69,10 @@ object Graph {
   def source[A,B](name: Name[A,B]): Flow[A, B] = Source(name.name)
 
   def label[A, B](name: String)(flow: Flow[A, B]): Graph[Flow[A, B]] = {
-    Graph(NameMap.empty.put(Name[A,B](name), flow), Source(name))
+    Graph(Map(name -> flow), Source(name))
   }
 
   def sink[A, B](name: Name[A, B])(flow: Flow[A, B]): Graph[Unit] = {
-    Graph(NameMap.empty.put(name, flow), ())
+    Graph(Map(name.name -> flow), ())
   }
 }
