@@ -23,7 +23,7 @@ object Dot {
         val label = Label(Public(name), name)
         Seq(label -> downstream)
       }
-      case Transform(upstream, _) => {
+      case Transform(upstream, _, _) => {
         val id = newID("transform")
         sources(id, upstream) ++ Seq(id -> downstream)
       }

@@ -28,30 +28,18 @@ object Machine {
       case Source(name) => {
         Map.empty[Label, Actor] -> Seq(Named(name) -> downstream)
       }
-      case Transform(upstream, transform) => {
+      case Transform(upstream, init, transformer) => {
 
         val id = newID()
 
         val (nodes -> edges) = compile(id, upstream)
 
-        val node = Actor(State(unit), { case (s, k, blob) =>
-          s -> Map(k -> transform(blob.cast).map(Message))
+        val node = Actor(State(init), { case (s, k, blob) =>
+          val (newS, messages) = transformer(s.cast, blob.cast)
+          State(newS) -> Map(k -> messages.map(Message(_)))
         })
 
         nodes.updated(id, node) -> (edges ++ Seq(id -> downstream))
-      }
-      case Scan(upstream, init, reduce) => {
-
-        val id = newID()
-
-        val (nodes, edges) = compile(id, upstream)
-
-        val actor = Actor(State(init), { case (s, k, msg) =>
-          val next = reduce(s.cast, msg.cast)
-          State(next) -> Map(k -> Seq(Message(next)))
-        })
-
-        nodes.updated(id, actor) -> (edges ++ Seq(id -> downstream))
       }
       case Merge(upstreams) => {
 
@@ -81,15 +69,6 @@ object Machine {
         })
 
         nodes.updated(id, actor) -> (edges ++ Seq(id -> downstream))
-      }
-      case PoolStream(pool) => compile(downstream, pool)
-      case Mapped(upstream, function) => {
-
-        val id = newID()
-
-        val (nodes, edges) = compile(id, upstream)
-
-        nodes.updated(id, Actor.passthrough) -> (edges ++ Seq(id -> downstream))
       }
     }
 

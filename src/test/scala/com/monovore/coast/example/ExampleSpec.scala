@@ -25,7 +25,7 @@ class ExampleSpec extends Specification {
       }
       _ <- Graph.sink(merged) {
         Graph.merge(bucketed, Graph.source(merged))
-          .pool(Set.empty[Entity] -> (None: Option[Entity])) { (state, next) =>
+          .fold(Set.empty[Entity] -> (None: Option[Entity])) { (state, next) =>
             val (set, last) = state
             // TODO: do merge
             (set + next) -> None
@@ -58,7 +58,7 @@ class ExampleSpec extends Specification {
         Graph.source(people)
           .map { case pair @ (_, person) => person.clubId -> pair }
           .groupByKey
-          .pool(Map.empty[Int, Person]) { _ + _ }
+          .fold(Map.empty[Int, Person]) { _ + _ }
       }
 
       clubPool <- Graph.labelP("club-pool") {

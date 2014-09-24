@@ -25,9 +25,22 @@ case class Graph[A](state: Map[String, Element[_, _]], contents: A) {
 
 sealed trait Element[A, +B]
 
-sealed trait Stream[A, +B] extends Element[A, B] {
+case class Source[A, +B](source: String) extends Element[A, B]
 
-  def flatMap[B0](func: B => Seq[B0]): Stream[A, B0] = Transform(this, func)
+case class Transform[S, A, B0, +B](upstream: Element[A, B0], init: S, transformer: (S -> B0) => (S -> Seq[B])) extends Element[A, B]
+
+case class Merge[A, +B](upstreams: Seq[Element[A, B]]) extends Element[A, B]
+
+case class GroupBy[A, B, A0](upstream: Element[A0, B], groupBy: B => A) extends Element[A, B]
+
+
+trait Stream[A, +B] { self =>
+
+  def element: Element[A, B]
+
+  def flatMap[B0](func: B => Seq[B0]): Stream[A, B0] = new Stream[A, B0] {
+    def element = Transform[Unit, A, B, B0](self.element, (), { case (_, b) => () -> func(b) })
+  }
 
   def filter(func: B => Boolean): Stream[A, B] = flatMap { a =>
     if (func(a)) Seq(a) else Seq.empty
@@ -35,11 +48,21 @@ sealed trait Stream[A, +B] extends Element[A, B] {
 
   def map[B0](func: B => B0): Stream[A, B0] = flatMap(func andThen { b => Seq(b)})
 
-  def pool[B0](init: B0)(func: (B0, B) => B0): Pool[A, B0] = Scan(this, init, func)
+  def fold[B0](init: B0)(func: (B0, B) => B0): Pool[A, B0] = new Pool[A, B0] {
 
-  def latestOr[B0 >: B](init: B0): Pool[A, B0] = Scan(this, init, { (_, b: B0) => b })
+    def initial = init
 
-  def groupBy[A0](func: B => A0): Stream[A0, B] = GroupBy(this, func)
+    def element = Transform[B0, A, B, B0](self.element, init, { case (s, b) =>
+      val newS = func(s, b)
+      newS -> Seq(newS)
+    })
+  }
+
+  def latestOr[B0 >: B](init: B0): Pool[A, B0] = fold(init) { (_, x) => x }
+
+  def groupBy[A0](func: B => A0): Stream[A0, B] = new Stream[A0, B] {
+    def element = GroupBy(self.element, func)
+  }
 
   def groupByKey[A0, B0](implicit asPair: B <:< (A0, B0)) =
     this.groupBy { _._1 }.map { _._2 }
@@ -49,7 +72,7 @@ sealed trait Stream[A, +B] extends Element[A, B] {
   def join[B0](pool: Pool[A, B0]): Stream[A, B -> B0] = {
 
     Graph.merge(pool.stream.map(Left(_)), this.map(Right(_)))
-      .pool(pool.init -> (None: Option[B])) { (state, msg) =>
+      .fold(pool.initial -> (None: Option[B])) { (state, msg) =>
         val (curr, _) = state
         msg match {
           case Left(newState) => (newState -> None)
@@ -64,29 +87,22 @@ sealed trait Stream[A, +B] extends Element[A, B] {
   }
 }
 
-case class Source[A, +B](source: String) extends Stream[A, B]
+sealed trait Pool[A, B] { self =>
 
-case class Transform[A, +B, B0](upstream: Stream[A, B0], transformer: B0 => Seq[B]) extends Stream[A, B]
+  def initial: B
 
-case class Merge[A, +B](upstreams: Seq[Stream[A, B]]) extends Stream[A, B]
+  def element: Element[A, B]
 
-case class GroupBy[A, B, A0](upstream: Stream[A0, B], groupBy: B => A) extends Stream[A, B]
-
-case class PoolStream[A, B](pool: Pool[A, B]) extends Stream[A, B]
-
-
-sealed trait Pool[A, B] extends Element[A, B] {
-
-  def init: B
-
-  def stream: Stream[A, B] = PoolStream(this)
+  def stream: Stream[A, B] = new Stream[A, B] {
+    def element = self.element
+  }
 
   def map[B0](function: B => B0): Pool[A, B0] = // Mapped(this, function)
-    this.stream.map(function).latestOr(function(this.init))
+    this.stream.map(function).latestOr(function(this.initial))
 
   def join[B0](other: Pool[A, B0]): Pool[A, (B, B0)] = {
     Graph.merge(this.stream.map(Left(_)), other.stream.map(Right(_)))
-      .pool(this.init, other.init) { (state, update) =>
+      .fold(this.initial, other.initial) { (state, update) =>
         update.fold(
           { left => (left, state._2) },
           { right => (state._1, right) }
@@ -95,30 +111,31 @@ sealed trait Pool[A, B] extends Element[A, B] {
   }
 }
 
-case class Static[A, B](init: B, name: String) extends Pool[A, B]
-
-case class Scan[A, B, B0](upstream: Stream[A, B0], init: B, reducer: (B, B0) => B) extends Pool[A, B]
-
-case class Mapped[A, B, B0](upstream: Pool[A, B0], mapper: B0 => B) extends Pool[A, B] {
-  def init: B = mapper(upstream.init)
-}
-
 object Graph {
 
-  def merge[A, B](upstreams: Stream[A, B]*): Stream[A, B] = Merge(upstreams)
+  def merge[A, B](upstreams: Stream[A, B]*): Stream[A, B] = new Stream[A, B] {
+    def element = Merge(upstreams.map { _.element })
+  }
 
-  def source[A,B](name: Name[A,B]): Stream[A, B] = Source(name.name)
+  def source[A,B](name: Name[A,B]): Stream[A, B] = new Stream[A, B] {
+    def element = Source(name.name)
+  }
 
   def label[A, B](name: String)(flow: Stream[A, B]): Graph[Stream[A, B]] = {
-    Graph(Map(name -> flow), Source(name))
+    Graph(Map(name -> flow.element), new Stream[A, B] {
+      def element = Source(name)
+    })
   }
 
   // TODO: clean up this nonsense with a typeclass
   def labelP[A, B](name: String)(flow: Pool[A, B]): Graph[Pool[A, B]] = {
-    Graph(Map(name -> flow), Static(flow.init, name))
+    Graph(Map(name -> flow.element), new Pool[A, B] {
+      def initial = flow.initial
+      def element = Source(name)
+    })
   }
 
   def sink[A, B](name: Name[A, B])(flow: Stream[A, B]): Graph[Unit] = {
-    Graph(Map(name.name -> flow), ())
+    Graph(Map(name.name -> flow.element), ())
   }
 }
