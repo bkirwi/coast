@@ -45,6 +45,23 @@ sealed trait Stream[A, +B] extends Element[A, B] {
     this.groupBy { _._1 }.map { _._2 }
 
   def flatten[B0](implicit func: B => Traversable[B0]) = this.flatMap(func andThen { _.toSeq })
+
+  def join[B0](pool: Pool[A, B0]): Stream[A, B -> B0] = {
+
+    Graph.merge(pool.stream.map(Left(_)), this.map(Right(_)))
+      .pool(pool.init -> (None: Option[B])) { (state, msg) =>
+        val (curr, _) = state
+        msg match {
+          case Left(newState) => (newState -> None)
+          case Right(b) => (curr -> Some(b))
+        }
+      }
+      .stream
+      .flatMap {
+        case (s, Some(b)) => Seq(b -> s)
+        case (s, None) => Nil
+      }
+  }
 }
 
 case class Source[A, +B](source: String) extends Stream[A, B]
