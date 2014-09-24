@@ -41,6 +41,8 @@ sealed trait Flow[A, +B] {
 
   def pool[B0](init: B0)(func: (B0, B) => B0): Pool[A, B0] = Scan(this, init, func)
 
+  def latestOr[B0 >: B](init: B0): Pool[A, B0] = Scan(this, init, { (_, b: B0) => b })
+
   def groupBy[A0](func: B => A0): Flow[A0, B] = GroupBy(this, func)
 
   def groupByKey[A0, B0](implicit asPair: B <:< (A0, B0)) =
