@@ -7,29 +7,34 @@ class ExampleSpec extends Specification {
 
   "a dswoosh implementation" should {
 
-    case class Entity(item: String, name: String, minPrice: Double)
+    case class Entity(name: String, tags: Set[String], priceRange: (Double, Double))
+
+    def buckets(entity: Entity): Seq[Int] = {
+      val (low, high) = entity.priceRange
+      low.toInt to high.toInt
+    }
 
     val entities = Name[String, Entity]("entities")
-    val merged = Name[String, Entity]("merged")
+    val merged = Name[Int, Entity]("merged")
 
     val graph = for {
       bucketed <- Graph.label("bucketed") {
-        Graph.merge(Graph.source(entities), Graph.source(merged))
-          .flatMap { entity =>
-            Seq(entity.item -> entity)
-          }
+        Graph.source(entities)
+          .flatMap { entity => buckets(entity).map { _ -> entity } }
           .groupByKey
       }
       _ <- Graph.sink(merged) {
-        bucketed
+        Graph.merge(bucketed, Graph.source(merged))
           .pool(Set.empty[Entity] -> (None: Option[Entity])) { (state, next) =>
             val (set, last) = state
-            // do merge
+            // TODO: do merge
             (set + next) -> None
           }
           .stream
           .map { _._2 }
           .flatten
+          .flatMap { entity => buckets(entity).map { _ -> entity } }
+          .groupByKey
       }
     } yield ()
 
@@ -60,7 +65,12 @@ class ExampleSpec extends Specification {
         Graph.source(clubs).latestOr(Club())
       }
 
-      // JOIN!
+      x = {
+        (clubPool join peoplePool join peoplePool)
+          .map { case (club -> members -> members2) =>
+            "GREAT"
+          }
+      }
     } yield ()
 
     "do nothing" in true

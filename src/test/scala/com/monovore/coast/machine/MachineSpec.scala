@@ -132,7 +132,7 @@ class MachineSpec extends Specification with ScalaCheck {
         } set (maxSize = InputSize)
       }
 
-      "x.flatMap(f).flatMap(g) === x.flatMap(f andThen { _.flatMap(g) })" in {
+      "stream.flatMap(f).flatMap(g) === stream.flatMap(f andThen { _.flatMap(g) })" in {
 
         val f: (Int => Seq[Int]) = { x => Seq(x, x) }
         val g: (Int => Seq[Int]) = { x => Seq(x + 6) }
@@ -146,7 +146,7 @@ class MachineSpec extends Specification with ScalaCheck {
         } set (maxSize = InputSize)
       }
 
-      "x.flatMap(lift) === x" in {
+      "stream.flatMap(lift) === stream" in {
 
         val noop = Graph.sink(output) { Graph.source(integers) }
         val mapped = Graph.sink(output) { Graph.source(integers).flatMap { x => List(x) } }
@@ -154,6 +154,36 @@ class MachineSpec extends Specification with ScalaCheck {
         prop { (pairs: Map[String, Seq[Int]]) =>
 
           equivalent(Messages.from(integers, pairs), noop, mapped)
+        } set (maxSize = InputSize)
+      }
+
+      "pool.map(identity) === pool" in {
+
+        val pool = Graph.source(integers).latestOr(0)
+
+        val original = Graph.sink(output) { pool.stream }
+        val mapped = Graph.sink(output) { pool.map(identity).stream }
+
+        prop { (pairs: Map[String, Seq[Int]]) =>
+
+          equivalent(Messages.from(integers, pairs), original, mapped)
+
+        } set (maxSize = InputSize)
+      }
+
+      "pool.map(f).map(g) === pool.map(f andThen g)" in {
+
+        val f: (Int => Int) = { _ * 2 }
+        val g: (Int => Int) = { _ + 6 }
+
+        val pool = Graph.source(integers).latestOr(0)
+
+        val original = Graph.sink(output) { pool.map(f andThen g).stream }
+        val mapped = Graph.sink(output) { pool.map(f).map(g).stream }
+
+        prop { (pairs: Map[String, Seq[Int]]) =>
+
+          equivalent(Messages.from(integers, pairs), original, mapped)
         } set (maxSize = InputSize)
       }
     }

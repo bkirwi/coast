@@ -83,6 +83,14 @@ object Machine {
         nodes.updated(id, actor) -> (edges ++ Seq(id -> downstream))
       }
       case PoolStream(pool) => compile(downstream, pool)
+      case Mapped(upstream, function) => {
+
+        val id = newID()
+
+        val (nodes, edges) = compile(id, upstream)
+
+        nodes.updated(id, Actor.passthrough) -> (edges ++ Seq(id -> downstream))
+      }
     }
 
     val (nodes, edges) = graph.state.keys.toSeq

@@ -66,7 +66,18 @@ sealed trait Pool[A, B] extends Element[A, B] {
 
   def stream: Flow[A, B] = PoolStream(this)
 
-  def map[B0](function: B => B0): Pool[A, B0] = Mapped(this, function)
+  def map[B0](function: B => B0): Pool[A, B0] = // Mapped(this, function)
+    this.stream.map(function).latestOr(function(this.init))
+
+  def join[B0](other: Pool[A, B0]): Pool[A, (B, B0)] = {
+    Graph.merge(this.stream.map(Left(_)), other.stream.map(Right(_)))
+      .pool(this.init, other.init) { (state, update) =>
+        update.fold(
+          { left => (left, state._2) },
+          { right => (state._1, right) }
+        )
+      }
+  }
 }
 
 case class Static[A, B](init: B, name: String) extends Pool[A, B]
@@ -87,6 +98,7 @@ object Graph {
     Graph(Map(name -> flow), Source(name))
   }
 
+  // TODO: clean up this nonsense with a typeclass
   def labelP[A, B](name: String)(flow: Pool[A, B]): Graph[Pool[A, B]] = {
     Graph(Map(name -> flow), Static(flow.init, name))
   }
