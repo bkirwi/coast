@@ -54,14 +54,14 @@ class ExampleSpec extends Specification {
 
     val graph = for {
 
-      peoplePool <- Graph.labelP("people-pool") {
+      peoplePool <- Graph.label("people-pool") {
         Graph.source(people)
           .map { case pair @ (_, person) => person.clubId -> pair }
           .groupByKey
           .fold(Map.empty[Int, Person]) { _ + _ }
       }
 
-      clubPool <- Graph.labelP("club-pool") {
+      clubPool <- Graph.label("club-pool") {
         Graph.source(clubs).latestOr(Club())
       }
 

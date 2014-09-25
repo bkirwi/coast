@@ -31,6 +31,7 @@ case class Transform[S, A, B0, +B](upstream: Element[A, B0], init: S, transforme
 
 case class Merge[A, +B](upstreams: Seq[Element[A, B]]) extends Element[A, B]
 
+// TODO: I'm not sure about the co- / contra-variance here... double-check?
 case class GroupBy[A, B, A0](upstream: Element[A0, B], groupBy: B => A) extends Element[A, B]
 
 
@@ -113,6 +114,8 @@ sealed trait Pool[A, B] { self =>
 
 object Graph {
 
+
+
   def merge[A, B](upstreams: Stream[A, B]*): Stream[A, B] = new Stream[A, B] {
     def element = Merge(upstreams.map { _.element })
   }
@@ -121,19 +124,27 @@ object Graph {
     def element = Source(name.name)
   }
 
-  def label[A, B](name: String)(flow: Stream[A, B]): Graph[Stream[A, B]] = {
-    Graph(Map(name -> flow.element), new Stream[A, B] {
-      def element = Source(name)
-    })
+  sealed trait Labellable[A] { def label(name: String, value: A): Graph[A] }
+
+  implicit def labelStreams[A, B]: Labellable[Stream[A, B]] = new Labellable[Stream[A, B]] {
+    override def label(name: String, value: Stream[A, B]): Graph[Stream[A, B]] = {
+      Graph(Map(name -> value.element), new Stream[A, B] {
+        def element = Source(name)
+      })
+    }
   }
 
-  // TODO: clean up this nonsense with a typeclass
-  def labelP[A, B](name: String)(flow: Pool[A, B]): Graph[Pool[A, B]] = {
-    Graph(Map(name -> flow.element), new Pool[A, B] {
-      def initial = flow.initial
-      def element = Source(name)
-    })
+  implicit def labelPools[A, B]: Labellable[Pool[A, B]] = new Labellable[Pool[A, B]] {
+    override def label(name: String, value: Pool[A, B]): Graph[Pool[A, B]] = {
+      Graph(Map(name -> value.element), new Pool[A, B] {
+        def initial = value.initial
+        def element = Source(name)
+      })
+    }
   }
+
+  def label[A](name: String)(value: A)(implicit lbl: Labellable[A]): Graph[A] =
+    lbl.label(name, value)
 
   def sink[A, B](name: Name[A, B])(flow: Stream[A, B]): Graph[Unit] = {
     Graph(Map(name.name -> flow.element), ())
