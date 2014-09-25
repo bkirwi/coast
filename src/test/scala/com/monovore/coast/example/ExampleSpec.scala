@@ -5,35 +5,47 @@ import org.specs2.mutable._
 
 class ExampleSpec extends Specification {
 
-  "a dswoosh implementation" should {
+  "a distributed entity resolution flow" should {
 
     case class Entity(name: String, tags: Set[String], priceRange: (Double, Double))
 
-    def buckets(entity: Entity): Seq[Int] = {
+    def scope(entity: Entity): Seq[Int] = {
       val (low, high) = entity.priceRange
       low.toInt to high.toInt
     }
 
+    def matches(a: Entity, b: Entity): Boolean = {
+      a == b // TODO: real matching
+    }
+
+    def merge(a: Entity, b: Entity): Entity = {
+      val (mins, maxs) = Seq(a.priceRange, b.priceRange).unzip
+      Entity(a.name, a.tags ++ b.tags, mins.min -> maxs.max)
+    }
+
     val entities = Name[String, Entity]("entities")
+
     val merged = Name[Int, Entity]("merged")
 
     val graph = for {
-      bucketed <- Graph.label("bucketed") {
+
+      // Group input into the correct scopes
+      scoped <- Graph.label("bucketed") {
         Graph.source(entities)
-          .flatMap { entity => buckets(entity).map { _ -> entity } }
+          .flatMap { entity => scope(entity).map { _ -> entity } }
           .groupByKey
       }
+
+      // Take all 'new' entities and (re)merge them
+      // Note the circular definition here, as entities created by the merge
+      // get piped back in.
       _ <- Graph.sink(merged) {
-        Graph.merge(bucketed, Graph.source(merged))
-          .fold(Set.empty[Entity] -> (None: Option[Entity])) { (state, next) =>
-            val (set, last) = state
-            // TODO: do merge
-            (set + next) -> None
+        Graph.merge(scoped, Graph.source(merged))
+          .transform(Set.empty[Entity]) { (entities, nextEntity) =>
+            // TODO: real swoosh
+            (entities + nextEntity) -> Seq.empty
           }
-          .stream
-          .map { _._2 }
-          .flatten
-          .flatMap { entity => buckets(entity).map { _ -> entity } }
+          .flatMap { entity => scope(entity).map { _ -> entity } }
           .groupByKey
       }
     } yield ()
@@ -43,17 +55,18 @@ class ExampleSpec extends Specification {
 
   "a denormalized indexing implementation" should {
 
+    // TODO: less dumb example
     case class Club()
-
     case class Person(clubId: Int = 0)
-
-    val clubs = Name[Int, Club]("clubs")
 
     // TODO: make keys visible everywhere
     val people = Name[Int, Int -> Person]("people")
+    val clubs = Name[Int, Club]("clubs")
+    val both = Name[Int, Club -> Set[Person]]("both")
 
     val graph = for {
 
+      // Roll up 'people' under their club id
       peoplePool <- Graph.label("people-pool") {
         Graph.source(people)
           .map { case pair @ (_, person) => person.clubId -> pair }
@@ -61,15 +74,18 @@ class ExampleSpec extends Specification {
           .fold(Map.empty[Int, Person]) { _ + _ }
       }
 
+      // Roll up clubs under their id
       clubPool <- Graph.label("club-pool") {
         Graph.source(clubs).latestOr(Club())
       }
 
-      x = {
-        (clubPool join peoplePool join peoplePool)
-          .map { case (club -> members -> members2) =>
-            "GREAT"
+      // Join, and a trivial transformation
+      _ <- Graph.sink(both) {
+        (clubPool join peoplePool)
+          .map { case (club -> members) =>
+            club -> members.values.toSet
           }
+          .stream
       }
     } yield ()
 
