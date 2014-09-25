@@ -35,7 +35,7 @@ object Machine {
         val (nodes -> edges) = compile(id, upstream)
 
         val node = Actor(State(init), { case (s, k, blob) =>
-          val (newS, messages) = transformer(s.cast, blob.cast)
+          val (newS, messages) = transformer(k.cast)(s.cast, blob.cast)
           State(newS) -> Map(k -> messages.map(Message(_)))
         })
 

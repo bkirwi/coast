@@ -1,5 +1,7 @@
 package com.monovore.coast
 
+import scala.language.higherKinds
+
 case class Name[A, B](name: String)
 
 /**
@@ -27,7 +29,7 @@ sealed trait Element[A, +B]
 
 case class Source[A, +B](source: String) extends Element[A, B]
 
-case class Transform[S, A, B0, +B](upstream: Element[A, B0], init: S, transformer: (S, B0) => (S, Seq[B])) extends Element[A, B]
+case class Transform[S, A, B0, +B](upstream: Element[A, B0], init: S, transformer: A => (S, B0) => (S, Seq[B])) extends Element[A, B]
 
 case class Merge[A, +B](upstreams: Seq[Element[A, B]]) extends Element[A, B]
 
@@ -35,34 +37,64 @@ case class Merge[A, +B](upstreams: Seq[Element[A, B]]) extends Element[A, B]
 case class GroupBy[A, B, A0](upstream: Element[A0, B], groupBy: B => A) extends Element[A, B]
 
 
-trait Stream[A, +B] { self =>
+trait StreamOps[A, +B] { self =>
+
+  type WithKey[+X]
+
+  // TODO: Applicative? Monad?
+  protected def withKey[X](wk: WithKey[X]): (A => X)
+  protected def mapKeyed[X, Y](x: WithKey[X])(fn: X => Y): WithKey[Y]
 
   def element: Element[A, B]
 
-  def transform[S, B0](init: S)(func: (S, B) => (S, Seq[B0])): Stream[A, B0] = new Stream[A, B0] {
-    def element = Transform[S, A, B, B0](self.element, init, { (s, b) => func(s, b) })
+  def stream = make(element)
+
+  def make[A0, B0](elem: Element[A0, B0]): Stream[A0, B0] =
+    new Stream[A0, B0] { def element: Element[A0, B0] = elem }
+
+  def flatMap[B0](func: WithKey[B => Seq[B0]]): Stream[A, B0] = make[A, B0] {
+    Transform[Unit, A, B, B0](self.element, (), {
+      withKey(func) andThen { unkeyed =>
+        (s: Unit, b: B) => s -> unkeyed(b) }
+      }
+    )
   }
 
-  def flatMap[B0](func: B => Seq[B0]): Stream[A, B0] =
-    transform(unit) { (_: Unit, b) => () -> func(b) }
-
-  def filter(func: B => Boolean): Stream[A, B] = flatMap { a =>
-    if (func(a)) Seq(a) else Seq.empty
+  def filter(func: WithKey[B => Boolean]): Stream[A, B] = flatMap {
+    mapKeyed(func) { func =>
+      { a => if (func(a)) Seq(a) else Seq.empty }
+    }
   }
 
-  def map[B0](func: B => B0): Stream[A, B0] = flatMap(func andThen { b => Seq(b)})
+  def map[B0](func: WithKey[B => B0]): Stream[A, B0] =
+    flatMap(mapKeyed(func) { func => func andThen { b => Seq(b)} })
 
-  def fold[B0](init: B0)(func: (B0, B) => B0): Pool[A, B0] = new Pool[A, B0] {
+  def transform[S, B0](init: S)(func: WithKey[(S, B) => (S, Seq[B0])]): Stream[A, B0] = {
 
-    def initial = init
+    val keyedFunc = withKey(func)
 
-    def element = Transform[B0, A, B, B0](self.element, init, { case (s, b) =>
-      val newS = func(s, b)
-      newS -> Seq(newS)
-    })
+    new Stream[A, B0] {
+      def element = Transform[S, A, B, B0](self.element, init, keyedFunc)
+    }
   }
 
-  def latestOr[B0 >: B](init: B0): Pool[A, B0] = fold(init) { (_, x) => x }
+  def fold[B0](init: B0)(func: WithKey[(B0, B) => B0]): Pool[A, B0] = {
+
+    val transformer = mapKeyed(func) { fn =>
+
+      (s: B0, b: B) => {
+        val b0 = fn(s, b)
+        b0 -> Seq(b0)
+      }
+    }
+
+    new Pool[A, B0] {
+      override def initial: B0 = init
+      override def element: Element[A, B0] = Transform(self.element, init, withKey(transformer))
+    }
+  }
+
+  def latestOr[B0 >: B](init: B0): Pool[A, B0] = stream.fold(init) { (_, x) => x }
 
   def groupBy[A0](func: B => A0): Stream[A0, B] = new Stream[A0, B] {
     def element = GroupBy(self.element, func)
@@ -71,18 +103,36 @@ trait Stream[A, +B] { self =>
   def groupByKey[A0, B0](implicit asPair: B <:< (A0, B0)) =
     this.groupBy { _._1 }.map { _._2 }
 
-  def flatten[B0](implicit func: B => Traversable[B0]) = this.flatMap(func andThen { _.toSeq })
+  def flatten[B0](implicit func: B => Traversable[B0]) = stream.flatMap(func andThen { _.toSeq })
 
   def join[B0](pool: Pool[A, B0]): Stream[A, B -> B0] = {
 
-    Graph.merge(pool.stream.map(Left(_)), this.map(Right(_)))
-      .transform(pool.initial) { (state, msg) =>
+    Graph.merge(pool.stream.map(Left(_)), stream.map(Right(_)))
+      .transform(pool.initial) { (state: B0, msg: Either[B0, B]) =>
         msg match {
           case Left(newState) => newState -> Seq.empty
           case Right(msg) => state -> Seq(msg -> state)
         }
       }
   }
+}
+
+trait Stream[A, +B] extends StreamOps[A, B] { stream =>
+
+  override type WithKey[+X] = X
+
+  override protected def withKey[X](wk: WithKey[X]): (A) => X = { _ => wk }
+  override protected def mapKeyed[X, Y](x: WithKey[X])(fn: (X) => Y): WithKey[Y] = fn(x)
+
+  def withKeys: KeyedOps[A, B] = KeyedOps(stream.element)
+}
+
+case class KeyedOps[A, +B](element: Element[A, B]) extends StreamOps[A, B] {
+
+  override type WithKey[+X] = A => X
+
+  override protected def withKey[X](wk: WithKey[X]): (A) => X = wk
+  override protected def mapKeyed[X, Y](x: WithKey[X])(fn: (X) => Y): WithKey[Y] = x andThen fn
 }
 
 sealed trait Pool[A, B] { self =>

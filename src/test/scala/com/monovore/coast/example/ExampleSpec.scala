@@ -60,7 +60,7 @@ class ExampleSpec extends Specification {
     case class Person(clubId: Int = 0)
 
     // TODO: make keys visible everywhere
-    val people = Name[Int, Int -> Person]("people")
+    val people = Name[Int, Person]("people")
     val clubs = Name[Int, Club]("clubs")
     val both = Name[Int, Club -> Set[Person]]("both")
 
@@ -69,7 +69,7 @@ class ExampleSpec extends Specification {
       // Roll up 'people' under their club id
       peoplePool <- Graph.label("people-pool") {
         Graph.source(people)
-          .map { case pair @ (_, person) => person.clubId -> pair }
+          .withKeys.map { key => person => person.clubId -> (key -> person) }
           .groupByKey
           .fold(Map.empty[Int, Person]) { _ + _ }
       }
