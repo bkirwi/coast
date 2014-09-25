@@ -31,6 +31,10 @@ object Dot {
         val id = newID("merge")
         upstreams.map { up => sources(id, up) }.flatten ++ Seq(id -> downstream)
       }
+      case GroupBy(upstream, _) => {
+        val id = newID("groupBy")
+        sources(id, upstream) ++ Seq(id -> downstream)
+      }
     }
 
     val chain = graph.state.keys
