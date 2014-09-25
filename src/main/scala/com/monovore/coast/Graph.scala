@@ -27,7 +27,7 @@ sealed trait Element[A, +B]
 
 case class Source[A, +B](source: String) extends Element[A, B]
 
-case class Transform[S, A, B0, +B](upstream: Element[A, B0], init: S, transformer: (S -> B0) => (S -> Seq[B])) extends Element[A, B]
+case class Transform[S, A, B0, +B](upstream: Element[A, B0], init: S, transformer: (S, B0) => (S, Seq[B])) extends Element[A, B]
 
 case class Merge[A, +B](upstreams: Seq[Element[A, B]]) extends Element[A, B]
 
@@ -39,9 +39,12 @@ trait Stream[A, +B] { self =>
 
   def element: Element[A, B]
 
-  def flatMap[B0](func: B => Seq[B0]): Stream[A, B0] = new Stream[A, B0] {
-    def element = Transform[Unit, A, B, B0](self.element, (), { case (_, b) => () -> func(b) })
+  def transform[S, B0](init: S)(func: (S, B) => (S, Seq[B0])): Stream[A, B0] = new Stream[A, B0] {
+    def element = Transform[S, A, B, B0](self.element, init, { (s, b) => func(s, b) })
   }
+
+  def flatMap[B0](func: B => Seq[B0]): Stream[A, B0] =
+    transform(unit) { (_: Unit, b) => () -> func(b) }
 
   def filter(func: B => Boolean): Stream[A, B] = flatMap { a =>
     if (func(a)) Seq(a) else Seq.empty
@@ -73,17 +76,11 @@ trait Stream[A, +B] { self =>
   def join[B0](pool: Pool[A, B0]): Stream[A, B -> B0] = {
 
     Graph.merge(pool.stream.map(Left(_)), this.map(Right(_)))
-      .fold(pool.initial -> (None: Option[B])) { (state, msg) =>
-        val (curr, _) = state
+      .transform(pool.initial) { (state, msg) =>
         msg match {
-          case Left(newState) => (newState -> None)
-          case Right(b) => (curr -> Some(b))
+          case Left(newState) => newState -> Seq.empty
+          case Right(msg) => state -> Seq(msg -> state)
         }
-      }
-      .stream
-      .flatMap {
-        case (s, Some(b)) => Seq(b -> s)
-        case (s, None) => Nil
       }
   }
 }
@@ -113,8 +110,6 @@ sealed trait Pool[A, B] { self =>
 }
 
 object Graph {
-
-
 
   def merge[A, B](upstreams: Stream[A, B]*): Stream[A, B] = new Stream[A, B] {
     def element = Merge(upstreams.map { _.element })
