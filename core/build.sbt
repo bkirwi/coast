@@ -1,10 +1,4 @@
 
-name := "coast"
-
-scalaVersion := "2.10.4"
-
-scalacOptions := Seq("-feature")
-
 libraryDependencies ++= Seq(
   "com.chuusai" % "shapeless_2.10.4" % "2.0.0",
   "com.twitter" %% "algebird-core" % "0.7.0",
