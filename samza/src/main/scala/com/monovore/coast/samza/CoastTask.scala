@@ -5,7 +5,7 @@ import org.apache.samza.config.Config
 import org.apache.samza.system.{SystemStream, OutgoingMessageEnvelope, IncomingMessageEnvelope}
 import org.apache.samza.task._
 
-class Whatever extends StreamTask with InitableTask {
+class CoastTask extends StreamTask with InitableTask {
 
   override def init(config: Config, context: TaskContext): Unit = {
     val thing = config.get("string")
