@@ -14,6 +14,9 @@ object CoastBuild extends Build {
     scalaVersion  in ThisBuild := "2.10.4",
     scalacOptions in ThisBuild := Seq("-feature"),
 
+    // make it possible to cancel forked processes with ctrl-c
+    cancelable in Global := true,
+
     // No tests in aggregate project
     test := ()
   )
