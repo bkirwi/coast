@@ -11,7 +11,7 @@ object Dot {
 
   case class Label(global: LabelType, pretty: String)
 
-  def apply(graph: Graph[_]): String = {
+  def apply(graph: Flow[_]): String = {
 
     val newID: String => Label = {
       val atomic = new AtomicInteger()
@@ -37,9 +37,8 @@ object Dot {
       }
     }
 
-    val chain = graph.state.keys
-      .flatMap { name =>
-        val flow = graph.state(name)
+    val chain = graph.state
+      .flatMap { case (name -> flow) =>
         sources(Label(Public(name), name), flow)
       }
 
@@ -82,13 +81,13 @@ object Dot {
     val input2 = Name[String, String]("whatever-2")
 
     val graph = for {
-      great <- Graph.label("great") {
-        Graph.merge(Graph.source(input), Graph.source(input2))
+      great <- Flow.label("great") {
+        Flow.merge(Flow.source(input), Flow.source(input2))
           .map { _ + "!!!" }
           .map { _ + "???" }
       }
-      _ <- Graph.label("better") {
-        Graph.merge(great, Graph.source(input))
+      _ <- Flow.label("better") {
+        Flow.merge(great, Flow.source(input))
           .map { _.reverse}
       }
     } yield ()

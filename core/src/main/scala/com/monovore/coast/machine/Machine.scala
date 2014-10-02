@@ -9,7 +9,7 @@ object Machine {
   case class Named(name: String) extends Label
   case class Anonymous(index: Int) extends Label
 
-  def compile(graph: Graph[_]): Machine = {
+  def compile(graph: Flow[_]): Machine = {
 
     val newID = {
 
@@ -72,10 +72,8 @@ object Machine {
       }
     }
 
-    val (nodes, edges) = graph.state.keys.toSeq
-      .map { key =>
-
-        val flow = graph.state(key)
+    val (nodes, edges) = graph.state
+      .map { case (key -> flow) =>
 
         val (nodes, edges) = compile(Named(key), flow)
 

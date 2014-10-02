@@ -30,8 +30,8 @@ class ExampleSpec extends Specification {
     val graph = for {
 
       // Group input into the correct scopes
-      scoped <- Graph.label("bucketed") {
-        Graph.source(entities)
+      scoped <- Flow.label("bucketed") {
+        Flow.source(entities)
           .flatMap { entity => scope(entity).map { _ -> entity } }
           .groupByKey
       }
@@ -39,8 +39,8 @@ class ExampleSpec extends Specification {
       // Take all 'new' entities and (re)merge them
       // Note the circular definition here, as entities created by the merge
       // get piped back in.
-      _ <- Graph.sink(merged) {
-        Graph.merge(scoped, Graph.source(merged))
+      _ <- Flow.sink(merged) {
+        Flow.merge(scoped, Flow.source(merged))
           .transform(Set.empty[Entity]) { (entities, nextEntity) =>
             // TODO: real swoosh
             (entities + nextEntity) -> Seq.empty
@@ -67,20 +67,20 @@ class ExampleSpec extends Specification {
     val graph = for {
 
       // Roll up 'people' under their club id
-      peoplePool <- Graph.label("people-pool") {
-        Graph.source(people)
+      peoplePool <- Flow.label("people-pool") {
+        Flow.source(people)
           .withKeys.map { key => person => person.clubId -> (key -> person) }
           .groupByKey
           .fold(Map.empty[Int, Person]) { _ + _ }
       }
 
       // Roll up clubs under their id
-      clubPool <- Graph.label("club-pool") {
-        Graph.source(clubs).latestOr(Club())
+      clubPool <- Flow.label("club-pool") {
+        Flow.source(clubs).latestOr(Club())
       }
 
       // Join, and a trivial transformation
-      _ <- Graph.sink(both) {
+      _ <- Flow.sink(both) {
         (clubPool join peoplePool)
           .map { case (club -> members) =>
             club -> members.values.toSet

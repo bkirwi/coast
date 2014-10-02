@@ -71,7 +71,7 @@ trait StreamOps[A, +B] { self =>
 
   def join[B0](pool: Pool[A, B0]): Stream[A, B -> B0] = {
 
-    Graph.merge(pool.stream.map(Left(_)), stream.map(Right(_)))
+    Flow.merge(pool.stream.map(Left(_)), stream.map(Right(_)))
       .transform(pool.initial) { (state: B0, msg: Either[B0, B]) =>
       msg match {
         case Left(newState) => newState -> Seq.empty
@@ -113,7 +113,7 @@ trait Pool[A, B] { self =>
     stream.map(function).latestOr(function(initial))
 
   def join[B0](other: Pool[A, B0]): Pool[A, (B, B0)] =
-    Graph.merge(stream.map(Left(_)), other.stream.map(Right(_)))
+    Flow.merge(stream.map(Left(_)), other.stream.map(Right(_)))
       .fold(initial, other.initial) { (state, update) =>
         update.fold(
           { left => (left, state._2) },
