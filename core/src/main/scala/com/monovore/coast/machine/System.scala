@@ -3,9 +3,9 @@ package machine
 
 import com.twitter.algebird.Semigroup
 
-private[machine] case class Message(get: Any) { def cast[T]: T = get.asInstanceOf[T] }
-private[machine] case class State(get: Any) { def cast[T]: T = get.asInstanceOf[T] }
-private[machine] case class Key(get: Any) { def cast[T]: T = get.asInstanceOf[T] }
+case class Message(get: Any) { def cast[T]: T = get.asInstanceOf[T] }
+case class State(get: Any) { def cast[T]: T = get.asInstanceOf[T] }
+case class Key(get: Any) { def cast[T]: T = get.asInstanceOf[T] }
 
 case class Actor(
   initialState: State,

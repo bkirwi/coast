@@ -13,6 +13,7 @@ object CoastBuild extends Build {
     // global project settings
     scalaVersion  in ThisBuild := "2.10.4",
     scalacOptions in ThisBuild := Seq("-feature"),
+    resolvers in ThisBuild += "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/",
 
     // make it possible to cancel forked processes with ctrl-c
     cancelable in Global := true,
