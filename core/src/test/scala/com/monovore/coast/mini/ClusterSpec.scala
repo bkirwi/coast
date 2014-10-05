@@ -26,15 +26,15 @@ class ClusterSpec extends Specification with ScalaCheck {
 
       cluster.send(source, input: _*)
 
-//      for (_ <- 1 to 6) {
-//        cluster.whileRunning(flow) { _ => Thread.sleep(10) }
-//      }
+      for (_ <- 1 to 6) {
+        cluster.whileRunning(flow) { _ => Thread.sleep(10) }
+      }
 
       cluster.whileRunning(flow) { running =>
         running.complete()
       }
 
-      val output = cluster.output(sink)(sink)
+      val output = cluster.messages(sink)(sink)
 
       output must_== input.groupByKey.mapValues { _.scanLeft(0) { _ + _ }.tail }
     }
