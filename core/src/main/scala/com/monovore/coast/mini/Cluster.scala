@@ -5,9 +5,12 @@ import java.util.concurrent.{Executors, LinkedBlockingQueue, BlockingQueue}
 
 import com.monovore.coast.machine.{Messages, Key, Message}
 
-sealed trait Thing[A, B]
-case class Data[A, B](pair: A -> B) extends Thing[A, B]
-case class Offset[A, B](offset: Int) extends Thing[A, B]
+import scala.util.control.NonFatal
+
+trait Thing[+A, +B]
+case class Data[+A, +B](key: A, value: B) extends Thing[A, B]
+case class Offset(offset: Int) extends Thing[Nothing, Nothing]
+case object Ready extends Thing[Nothing, Nothing]
 
 class Cluster(log: Log[String, Key -> Message]) {
 
@@ -19,7 +22,7 @@ class Cluster(log: Log[String, Key -> Message]) {
       .foreach { pair => log.push(name.name, pair) }
   }
 
-  def output(names: Name[_, _]*): Messages = Messages(
+  def messages(names: Name[_, _]*): Messages = Messages(
     names
       .map { name =>
         name.name -> log.fetchAll(name.name).groupByKey
@@ -27,9 +30,26 @@ class Cluster(log: Log[String, Key -> Message]) {
       .toMap
   )
 
-  trait Task {
-    @volatile var idle: Boolean = false
-    def step(): Unit
+  abstract class Task { task =>
+
+    @volatile private[this] var _ready: Boolean = false
+    def ready = _ready
+
+    @volatile private[this] var _idle: Boolean = false
+    def idle = _idle
+
+    def prod(): Unit = {
+      if (!ready) _ready = {
+        val x = prepare()
+        if (x) println("READY!!")
+        x
+      }
+      else _idle = step()
+    }
+
+    def prepare(): Boolean
+
+    def step(): Boolean
   }
 
   def whileRunning[A](flow: Flow[_])(block: RunningFlow => A): A = {
@@ -44,26 +64,37 @@ class Cluster(log: Log[String, Key -> Message]) {
 
     def compile[A, B](
       element: Element[A, B],
-      queue: BlockingQueue[Thing[A, B]]
+      downstream: BlockingQueue[Thing[A, B]]
     ): Seq[Task] = element match {
+
       case Source(name) => {
+
         val task = new Task {
 
           private[this] var offset: Int = 0
 
-          def step(): Unit = {
+          override def prepare(): Boolean = {
 
-            log.fetch(name, offset) match {
-              case Some(k -> v) => {
-                queue.put(Offset(offset))
-                queue.put(Data(k.cast -> v.cast))
-                offset += 1
-                idle = false
-              }
-              case None => {
-                idle = true
-              }
+            val next = Option(downstream.poll())
+
+            next collect {
+              case Offset(o) => offset = o
             }
+
+            next.collect { case Ready => true } getOrElse false
+          }
+
+          def step(): Boolean = {
+
+            val fetched = log.fetch(name, offset)
+
+            fetched foreach { case k -> v =>
+              downstream.put(Offset(offset))
+              downstream.put(Data(k.cast, v.cast))
+              offset += 1
+            }
+
+            fetched.isEmpty
           }
         }
 
@@ -82,29 +113,41 @@ class Cluster(log: Log[String, Key -> Message]) {
 
             @volatile private[this] var state: Map[A, S] = Map.empty.withDefaultValue(init)
 
-            override def step(): Unit = {
+            override def prepare(): Boolean = {
+
+              val next = Option(downstream.poll())
+
+              next collect {
+                case Offset(o) => upQueue.put(Offset(o))
+                case Ready => upQueue.put(Ready)
+              }
+
+              next.collect { case Ready => true } getOrElse false
+            }
+
+            override def step(): Boolean = {
 
               val next = Option(upQueue.poll())
 
               next foreach {
-                case Data(k -> msg) => {
+                case Data(k, msg) => {
                   val (newState, out) = transformer(k)(state(k), msg)
                   state += (k -> newState)
-                  out.foreach { msg => queue.put(Data(k -> msg)) }
+                  out.foreach { msg => queue.put(Data(k, msg)) }
                 }
                 case Offset(o) => {
                   queue.put(Offset(o))
                 }
               }
 
-              idle = next.isEmpty
+              next.isEmpty
             }
           }
 
           upstreamTask :+ myTask
         }
 
-        doFor(queue, upstream, init, transformer)
+        doFor(downstream, upstream, init, transformer)
       }
     }
 
@@ -125,16 +168,34 @@ class Cluster(log: Log[String, Key -> Message]) {
 
       val downstream = new Task {
 
-        private[this] var offset: Int = myCheckpoint
+        private[this] var checkpointOffset: Int = 0
+
+        private[this] var offset: Int = 0
 
         private[this] val skipUntil: Int = log.fetchAll(sink).size
 
-        def step(): Unit = {
+        override def prepare(): Boolean = {
+
+          val next = log.fetch(checkpoints, checkpointOffset)
+
+          next foreach { msg =>
+            val (upstream, checkpoint) = msg._2.cast[Int -> Int]
+            offset = checkpoint
+            checkpointOffset += 1
+            queue.put(Offset(upstream))
+          }
+
+          if (next.isEmpty) queue.put(Ready)
+
+          next.isEmpty
+        }
+
+        def step(): Boolean = {
 
           val next = Option(queue.poll())
 
           next foreach {
-            case Data(k -> msg) => {
+            case Data(k, msg) => {
               if (offset >= skipUntil) log.push(sink, Key(k) -> Message(msg))
               offset += 1
             }
@@ -143,7 +204,7 @@ class Cluster(log: Log[String, Key -> Message]) {
             }
           }
 
-          idle = next.isEmpty
+          next.isEmpty
         }
       }
 
@@ -165,8 +226,13 @@ class Cluster(log: Log[String, Key -> Message]) {
 
       val runnable = new Runnable {
         override def run(): Unit = {
-          task.step()
-//          Thread.sleep(4)
+
+          try {
+            task.prod()
+          } catch {
+            case NonFatal(e) => e.printStackTrace()
+          }
+
           executor.submit(this)
         }
       }
@@ -179,39 +245,15 @@ class Cluster(log: Log[String, Key -> Message]) {
 
     def complete(): Unit = tasks foreach { task =>
 
-      while (!task.idle) Thread.sleep(10)
+      var count: Int = 0
 
+      while (!task.idle) {
+        count += 1
+        if (count > 500) {
+          sys.error("Taking forever!")
+        }
+        Thread.sleep(10)
+      }
     }
-
-//    class Consumer(input: String, output: BlockingQueue[Key -> Message]) extends Runnable {
-//
-//      @volatile private[this] var offset: Int = 0
-//
-//      def isComplete(): Boolean = log.fetch(input, offset).isEmpty
-//
-//      override def run(): Unit = {
-//
-//        while (true) {
-//
-//          for {
-//            next <- log.fetch(input, offset)
-//          } {
-//            output.put(next)
-//            offset += 1
-//          }
-//        }
-//      }
-//    }
-//
-//    class Processor(input: BlockingQueue[Key -> Message], process: (Key -> Message) => Unit) extends Runnable {
-//
-//      override def run(): Unit = {
-//
-//        while (true) {
-//          val next = input.take()
-//          process(next)
-//        }
-//      }
-//    }
   }
 }
