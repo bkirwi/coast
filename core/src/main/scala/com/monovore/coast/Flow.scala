@@ -4,25 +4,25 @@ case class Name[A, B](name: String)
 
 /**
  * A mechanism for maintaining name bindings.
- * @param state
- * @param contents
+ * @param bindings
+ * @param value
  * @tparam A
  */
-case class Flow[A](state: Seq[String -> Element[_, _]], contents: A) {
+case class Flow[A](bindings: Seq[String -> Element[_, _]], value: A) {
 
-  def map[B](func: A => B): Flow[B] = copy(contents = func(contents))
+  def map[B](func: A => B): Flow[B] = copy(value = func(value))
 
   def flatMap[B](func: A => Flow[B]): Flow[B] = {
 
-    val result = func(contents)
+    val result = func(value)
 
-    val duplicateName = state.exists { case (name, _) =>
-      result.state.exists { case (other, _) => name == other }
+    val duplicateName = bindings.exists { case (name, _) =>
+      result.bindings.exists { case (other, _) => name == other }
     }
 
     if (duplicateName) throw new IllegalArgumentException("Reused name binding!")
 
-    Flow(state ++ result.state, result.contents)
+    Flow(bindings ++ result.bindings, result.value)
   }
 }
 

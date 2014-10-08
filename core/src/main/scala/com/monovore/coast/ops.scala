@@ -73,11 +73,11 @@ trait StreamOps[A, +B] { self =>
 
     Flow.merge(pool.stream.map(Left(_)), stream.map(Right(_)))
       .transform(pool.initial) { (state: B0, msg: Either[B0, B]) =>
-      msg match {
-        case Left(newState) => newState -> Seq.empty
-        case Right(msg) => state -> Seq(msg -> state)
+        msg match {
+          case Left(newState) => newState -> Seq.empty
+          case Right(msg) => state -> Seq(msg -> state)
+        }
       }
-    }
   }
 }
 

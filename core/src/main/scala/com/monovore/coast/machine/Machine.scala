@@ -72,7 +72,7 @@ object Machine {
       }
     }
 
-    val (nodes, edges) = graph.state
+    val (nodes, edges) = graph.bindings
       .map { case (key -> flow) =>
 
         val (nodes, edges) = compile(Named(key), flow)

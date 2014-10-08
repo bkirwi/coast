@@ -37,7 +37,7 @@ object Dot {
       }
     }
 
-    val chain = graph.state
+    val chain = graph.bindings
       .flatMap { case (name -> flow) =>
         sources(Label(Public(name), name), flow)
       }
