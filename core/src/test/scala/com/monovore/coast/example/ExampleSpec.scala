@@ -91,4 +91,38 @@ class ExampleSpec extends Specification {
 
     "do nothing" in true
   }
+
+  "a reach calculation" should {
+
+    type UserID = String
+    type Link = String
+
+    val followers = Name[UserID, UserID]("new-followers")
+    val tweets = Name[UserID, Link]("tweets")
+
+    val reach = Name[Link, Int]("reach")
+
+    val flow = for {
+
+      followerStream <- Flow.label("follower-stream") {
+
+        val followersByUser =
+          Flow.source(followers).fold(Set.empty[UserID]) { _ + _ }
+
+        Flow.source(tweets)
+          .join(followersByUser)
+          .groupByKey
+      }
+
+      _ <- Flow.sink(reach) {
+        followerStream
+          .fold(Set.empty[UserID]) { _ ++ _ }
+          .map { _.size }
+          .stream
+      }
+
+    } yield ()
+
+    "do nothing" in true
+  }
 }
