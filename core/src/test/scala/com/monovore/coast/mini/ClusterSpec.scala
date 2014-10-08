@@ -9,7 +9,7 @@ class ClusterSpec extends Specification with ScalaCheck {
 
   "a mini-cluster" should {
 
-    "behave correctly" in {
+    "behave correctly" in prop { (x: Int) =>
 
       val source = Name[String, Int]("source")
       val sink = Name[String, Int]("sink")
@@ -20,21 +20,23 @@ class ClusterSpec extends Specification with ScalaCheck {
         }
       } yield ()
 
-      val cluster = new Cluster()
+      val input = (1 to 1000).map { n => s"great-${n % 4}" -> n }
 
-      val input = (1 to 500).map { n => s"great-${n % 4}" -> n }
+      val actors = new Actors(Log.empty())
 
-      cluster.send(source, input: _*)
+      actors.send(source, input: _*)
 
-      for (_ <- 1 to 6) {
-        cluster.whileRunning(flow) { _ => Thread.sleep(10) }
+      for (i <- 1 to 40) {
+        actors.withRunning(flow) { system =>
+          Thread.sleep(4)
+        }
       }
 
-      cluster.whileRunning(flow) { running =>
-        running.complete()
+      actors.withRunning(flow) { system =>
+        Thread.sleep(1000)
       }
 
-      val output = cluster.messages(sink)(sink)
+      val output = actors.messages(sink)(sink)
 
       output must_== input.groupByKey.mapValues { _.scanLeft(0) { _ + _ }.tail }
     }
