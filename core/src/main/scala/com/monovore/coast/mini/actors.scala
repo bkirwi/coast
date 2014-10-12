@@ -204,11 +204,13 @@ object SinkActor {
 
 class MergeActor(upstreamProps: Seq[Props], logName: String, log: Log[String, Key -> Message]) extends Actor { actor =>
 
+  class Upstream(val ref: ActorRef, val queue: mutable.Queue[NewMessage], var offset: Int)
+
   val upstreams =
     upstreamProps.zipWithIndex
       .map { case (ps, ix) =>
         val ref = context.actorOf(ps, s"merged-$ix")
-        ref -> mutable.Queue[NewMessage]()
+        new Upstream(ref, mutable.Queue[NewMessage](), 0)
       }
 
   var offset: Int = 0
@@ -216,9 +218,13 @@ class MergeActor(upstreamProps: Seq[Props], logName: String, log: Log[String, Ke
   var highWater: Int = 0
 
   override def receive: Receive = {
-    case Offset(offset, None) => actor.offset = offset
+    case Offset(offset, None) => actor.highWater = offset
+    case Checkpoint(offset, upstr, None) => {
+      actor.offset = ???
+    }
     case Ready => {
       self ! Ready
+      upstreams.foreach { _.ref ! Ready }
       context.become(process(context.sender()))
     }
   }
@@ -231,10 +237,10 @@ class MergeActor(upstreamProps: Seq[Props], logName: String, log: Log[String, Ke
       nextChoice match {
         case Some(_ -> Message(ix: Int)) => { // pre-chosen
 
-          val (ref, queue) = upstreams(ix)
+          val up = upstreams(ix)
 
-          if (queue.nonEmpty) {
-            val toSend = queue.dequeue()
+          if (up.queue.nonEmpty) {
+            val toSend = up.queue.dequeue()
             downstream ! toSend
             actor.offset += 1
             downstream ! Offset(actor.offset, None)
@@ -242,12 +248,42 @@ class MergeActor(upstreamProps: Seq[Props], logName: String, log: Log[String, Ke
           }
         }
         case None => {
-          upstreams.foreach { case (_, queue) =>
-            queue.foreach { context.self ! _ }
-            queue.clear()
+          upstreams.foreach { up =>
+            up.queue.foreach { context.self ! _ }
+            up.queue.clear()
           }
         }
       }
     }
   }
+}
+
+object MergeActor {
+
+  def make(upstreams: Seq[Props], name: String, log: Log[String, Key -> Message]): Props =
+    Props(new MergeActor(upstreams, name, log))
+}
+
+object Fuuuuuu {
+
+  class Src {
+
+    var offset: Int = 0
+
+    def go = {
+
+      def bootstrap = bootstrapStream.next()
+        .flatMap {
+          case None => unit
+          case Some(o) => {
+            offset = o
+            bootstrap
+          }
+        }
+
+
+    }
+
+  }
+
 }

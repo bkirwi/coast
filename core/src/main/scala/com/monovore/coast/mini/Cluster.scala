@@ -42,6 +42,10 @@ class Cluster(log: Log[String, Key -> Message]) {
         TransformActor.make(upstreamProps, init, transformer)
       }
 
+      case Merge(upstreams) => {
+        val upstreamProps = upstreams.map(compile)
+        MergeActor.make(upstreamProps, "coast-merges", log)
+      }
     }
 
     val roots = flow.bindings
@@ -60,7 +64,7 @@ class Cluster(log: Log[String, Key -> Message]) {
 
     val actors = ActorSystem.create("whatever", config)
 
-    actors.eventStream.setLogLevel(Logging.ErrorLevel)
+    actors.eventStream.setLogLevel(Logging.DebugLevel)
 
     roots.map { p =>
       val ref = actors.actorOf(p)

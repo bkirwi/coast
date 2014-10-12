@@ -16,11 +16,13 @@ class ClusterSpec extends Specification with ScalaCheck {
 
       val flow = for {
         _ <- Flow.sink(sink) {
-          Flow.source(source).fold(0) { _ + _ }.stream.fold(0) { _ + _ }.stream
+          Flow.merge(Flow.source(source), Flow.source(source))
         }
       } yield ()
 
-      val input = (1 to 200).map { n => s"great-${n % 4}" -> n }
+      val inputSize = 200
+
+      val input = (1 to inputSize).map { n => s"great-${n % 4}" -> n }
 
       val actors = new Cluster(Log.empty())
 
@@ -38,7 +40,7 @@ class ClusterSpec extends Specification with ScalaCheck {
 
       val output = actors.messages(sink)(sink)
 
-      output must_== input.groupByKey.mapValues { _.scanLeft(0) { _ + _ }.tail.scanLeft(0) { _ + _ }.tail }
+      output.values.map { _.size }.sum must_== (inputSize * 2)
     }
   }
 }

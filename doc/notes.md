@@ -190,4 +190,21 @@ arbitrary amount of input before producing any output. On the other hand,
 if you care about the order in which you get your input,
 you need *some* way to control where your input comes from.
 
+This is doubly important for merge nodes, which go through the following life-
+cycle:
 
+- State is restored from a checkpoint, including:
+  - The 'high-water mark', which is the largest offset in the log
+    that was confirmed downstream. Given the data in the log, this implies a
+    high-water mark for the incoming streams as well. (Checkpoint this?)
+  - The 'current' offset for all incoming streams, as regular checkpoints.
+
+- Start the incoming streams, dropping input until their individual high-water
+  marks.
+
+- From our high-water mark, continue replaying until the log is exhausted
+
+- Start taking arbitrary messages from upstream, logging our choices
+
+This is a complicated flow, and involves both 'pulling' and 'pushing' data.
+'Just' push might be acceptable, as long as
