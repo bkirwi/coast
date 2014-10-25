@@ -207,4 +207,44 @@ cycle:
 - Start taking arbitrary messages from upstream, logging our choices
 
 This is a complicated flow, and involves both 'pulling' and 'pushing' data.
-'Just' push might be acceptable, as long as
+'Just' push might be acceptable, as long as there's a mechanism for backpressure;
+for example, a disruptor-queue-based implementation would probably be pretty
+straightforward.
+
+Thinking about a Samza- or Storm-backed implementation, there's another related
+issue. The spout or input chooser or whatever needs to replay the sources after
+a failure. Consider:
+
+```scala
+Flow.merge(numbers.map { 1 to _ }, other)
+  .doWhatever
+```
+
+If `coast` logs the merge choices exactly where the merge happens, there's no
+1-1 correspondence between the offset in numbers and the offset of the input
+that's fed to the merge. If the spout is feeding input in one at a time, there's
+almost certainly going to need to be some internal buffering in the merge
+implementation, which is lame. There's no upper bound to how much buffering
+needs to happen. The disruptor-based implementation would handle this just fine.
+
+An alternative situation is to 'pull' all the merges to the top. The spout /
+thing could handle all the replay and selection itself... but this implies that
+the implementation would have to completely process each element before starting
+on the next one. This is an admissable implementation, but it's a bit weird that
+it can't represent as many interleavings as a more general version could. The
+only time I can imagine this causing trouble is if: each message from one source
+could produce a large number of intermediate messages, and we have a second
+source which we'd always like to handle promptly. BUT that's probably not a huge
+problem?
+
+So I'm relatively convinced: it's not worth the pain of trying to have one
+core model for both a 'native' and 'spouty' implementation, since they have a
+different structure and keep different state. Of course, this just shifts things
+to a different pain of having two implementations: but hey, life is suffering.
+
+So, a different implementation:
+
+Replay the checkpoint stream. The 'spout' tracks the current offset in each
+source; the 'bolt' applies all the state updates or whatever. Then, replay the
+merge stream, taking input from the appropriate upstream and sending it out.
+Then, just send whatever and remember what you pick.
