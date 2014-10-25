@@ -70,27 +70,38 @@ State
 
 State is hard!
 
-Node schematic:
+For every (input, intermediate, final) stream, we can calculate the 'offset', or
+distance from the beginning. We need this to get exactly-once semantics for
+inputs and state. We probably don't want to reify this unless we need it, since
+it could interfere with some refactorings.
 
-```
-Stream[A,B0]  Stream[A,B1]  Stream[A,B2]
-  |              |              |
-  |              |              |      (S, BN) -> (S, Seq[B)
-  \--------------+--------------/
-                 |
-               merge
-                 |
-  /--------------+--------------\
-  |              |              |
-Stream[A, S]  Stream[A, B]  Stream[A0, B0]
- (state)       (output)      (groupBy)
-```
+(This is a good argument for separating stateful and stateless transformations,
+incidentally.)
 
-NB: every stream should be emitted under its own name. Kafka will give us back
-the offset from that, and then we can emit to the grouped stream using that
-offset. This will make it easier to dedup on the client, since we can then
-guarantee that everything with the same (stream, offset) are identical and
-consistent.
+'Essential' state is the data necessary to fully determine the 'value' of the
+stream. All input is essential; some intermediate results are as well, iff they
+couldn't be recomputed. For example, when merging streams the order is essential
+state, since we need to be able to reproduce it on demand.
+
+'Incedental' state is not strictly necessary -- it's kept around to avoid huge
+amounts of repeated work. The most obvious is source offsets: we could
+theoretically replay the input data from scratch every time, though we may not
+want to. Same deal with the state in a fold / etc. Changing the frequency / etc.
+at which this is recorded shouldn't change the results. OHOH, this data needs to
+be always consistent. In particular, the downstream state must always be at
+least as recent as the upstream state... we can always skip repeated values, but
+we can't spirit up missing ones.
+
+One way to ensure this is to stick these state changes into the data stream.
+This avoids a bunch of concurrency / visibility issues.
+
+This sounds like a two-step-type process... we do all the wiring, everybody
+reads checkpoints from their downstream until they get some sigil value, then
+starts their regular processing.
+
+Merges are interesting, since they involve both some essential state (the
+selection order) and some checkpointy stuff (how much has been emitted so far).
+Seems like it should be doable as well, though.
 
 Names for State
 ===
@@ -168,5 +179,32 @@ Principles
 Blockers
 ===
 
-- Syntax for keyed joins, access to partition key
 - Minimal required labelling
+- Actual Backend
+
+Pull vs. Push
+===
+
+It's hard to put a time-cap on 'pull', since you may need to consume an
+arbitrary amount of input before producing any output. On the other hand,
+if you care about the order in which you get your input,
+you need *some* way to control where your input comes from.
+
+This is doubly important for merge nodes, which go through the following life-
+cycle:
+
+- State is restored from a checkpoint, including:
+  - The 'high-water mark', which is the largest offset in the log
+    that was confirmed downstream. Given the data in the log, this implies a
+    high-water mark for the incoming streams as well. (Checkpoint this?)
+  - The 'current' offset for all incoming streams, as regular checkpoints.
+
+- Start the incoming streams, dropping input until their individual high-water
+  marks.
+
+- From our high-water mark, continue replaying until the log is exhausted
+
+- Start taking arbitrary messages from upstream, logging our choices
+
+This is a complicated flow, and involves both 'pulling' and 'pushing' data.
+'Just' push might be acceptable, as long as
