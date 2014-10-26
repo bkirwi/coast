@@ -7,8 +7,25 @@ import org.apache.samza.task._
 
 class CoastTask extends StreamTask with InitableTask {
 
+  var collector: MessageCollector = _
+  var sink: MessageSink.ByteSink = _
+
   override def init(config: Config, context: TaskContext): Unit = {
-    val thing = config.get("string")
+
+    val factory = SerializationUtil.fromBase64[MessageSink.Factory](config.get(Samza.TaskKey))
+    val output = config.get(Samza.TaskName)
+
+    val finalSink = new MessageSink.ByteSink {
+
+      override def execute(stream: String, key: Array[Byte], value: Array[Byte]): Unit = {
+
+        val out = new OutgoingMessageEnvelope(new SystemStream("kafka", output), key, value)
+
+        collector.send(out)
+      }
+    }
+
+    sink = factory.make(config, context, finalSink)
   }
 
   override def process(
@@ -17,15 +34,12 @@ class CoastTask extends StreamTask with InitableTask {
     coordinator: TaskCoordinator
   ): Unit = {
 
-    val key = envelope.getKey
-    val offset = envelope.getOffset
-    val message = envelope.getMessage
+    val stream = envelope.getSystemStreamPartition.getSystemStream.getStream
+    val key = Option(envelope.getKey.asInstanceOf[Array[Byte]]).getOrElse(Array.empty[Byte])
+    val message = envelope.getMessage.asInstanceOf[Array[Byte]]
 
-    collector.send(new OutgoingMessageEnvelope(
-      new SystemStream("system", "stream"),
-      "partitionKey",
-      "key",
-      "message"
-    ))
+    this.collector = collector
+
+    sink.execute(stream, key, message)
   }
 }

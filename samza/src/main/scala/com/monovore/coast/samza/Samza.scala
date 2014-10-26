@@ -1,88 +1,94 @@
 package com.monovore.coast
 package samza
 
-import java.io.{ObjectOutputStream, ByteArrayOutputStream}
-
-import com.google.common.io.BaseEncoding
-import com.monovore.coast.samza.SamzaTasklet.Message
 import org.apache.samza.config.{Config, MapConfig}
-import org.apache.samza.job.local.LocalJobFactory
 
 import scala.collection.JavaConverters._
 
 object Samza {
 
-  val Encoding = BaseEncoding.base64Url.omitPadding
-
-  def compile[A, B](ent: Element[A, B]): (Seq[String], SamzaTasklet) = ent match {
-    case Source(name) => Seq(name) -> new SamzaTasklet {
-      override def execute(message: Message): Seq[Message] = Seq.empty
-    }
-  }
-
   val KafkaBrokers = "192.168.80.20:9092"
   val ZookeeperHosts = "192.168.80.20:2181"
 
-  def toConfig(graph: Flow[_]): Seq[Config] = {
+  val TaskKey = "coast.task.serialized.base64"
+  val TaskName = "coast.task.name"
 
-    val configs = graph.bindings.map { case (name -> element) =>
+  def formatPath(path: List[String]): String = {
+    if (path.isEmpty) "/"
+    else path.reverse.map { "/" + _ }.mkString
+  }
 
-      val (inputs, thing) = compile(element)
+  private[this] def sourcesFor[A, B](element: Element[A, B]): Set[String] = element match {
+    case Source(name) => Set(name)
+    case Transform(up, _, _) => sourcesFor(up)
+    case Merge(ups) => ups.flatMap(sourcesFor).toSet
+    case GroupBy(up, _) => sourcesFor(up)
+  }
 
-      val textThing = {
-        val baos = new ByteArrayOutputStream()
-        val oos = new ObjectOutputStream(baos)
-        oos.writeObject(thing)
-        oos.close()
-        Encoding.encode(baos.toByteArray)
-      }
+  private[this] def storageFor[A, B](element: Element[A, B], path: List[String]): Set[String] = element match {
+    case Source(_) => Set.empty
+    case PureTransform(up, _) => storageFor(up, path)
+    case Merge(ups) => {
+      ups.zipWithIndex
+        .map { case (up, i) => storageFor(up, s"merge-$i" :: path)}
+        .flatten.toSet
+    }
+    case Aggregate(up, _, _) => {
+      val upstreamed = storageFor(up, "aggregated" :: path)
+      upstreamed + Samza.formatPath(path)
+    }
+    case GroupBy(up, _) => storageFor(up, path)
+  }
+
+  def configFor(flow: Flow[_])(
+    system: String = "kafka",
+    baseConfig: Config = new MapConfig()
+  ): Map[String, Config] = {
+
+    val baseConfigMap = baseConfig.asScala.toMap
+
+    val configs = flow.bindings.map { case (name -> element) =>
+
+      val inputs = sourcesFor(element)
+
+      val factory: MessageSink.Factory = new MessageSink.FromElement(element)
+
+      val storage = storageFor(element, List(name))
 
       val configMap = Map(
 
         // Job
-        "job.factory.class" -> "samza.job.local.LocalJobFactory",
         "job.name" -> name,
 
         // Task
         "task.class" -> "com.monovore.coast.samza.CoastTask",
-        "task.inputs" -> inputs.map { i => s"kafka.$i" }.mkString(","),
+        "task.inputs" -> inputs.map { i => s"$system.$i"}.mkString(","),
 
-        // Systems
-        "systems.kafka.samza.factory" -> "org.apache.samza.system.kafka.KafkaSystemFactory",
-        "systems.kafka.consumer.zookeeper.connect" -> ZookeeperHosts,
-        "systems.kafka.producer.metadata.broker.list" -> KafkaBrokers,
+        "serializers.registry.string.class" -> "org.apache.samza.serializers.StringSerdeFactory",
 
-        "coast.task.serialized.base64" -> textThing
+        // Coast-specific
+        TaskKey -> SerializationUtil.toBase64(factory),
+        TaskName -> name
       )
 
-      new MapConfig(configMap.asJava)
+      val storageMap = storage
+        .map { name =>
+
+          Map(
+            s"stores.$name.factory" -> "org.apache.samza.storage.kv.KeyValueStorageEngineFactory",
+            s"stores.$name.key.serde" -> "string",
+            s"stores.$name.msg.serde" -> "string"
+          )
+        }
+        .flatten.toMap
+
+      name -> new MapConfig(
+        (baseConfigMap ++ configMap ++ storageMap).asJava
+      )
     }
 
-    configs.toSeq
+    configs.toMap
   }
 
-  def main(args: Array[String]): Unit = {
-
-    val Metrics = Name[String, String]("metrics")
-
-    val graph = for {
-
-      _ <- Graph.label("bitches") {
-        Graph.source(Metrics)
-      }
-
-    } yield ()
-
-    val factory = new LocalJobFactory
-
-    val jobs = toConfig(graph)
-      .map { config =>
-        println(config)
-        factory.getJob(config)
-      }
-
-    jobs.foreach { _.submit() }
-
-    println("cool!")
-  }
+  def config(pairs: (String -> String)*): Config = new MapConfig(pairs.toMap.asJava)
 }
