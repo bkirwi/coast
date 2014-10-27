@@ -18,9 +18,9 @@ trait StreamOps[A, +B] { self =>
     new Stream[A0, B0] { def element: Element[A0, B0] = elem }
 
   def flatMap[B0](func: WithKey[B => Seq[B0]]): Stream[A, B0] = make[A, B0] {
-    Transform[Unit, A, B, B0](self.element, (), {
+    PureTransform[A, B, B0](self.element, {
       withKey(func) andThen { unkeyed =>
-        (s: Unit, b: B) => s -> unkeyed(b) }
+        (b: B) => unkeyed(b) }
     })
   }
 
