@@ -14,6 +14,8 @@ object CoastBuild extends Build {
     scalaVersion  in ThisBuild := "2.10.4",
     scalacOptions in ThisBuild := Seq("-feature"),
 
+    organization in ThisBuild := "com.monovore.coast",
+
     // make it possible to cancel forked processes with ctrl-c
     cancelable in Global := true,
 
@@ -23,6 +25,10 @@ object CoastBuild extends Build {
     libraryDependencies in ThisBuild ++= Seq(
       "org.specs2" %% "specs2" % "2.4.2" % "test",
       "org.scalacheck" %% "scalacheck" % "1.11.5" % "test"
+    ),
+
+    publishTo in ThisBuild := Some(
+      Resolver.file("file",  new File(Path.userHome.absolutePath+"/.m2/repository"))
     )
   )
 
