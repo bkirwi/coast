@@ -84,9 +84,14 @@ class MachineSpec extends Specification with ScalaCheck {
 
       "groupBy" in {
 
-        val graph = Flow.sink(output) {
-          Flow.source(integers).groupBy { n => (n % 2 == 0).toString }
-        }
+        val graph = for {
+
+          grouped <- Flow.label("grouped") {
+            Flow.source(integers).groupBy { n => (n % 2 == 0).toString}
+          }
+
+          _ <- Flow.sink(output) { grouped }
+        } yield ()
 
         prop { input: Map[String, Seq[Int]] =>
 
