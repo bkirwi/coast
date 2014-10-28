@@ -2,21 +2,24 @@ package com.monovore
 
 package object coast {
 
-  val unit: Unit = ()
+  // IMPLEMENTATION
+  // always-visible utilities; should be hidden within the coast package
 
-  def some[A](a: A): Option[A] = Some(a)
+  private[coast] val unit: Unit = ()
 
-  type ->[A, B] = (A, B)
+  private[coast] def some[A](a: A): Option[A] = Some(a)
 
-  object -> {
+  private[coast] type ->[A, B] = (A, B)
+
+  private[coast] object -> {
     def unapply[A, B](pair: (A, B)) = Some(pair)
   }
 
-  implicit class SeqOps[A](underlying: Seq[A]) {
+  private[coast] implicit class SeqOps[A](underlying: Seq[A]) {
     def groupByKey[B,C](implicit proof: A <:< (B, C)): Map[B, Seq[C]] =
       underlying.groupBy { _._1 }.mapValues { _.unzip._2 }
   }
 
-  def assuming[A](cond: Boolean)(action: => A): Option[A] =
+  private[coast] def assuming[A](cond: Boolean)(action: => A): Option[A] =
     if (cond) Some(action) else None
 }
