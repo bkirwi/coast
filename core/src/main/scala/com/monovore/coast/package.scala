@@ -22,4 +22,8 @@ package object coast {
 
   private[coast] def assuming[A](cond: Boolean)(action: => A): Option[A] =
     if (cond) Some(action) else None
+
+  private[coast] type Id[+A] = A
+
+  private[coast] type From[A] = { type To[+B] = (A => B) }
 }
