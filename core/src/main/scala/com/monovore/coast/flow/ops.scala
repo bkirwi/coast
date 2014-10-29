@@ -1,4 +1,9 @@
 package com.monovore.coast
+package flow
+
+import model._
+
+import com.monovore.coast.format.WireFormat
 
 import scala.language.higherKinds
 
@@ -22,7 +27,7 @@ class Grouped extends AnyGrouping
 
 class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
   private[coast] val context: Context[A, WithKey],
-  private[coast] val element: Element[A, B]
+  private[coast] val element: Node[A, B]
 ) { self =>
 
   def stream: StreamDef[G, A, B] = new StreamDef(element)
@@ -82,7 +87,7 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
     implicit isGrouped: G <:< Grouped, keyFormat: WireFormat[A], b0Format: WireFormat[B0]
   ): Stream[A, B -> B0] = {
 
-    Flow.merge(pool.stream.map(Left(_)), new StreamDef(element).map(Right(_)))
+    merge(pool.stream.map(Left(_)), new StreamDef(element).map(Right(_)))
       .transform(pool.initial) { (state: B0, msg: Either[B0, B]) =>
         msg match {
           case Left(newState) => newState -> Seq.empty
@@ -92,7 +97,7 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
   }
 }
 
-class StreamDef[+G <: AnyGrouping, A, +B](element: Element[A, B]) extends StreamBuilder[Id, G, A, B](new NoContext[A], element) {
+class StreamDef[+G <: AnyGrouping, A, +B](element: Node[A, B]) extends StreamBuilder[Id, G, A, B](new NoContext[A], element) {
 
   def withKeys: StreamBuilder[From[A]#To, G, A, B] =
     new StreamBuilder[From[A]#To, G, A, B](new FnContext[A], element)
@@ -100,7 +105,7 @@ class StreamDef[+G <: AnyGrouping, A, +B](element: Element[A, B]) extends Stream
 
 class PoolDef[+G <: AnyGrouping, A, +B](
   private[coast] val initial: B,
-  private[coast] val element: Element[A, B]
+  private[coast] val element: Node[A, B]
 ) { self =>
 
   def stream: StreamDef[G, A, B] = new StreamDef(element)
@@ -114,7 +119,7 @@ class PoolDef[+G <: AnyGrouping, A, +B](
 
     val grouped: PoolDef[Grouped, A, B] = new PoolDef(initial, element)
 
-    val merged = Flow.merge(grouped.stream.map(Left(_)), other.stream.map(Right(_)))
+    val merged = merge(grouped.stream.map(Left(_)), other.stream.map(Right(_)))
 
     merged
       .fold(initial: B0, other.initial) { (state, update) =>

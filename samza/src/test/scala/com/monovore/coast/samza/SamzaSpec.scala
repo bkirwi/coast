@@ -1,6 +1,7 @@
 package com.monovore.coast
 package samza
 
+import com.monovore.coast
 import org.apache.samza.config.serializers.JsonConfigSerializer
 import org.specs2.ScalaCheck
 import org.specs2.mutable._
@@ -11,18 +12,18 @@ class SamzaSpec extends Specification with ScalaCheck {
 
     "compile a simple flow" in {
 
-      import WireFormats.pretty._
+      import coast.format.pretty._
 
       val source = Name[String, Int]("ints")
       val sink = Name[String, Int]("bigger-ints")
 
-      val flow = Flow.sink(sink) {
-        Flow.source(source).fold(0) { _ + _ }.stream
+      val sampleFlow = coast.sink(sink) {
+        coast.source(source).fold(0) { _ + _ }.stream
       }
 
-      val configs = Samza.configFor(flow)(
+      val configs = samza.configureFlow(sampleFlow)(
         system = "whatever",
-        baseConfig = Samza.config(
+        baseConfig = samza.config(
         )
       )
 
@@ -34,7 +35,7 @@ class SamzaSpec extends Specification with ScalaCheck {
 
       println(JsonConfigSerializer.toJson(config))
 
-      config.get(Samza.TaskName) must_== "bigger-ints"
+      config.get(samza.TaskName) must_== "bigger-ints"
 
       config.get("stores./bigger-ints.factory") must_!= null
     }

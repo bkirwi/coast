@@ -1,7 +1,12 @@
 package com.monovore.coast
 package dot
 
+import flow._
+import model._
+
 import java.util.concurrent.atomic.AtomicInteger
+
+import com.monovore.coast.model.{Transform, Node}
 
 object Dot {
 
@@ -11,14 +16,14 @@ object Dot {
 
   case class Label(global: LabelType, pretty: String)
 
-  def apply(graph: Flow[_]): String = {
+  def apply(graph: Flow[Unit]): String = {
 
     val newID: String => Label = {
       val atomic = new AtomicInteger()
       (pretty) => { Label(Private(atomic.getAndIncrement), pretty) }
     }
 
-    def sources[A, B](downstream: Label, flow: Element[A, B]): Seq[(Label, Label)] = flow match {
+    def sources[A, B](downstream: Label, flow: Node[A, B]): Seq[(Label, Label)] = flow match {
       case Source(name) => {
         val label = Label(Public(name), name)
         Seq(label -> downstream)
@@ -68,34 +73,5 @@ object Dot {
        |  ${ edges.mkString("\n  ") }
        |}
        |""".stripMargin
-  }
-
-
-  /*
-   * Whoa there!
-   */
-  def main(args: Array[String]): Unit = {
-
-    import WireFormats.javaSerialization
-
-    val input = Name[String, String]("whatever")
-
-    val input2 = Name[String, String]("whatever-2")
-
-    val graph = for {
-      great <- Flow.label("great") {
-        Flow.merge(Flow.source(input), Flow.source(input2))
-          .map { _ + "!!!" }
-          .map { _ + "???" }
-      }
-      _ <- Flow.label("better") {
-        Flow.merge(great, Flow.source(input))
-          .map { _.reverse}
-      }
-    } yield ()
-
-    val output = Dot(graph)
-
-    Console.err.print(output)
   }
 }

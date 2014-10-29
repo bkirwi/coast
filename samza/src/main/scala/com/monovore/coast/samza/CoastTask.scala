@@ -12,8 +12,8 @@ class CoastTask extends StreamTask with InitableTask {
 
   override def init(config: Config, context: TaskContext): Unit = {
 
-    val factory = SerializationUtil.fromBase64[MessageSink.Factory](config.get(Samza.TaskKey))
-    val output = config.get(Samza.TaskName)
+    val factory = SerializationUtil.fromBase64[MessageSink.Factory](config.get(samza.TaskKey))
+    val output = config.get(samza.TaskName)
 
     val finalSink = new MessageSink.ByteSink {
 

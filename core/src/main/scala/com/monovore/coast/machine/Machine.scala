@@ -1,6 +1,9 @@
 package com.monovore.coast
 package machine
 
+import com.monovore.coast.flow._
+import com.monovore.coast.model._
+
 import com.twitter.algebird.Semigroup
 
 object Machine {
@@ -23,7 +26,7 @@ object Machine {
 
     def compile[A, B](
       downstream: Label, 
-      flow: Element[A, B]
+      flow: Node[A, B]
     ): (Map[Label, Actor] -> Seq[Label -> Label]) = flow match {
       case Source(name) => {
         Map.empty[Label, Actor] -> Seq(Named(name) -> downstream)

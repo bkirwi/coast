@@ -1,12 +1,11 @@
 package com.monovore.coast
-package samza
 
-import com.google.common.hash.Hashing
+import com.monovore.coast.model._
 import org.apache.samza.config.{Config, MapConfig}
 
 import scala.collection.JavaConverters._
 
-object Samza {
+package object samza {
 
   val KafkaBrokers = "192.168.80.20:9092"
   val ZookeeperHosts = "192.168.80.20:2181"
@@ -19,7 +18,7 @@ object Samza {
     else path.reverse.map { "/" + _ }.mkString
   }
 
-  private[this] def sourcesFor[A, B](element: Element[A, B]): Set[String] = element match {
+  private[this] def sourcesFor[A, B](element: Node[A, B]): Set[String] = element match {
     case Source(name) => Set(name)
     case Transform(up, _, _) => sourcesFor(up)
     case Merge(ups) => ups.flatMap(sourcesFor).toSet
@@ -28,7 +27,7 @@ object Samza {
 
   case class Storage(name: String, keyString: String, valueString: String)
 
-  private[this] def storageFor[A, B](element: Element[A, B], path: List[String]): Seq[Storage] = element match {
+  private[this] def storageFor[A, B](element: Node[A, B], path: List[String]): Seq[Storage] = element match {
     case Source(_) => Seq.empty
     case PureTransform(up, _) => storageFor(up, path)
     case Merge(ups) => {
@@ -38,7 +37,7 @@ object Samza {
     case agg @ Aggregate(up, _, _) => {
       val upstreamed = storageFor(up, "aggregated" :: path)
       upstreamed :+ Storage(
-        name = Samza.formatPath(path),
+        name = formatPath(path),
         keyString = SerializationUtil.toBase64(agg.keyFormat),
         valueString = SerializationUtil.toBase64(agg.stateFormat)
       )
@@ -46,7 +45,7 @@ object Samza {
     case GroupBy(up, _) => storageFor(up, path)
   }
 
-  def configFor(flow: Flow[_])(
+  def configureFlow(flow: Flow[_])(
     system: String = "kafka",
     baseConfig: Config = new MapConfig()
   ): Map[String, Config] = {

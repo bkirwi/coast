@@ -1,7 +1,7 @@
 package com.monovore.coast
 package samza
 
-import com.google.common.base.Charsets
+import com.monovore.coast.model._
 import org.apache.samza.config.Config
 import org.apache.samza.storage.kv.KeyValueStore
 import org.apache.samza.task.TaskContext
@@ -41,7 +41,7 @@ object MessageSink {
 
       def compileAggregate[S, A, B, B0](trans: Aggregate[S, A, B0, B], sink: MessageSink[A, B], prefix: List[String]) = {
 
-        val store = context.getStore(Samza.formatPath(prefix)).asInstanceOf[KeyValueStore[A, S]]
+        val store = context.getStore(samza.formatPath(prefix)).asInstanceOf[KeyValueStore[A, S]]
 
         val transformed = new MessageSink[A, B0] {
 
@@ -101,7 +101,7 @@ object MessageSink {
         }
       }
 
-      def compile[A, B](ent: Element[A, B], sink: MessageSink[A, B], prefix: List[String]): ByteSink = {
+      def compile[A, B](ent: Node[A, B], sink: MessageSink[A, B], prefix: List[String]): ByteSink = {
 
         ent match {
           case source @ Source(_) => compileSource(source, sink, prefix)
@@ -123,7 +123,7 @@ object MessageSink {
         }
       }
 
-      val name = config.get(Samza.TaskName)
+      val name = config.get(samza.TaskName)
 
       compile(sink.element, last, List(name))
     }

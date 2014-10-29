@@ -4,29 +4,27 @@ import java.io.{ObjectInputStream, ByteArrayInputStream, ObjectOutputStream, Byt
 
 import com.google.common.base.Charsets
 
-trait WireFormat[A] extends Serializable {
-  def write(value: A): Array[Byte]
-  def read(bytes: Array[Byte]): A
-}
+package object format {
 
-object WireFormats {
+  object javaSerialization {
 
-  implicit def javaSerialization[A] = new WireFormat[A] {
+    implicit def forAnything[A] = new WireFormat[A] {
 
-    override def write(value: A): Array[Byte] = {
-      val baos = new ByteArrayOutputStream()
-      val oos = new ObjectOutputStream(baos)
-      oos.writeObject(value)
-      oos.close()
-      baos.toByteArray
-    }
+      override def write(value: A): Array[Byte] = {
+        val baos = new ByteArrayOutputStream()
+        val oos = new ObjectOutputStream(baos)
+        oos.writeObject(value)
+        oos.close()
+        baos.toByteArray
+      }
 
-    override def read(bytes: Array[Byte]): A = {
-      val bais = new ByteArrayInputStream(bytes)
-      val ois = new ObjectInputStream(bais)
-      val value = ois.readObject().asInstanceOf[A]
-      ois.close()
-      value
+      override def read(bytes: Array[Byte]): A = {
+        val bais = new ByteArrayInputStream(bytes)
+        val ois = new ObjectInputStream(bais)
+        val value = ois.readObject().asInstanceOf[A]
+        ois.close()
+        value
+      }
     }
   }
 
@@ -43,4 +41,3 @@ object WireFormats {
     }
   }
 }
-

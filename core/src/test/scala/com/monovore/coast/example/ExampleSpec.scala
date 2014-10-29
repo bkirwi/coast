@@ -1,9 +1,10 @@
 package com.monovore.coast
 package example
 
+import com.monovore.coast
 import org.specs2.mutable._
 
-import WireFormats.javaSerialization
+import format.javaSerialization.forAnything
 
 class ExampleSpec extends Specification {
 
@@ -25,9 +26,9 @@ class ExampleSpec extends Specification {
       Entity(a.name, a.tags ++ b.tags, mins.min -> maxs.max)
     }
 
-    val entities = Name[String, Entity]("entities")
+    val entities = coast.Name[String, Entity]("entities")
 
-    val merged = Name[Int, Entity]("merged")
+    val merged = coast.Name[Int, Entity]("merged")
 
 //    val graph = for {
 //
@@ -62,26 +63,26 @@ class ExampleSpec extends Specification {
     case class Person(clubId: Int = 0)
 
     // TODO: make keys visible everywhere
-    val people = Name[Int, Person]("people")
-    val clubs = Name[Int, Club]("clubs")
-    val both = Name[Int, Club -> Set[Person]]("both")
+    val people = coast.Name[Int, Person]("people")
+    val clubs = coast.Name[Int, Club]("clubs")
+    val both = coast.Name[Int, Club -> Set[Person]]("both")
 
     val graph = for {
 
       // Roll up 'people' under their club id
-      peopleByKey <- Flow.label("people-pool") {
-        Flow.source(people)
+      peopleByKey <- coast.label("people-pool") {
+        coast.source(people)
           .withKeys.map { key => person => person.clubId -> (key -> person) }
           .groupByKey
       }
 
       // Roll up clubs under their id
-      clubPool <- Flow.label("club-pool") {
-        Flow.source(clubs).latestOr(Club())
+      clubPool <- coast.label("club-pool") {
+        coast.source(clubs).latestOr(Club())
       }
 
       // Join, and a trivial transformation
-      _ <- Flow.sink(both) {
+      _ <- coast.sink(both) {
 
         val peoplePool = peopleByKey.fold(Map.empty[Int, Person]) { _ + _ }
 
@@ -101,24 +102,24 @@ class ExampleSpec extends Specification {
     type UserID = String
     type Link = String
 
-    val followers = Name[UserID, UserID]("new-followers")
-    val tweets = Name[UserID, Link]("tweets")
+    val followers = coast.Name[UserID, UserID]("new-followers")
+    val tweets = coast.Name[UserID, Link]("tweets")
 
-    val reach = Name[Link, Int]("reach")
+    val reach = coast.Name[Link, Int]("reach")
 
-    val flow = for {
+    val reachFlow = for {
 
-      followerStream <- Flow.label("follower-stream") {
+      followerStream <- coast.label("follower-stream") {
 
         val followersByUser =
-          Flow.source(followers).fold(Set.empty[UserID]) { _ + _ }
+          coast.source(followers).fold(Set.empty[UserID]) { _ + _ }
 
-        Flow.source(tweets)
+        coast.source(tweets)
           .join(followersByUser)
           .groupByKey
       }
 
-      _ <- Flow.sink(reach) {
+      _ <- coast.sink(reach) {
         followerStream
           .fold(Set.empty[UserID]) { _ ++ _ }
           .map { _.size }
