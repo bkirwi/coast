@@ -7,7 +7,7 @@ object CoastBuild extends Build {
     id = "coast",
     base = file(".")
   ) aggregate (
-    core
+    core, samza
   ) settings(
 
     // global project settings
@@ -35,5 +35,12 @@ object CoastBuild extends Build {
   lazy val core = Project(
     id = "coast-core",
     base = file("core")
+  )
+
+  lazy val samza = Project(
+    id = "coast-samza",
+    base = file("samza")
+  ) dependsOn (
+    core
   )
 }

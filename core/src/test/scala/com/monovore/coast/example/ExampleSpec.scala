@@ -3,6 +3,8 @@ package example
 
 import org.specs2.mutable._
 
+import WireFormats.javaSerialization
+
 class ExampleSpec extends Specification {
 
   "a distributed entity resolution flow" should {
@@ -27,28 +29,28 @@ class ExampleSpec extends Specification {
 
     val merged = Name[Int, Entity]("merged")
 
-    val graph = for {
-
-      // Group input into the correct scopes
-      scoped <- Flow.label("bucketed") {
-        Flow.source(entities)
-          .flatMap { entity => scope(entity).map { _ -> entity } }
-          .groupByKey
-      }
-
-      // Take all 'new' entities and (re)merge them
-      // Note the circular definition here, as entities created by the merge
-      // get piped back in.
-      _ <- Flow.sink(merged) {
-        Flow.merge(scoped, Flow.source(merged))
-          .transform(Set.empty[Entity]) { (entities, nextEntity) =>
-            // TODO: real swoosh
-            (entities + nextEntity) -> Seq.empty
-          }
-          .flatMap { entity => scope(entity).map { _ -> entity } }
-          .groupByKey
-      }
-    } yield ()
+//    val graph = for {
+//
+//      // Group input into the correct scopes
+//      scoped <- Flow.label("bucketed") {
+//        Flow.source(entities)
+//          .flatMap { entity => scope(entity).map { _ -> entity } }
+//          .groupByKey
+//      }
+//
+//      // Take all 'new' entities and (re)merge them
+//      // Note the circular definition here, as entities created by the merge
+//      // get piped back in.
+//      _ <- Flow.sink(merged) {
+//        Flow.merge(scoped, Flow.source(merged))
+//          .transform(Set.empty[Entity]) { (entities, nextEntity) =>
+//            // TODO: real swoosh
+//            (entities + nextEntity) -> Seq.empty
+//          }
+//          .flatMap { entity => scope(entity).map { _ -> entity } }
+//          .groupByKey
+//      }
+//    } yield ()
 
     "do nothing" in true
   }
@@ -67,11 +69,10 @@ class ExampleSpec extends Specification {
     val graph = for {
 
       // Roll up 'people' under their club id
-      peoplePool <- Flow.label("people-pool") {
+      peopleByKey <- Flow.label("people-pool") {
         Flow.source(people)
           .withKeys.map { key => person => person.clubId -> (key -> person) }
           .groupByKey
-          .fold(Map.empty[Int, Person]) { _ + _ }
       }
 
       // Roll up clubs under their id
@@ -81,6 +82,9 @@ class ExampleSpec extends Specification {
 
       // Join, and a trivial transformation
       _ <- Flow.sink(both) {
+
+        val peoplePool = peopleByKey.fold(Map.empty[Int, Person]) { _ + _ }
+
         (clubPool join peoplePool)
           .map { case (club -> members) =>
             club -> members.values.toSet

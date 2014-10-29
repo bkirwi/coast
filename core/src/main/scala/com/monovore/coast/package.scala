@@ -2,6 +2,9 @@ package com.monovore
 
 package object coast {
 
+  type Stream[A, +B] = StreamDef[Grouped, A, B]
+  type Pool[A, +B] = PoolDef[Grouped, A, B]
+
   // IMPLEMENTATION
   // always-visible utilities; should be hidden within the coast package
 
@@ -22,4 +25,8 @@ package object coast {
 
   private[coast] def assuming[A](cond: Boolean)(action: => A): Option[A] =
     if (cond) Some(action) else None
+
+  private[coast] type Id[+A] = A
+
+  private[coast] type From[A] = { type To[+B] = (A => B) }
 }

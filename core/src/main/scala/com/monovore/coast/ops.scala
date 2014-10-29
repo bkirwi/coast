@@ -2,49 +2,61 @@ package com.monovore.coast
 
 import scala.language.higherKinds
 
-trait StreamOps[A, +B] { self =>
+sealed trait Context[K, X[+_]] {
+  def unwrap[A](wrapped: X[A]): (K => A)
+  def map[A, B](wrapped: X[A])(function: A => B): X[B]
+}
 
-  type WithKey[+X]
+class NoContext[K] extends Context[K, Id] {
+  override def unwrap[A](wrapped: Id[A]): (K) => A = { _ => wrapped }
+  override def map[A, B](wrapped: Id[A])(function: (A) => B): Id[B] = function(wrapped)
+}
 
-  // TODO: Applicative? Monad?
-  protected def withKey[X](wk: WithKey[X]): (A => X)
-  protected def mapKeyed[X, Y](x: WithKey[X])(fn: X => Y): WithKey[Y]
+class FnContext[K] extends Context[K, From[K]#To] {
+  override def unwrap[A](wrapped: From[K]#To[A]): (K) => A = wrapped
+  override def map[A, B](wrapped: From[K]#To[A])(function: (A) => B): From[K]#To[B] = wrapped andThen function
+}
 
-  def element: Element[A, B]
+class AnyGrouping
+class Grouped extends AnyGrouping
 
-  def stream = make(element)
+class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
+  private[coast] val context: Context[A, WithKey],
+  private[coast] val element: Element[A, B]
+) { self =>
 
-  def make[A0, B0](elem: Element[A0, B0]): Stream[A0, B0] =
-    new Stream[A0, B0] { def element: Element[A0, B0] = elem }
+  def stream: StreamDef[G, A, B] = new StreamDef(element)
 
-  def flatMap[B0](func: WithKey[B => Seq[B0]]): Stream[A, B0] = make[A, B0] {
+  def flatMap[B0](func: WithKey[B => Seq[B0]]): StreamDef[G, A, B0] = new StreamDef(
     PureTransform[A, B, B0](self.element, {
-      withKey(func) andThen { unkeyed =>
+      context.unwrap(func) andThen { unkeyed =>
         (b: B) => unkeyed(b) }
     })
-  }
+  )
 
-  def filter(func: WithKey[B => Boolean]): Stream[A, B] = flatMap {
-    mapKeyed(func) { func =>
+  def filter(func: WithKey[B => Boolean]): StreamDef[G, A, B] = flatMap {
+    context.map(func) { func =>
       { a => if (func(a)) Seq(a) else Seq.empty }
     }
   }
 
-  def map[B0](func: WithKey[B => B0]): Stream[A, B0] =
-    flatMap(mapKeyed(func) { func => func andThen { b => Seq(b)} })
+  def map[B0](func: WithKey[B => B0]): StreamDef[G, A, B0] =
+    flatMap(context.map(func) { func => func andThen { b => Seq(b)} })
 
-  def transform[S, B0](init: S)(func: WithKey[(S, B) => (S, Seq[B0])]): Stream[A, B0] = {
+  def transform[S, B0](init: S)(func: WithKey[(S, B) => (S, Seq[B0])])(
+    implicit isGrouped: G <:< Grouped, keyFormat: WireFormat[A], stateFormat: WireFormat[S]
+  ): Stream[A, B0] = {
 
-    val keyedFunc = withKey(func)
+    val keyedFunc = context.unwrap(func)
 
-    new Stream[A, B0] {
-      def element = Transform[S, A, B, B0](self.element, init, keyedFunc)
-    }
+    new StreamDef(Aggregate[S, A, B, B0](self.element, init, keyedFunc))
   }
 
-  def fold[B0](init: B0)(func: WithKey[(B0, B) => B0]): Pool[A, B0] = {
+  def fold[B0](init: B0)(func: WithKey[(B0, B) => B0])(
+    implicit isGrouped: G <:< Grouped, keyFormat: WireFormat[A], stateFormat: WireFormat[B0]
+  ): Pool[A, B0] = {
 
-    val transformer = mapKeyed(func) { fn =>
+    val transformer = context.map(func) { fn =>
 
       (s: B0, b: B) => {
         val b0 = fn(s, b)
@@ -52,26 +64,25 @@ trait StreamOps[A, +B] { self =>
       }
     }
 
-    new Pool[A, B0] {
-      override def initial: B0 = init
-      override def element: Element[A, B0] = Transform(self.element, init, withKey(transformer))
-    }
+    new PoolDef(init, Transform(self.element, init, context.unwrap(transformer)))
   }
 
-  def latestOr[B0 >: B](init: B0): Pool[A, B0] = stream.fold(init) { (_, x) => x }
+  def latestOr[B0 >: B](init: B0): PoolDef[G, A, B0] =
+    new PoolDef(init, element)
 
-  def groupBy[A0](func: B => A0): Stream[A0, B] = new Stream[A0, B] {
-    def element = GroupBy(self.element, func)
-  }
+  def groupBy[A0](func: B => A0): StreamDef[AnyGrouping, A0, B] =
+    new StreamDef[G, A0, B](GroupBy(self.element, func))
 
   def groupByKey[A0, B0](implicit asPair: B <:< (A0, B0)) =
     stream.groupBy { _._1 }.map { _._2 }
 
   def flatten[B0](implicit func: B => Traversable[B0]) = stream.flatMap(func andThen { _.toSeq })
 
-  def join[B0](pool: Pool[A, B0]): Stream[A, B -> B0] = {
+  def join[B0](pool: Pool[A, B0])(
+    implicit isGrouped: G <:< Grouped, keyFormat: WireFormat[A], b0Format: WireFormat[B0]
+  ): Stream[A, B -> B0] = {
 
-    Flow.merge(pool.stream.map(Left(_)), stream.map(Right(_)))
+    Flow.merge(pool.stream.map(Left(_)), new StreamDef(element).map(Right(_)))
       .transform(pool.initial) { (state: B0, msg: Either[B0, B]) =>
         msg match {
           case Left(newState) => newState -> Seq.empty
@@ -81,43 +92,36 @@ trait StreamOps[A, +B] { self =>
   }
 }
 
-trait Stream[A, +B] extends StreamOps[A, B] { stream =>
+class StreamDef[+G <: AnyGrouping, A, +B](element: Element[A, B]) extends StreamBuilder[Id, G, A, B](new NoContext[A], element) {
 
-  override type WithKey[+X] = X
-
-  override protected def withKey[X](wk: WithKey[X]): (A) => X = { _ => wk }
-  override protected def mapKeyed[X, Y](x: WithKey[X])(fn: (X) => Y): WithKey[Y] = fn(x)
-
-  def withKeys: KeyedOps[A, B] = KeyedOps(stream.element)
+  def withKeys: StreamBuilder[From[A]#To, G, A, B] =
+    new StreamBuilder[From[A]#To, G, A, B](new FnContext[A], element)
 }
 
-case class KeyedOps[A, +B](element: Element[A, B]) extends StreamOps[A, B] {
+class PoolDef[+G <: AnyGrouping, A, +B](
+  private[coast] val initial: B,
+  private[coast] val element: Element[A, B]
+) { self =>
 
-  override type WithKey[+X] = A => X
+  def stream: StreamDef[G, A, B] = new StreamDef(element)
 
-  override protected def withKey[X](wk: WithKey[X]): (A) => X = wk
-  override protected def mapKeyed[X, Y](x: WithKey[X])(fn: (X) => Y): WithKey[Y] = x andThen fn
-}
-
-trait Pool[A, B] { self =>
-
-  def initial: B
-
-  def element: Element[A, B]
-
-  def stream: Stream[A, B] = new Stream[A, B] {
-    def element = self.element
-  }
-
-  def map[B0](function: B => B0): Pool[A, B0] =
+  def map[B0](function: B => B0): PoolDef[G, A, B0] =
     stream.map(function).latestOr(function(initial))
 
-  def join[B0](other: Pool[A, B0]): Pool[A, (B, B0)] =
-    Flow.merge(stream.map(Left(_)), other.stream.map(Right(_)))
-      .fold(initial, other.initial) { (state, update) =>
+  def join[B0 >: B, B1](other: Pool[A, B1])(
+    implicit isGrouped: G <:< Grouped, keyFormat: WireFormat[A], pairFormat: WireFormat[(B0, B1)]
+  ): PoolDef[Grouped, A, (B0, B1)] = {
+
+    val grouped: PoolDef[Grouped, A, B] = new PoolDef(initial, element)
+
+    val merged = Flow.merge(grouped.stream.map(Left(_)), other.stream.map(Right(_)))
+
+    merged
+      .fold(initial: B0, other.initial) { (state, update) =>
         update.fold(
           { left => (left, state._2) },
           { right => (state._1, right) }
         )
       }
+  }
 }
