@@ -2,12 +2,20 @@ package com.monovore.coast
 
 sealed trait Element[A, +B]
 
-case class Source[A, +B](source: String) extends Element[A, B]
+case class Source[A, B](
+  source: String
+)(
+  implicit val keyFormat: WireFormat[A],
+  val valueFormat: WireFormat[B]
+) extends Element[A, B]
 
 case class Aggregate[S, A, B0, +B](
   upstream: Element[A, B0],
   init: S,
   transformer: A => (S, B0) => (S, Seq[B])
+)(
+  implicit val keyFormat: WireFormat[A],
+  val stateFormat: WireFormat[S]
 ) extends Transform[S, A, B0, B]
 
 sealed trait Transform[S, A, B0, +B] extends Element[A, B] {
@@ -36,7 +44,7 @@ object Transform {
   def unapply[S, A, B0, B](t: Transform[S, A, B0, B]): Option[(Element[A, B0], S, A => (S, B0) => (S, Seq[B]))] =
     Some((t.upstream, t.init, t.transformer))
 
-  def apply[S, A, B0, B](e: Element[A, B0], i: S, t: A => (S, B0) => (S, Seq[B])): Transform[S, A, B0, B] =
+  def apply[S : WireFormat, A: WireFormat, B0, B](e: Element[A, B0], i: S, t: A => (S, B0) => (S, Seq[B])): Transform[S, A, B0, B] =
     Aggregate(e, i, t)
 }
 

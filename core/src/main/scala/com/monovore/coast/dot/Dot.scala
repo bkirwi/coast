@@ -38,7 +38,7 @@ object Dot {
     }
 
     val chain = graph.bindings
-      .flatMap { case (name -> flow) =>
+      .flatMap { case (name -> Sink(flow)) =>
         sources(Label(Public(name), name), flow)
       }
 
@@ -75,6 +75,8 @@ object Dot {
    * Whoa there!
    */
   def main(args: Array[String]): Unit = {
+
+    import WireFormats.javaSerialization
 
     val input = Name[String, String]("whatever")
 

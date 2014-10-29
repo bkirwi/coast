@@ -11,6 +11,8 @@ class SamzaSpec extends Specification with ScalaCheck {
 
     "compile a simple flow" in {
 
+      import WireFormats.pretty._
+
       val source = Name[String, Int]("ints")
       val sink = Name[String, Int]("bigger-ints")
 

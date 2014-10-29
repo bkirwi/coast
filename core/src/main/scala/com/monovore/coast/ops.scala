@@ -43,14 +43,18 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
   def map[B0](func: WithKey[B => B0]): StreamDef[G, A, B0] =
     flatMap(context.map(func) { func => func andThen { b => Seq(b)} })
 
-  def transform[S, B0](init: S)(func: WithKey[(S, B) => (S, Seq[B0])])(implicit isGrouped: G <:< Grouped): Stream[A, B0] = {
+  def transform[S, B0](init: S)(func: WithKey[(S, B) => (S, Seq[B0])])(
+    implicit isGrouped: G <:< Grouped, keyFormat: WireFormat[A], stateFormat: WireFormat[S]
+  ): Stream[A, B0] = {
 
     val keyedFunc = context.unwrap(func)
 
-    new StreamDef(Transform[S, A, B, B0](self.element, init, keyedFunc))
+    new StreamDef(Aggregate[S, A, B, B0](self.element, init, keyedFunc))
   }
 
-  def fold[B0](init: B0)(func: WithKey[(B0, B) => B0])(implicit isGrouped: G <:< Grouped): Pool[A, B0] = {
+  def fold[B0](init: B0)(func: WithKey[(B0, B) => B0])(
+    implicit isGrouped: G <:< Grouped, keyFormat: WireFormat[A], stateFormat: WireFormat[B0]
+  ): Pool[A, B0] = {
 
     val transformer = context.map(func) { fn =>
 
@@ -74,7 +78,9 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
 
   def flatten[B0](implicit func: B => Traversable[B0]) = stream.flatMap(func andThen { _.toSeq })
 
-  def join[B0](pool: Pool[A, B0])(implicit isGrouped: G <:< Grouped): Stream[A, B -> B0] = {
+  def join[B0](pool: Pool[A, B0])(
+    implicit isGrouped: G <:< Grouped, keyFormat: WireFormat[A], b0Format: WireFormat[B0]
+  ): Stream[A, B -> B0] = {
 
     Flow.merge(pool.stream.map(Left(_)), new StreamDef(element).map(Right(_)))
       .transform(pool.initial) { (state: B0, msg: Either[B0, B]) =>
@@ -102,14 +108,16 @@ class PoolDef[+G <: AnyGrouping, A, +B](
   def map[B0](function: B => B0): PoolDef[G, A, B0] =
     stream.map(function).latestOr(function(initial))
 
-  def join[B0](other: Pool[A, B0])(implicit isGrouped: G <:< Grouped): PoolDef[Grouped, A, (B, B0)] = {
+  def join[B0 >: B, B1](other: Pool[A, B1])(
+    implicit isGrouped: G <:< Grouped, keyFormat: WireFormat[A], pairFormat: WireFormat[(B0, B1)]
+  ): PoolDef[Grouped, A, (B0, B1)] = {
 
     val grouped: PoolDef[Grouped, A, B] = new PoolDef(initial, element)
 
     val merged = Flow.merge(grouped.stream.map(Left(_)), other.stream.map(Right(_)))
 
     merged
-      .fold(initial, other.initial) { (state, update) =>
+      .fold(initial: B0, other.initial) { (state, update) =>
         update.fold(
           { left => (left, state._2) },
           { right => (state._1, right) }

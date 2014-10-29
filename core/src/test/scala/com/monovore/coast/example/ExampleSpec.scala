@@ -3,6 +3,8 @@ package example
 
 import org.specs2.mutable._
 
+import WireFormats.javaSerialization
+
 class ExampleSpec extends Specification {
 
   "a distributed entity resolution flow" should {

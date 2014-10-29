@@ -6,6 +6,8 @@ import org.scalacheck.{Gen, Prop}
 import org.specs2.ScalaCheck
 import org.specs2.mutable._
 
+import WireFormats.javaSerialization
+
 class MachineSpec extends Specification with ScalaCheck {
 
   // Tweak me

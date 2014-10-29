@@ -1,6 +1,7 @@
 package com.monovore.coast
 package samza
 
+import com.google.common.hash.Hashing
 import org.apache.samza.config.{Config, MapConfig}
 
 import scala.collection.JavaConverters._
@@ -25,17 +26,22 @@ object Samza {
     case GroupBy(up, _) => sourcesFor(up)
   }
 
-  private[this] def storageFor[A, B](element: Element[A, B], path: List[String]): Set[String] = element match {
-    case Source(_) => Set.empty
+  case class Storage(name: String, keyString: String, valueString: String)
+
+  private[this] def storageFor[A, B](element: Element[A, B], path: List[String]): Seq[Storage] = element match {
+    case Source(_) => Seq.empty
     case PureTransform(up, _) => storageFor(up, path)
     case Merge(ups) => {
       ups.zipWithIndex
-        .map { case (up, i) => storageFor(up, s"merge-$i" :: path)}
-        .flatten.toSet
+        .flatMap { case (up, i) => storageFor(up, s"merge-$i" :: path)}
     }
-    case Aggregate(up, _, _) => {
+    case agg @ Aggregate(up, _, _) => {
       val upstreamed = storageFor(up, "aggregated" :: path)
-      upstreamed + Samza.formatPath(path)
+      upstreamed :+ Storage(
+        name = Samza.formatPath(path),
+        keyString = SerializationUtil.toBase64(agg.keyFormat),
+        valueString = SerializationUtil.toBase64(agg.stateFormat)
+      )
     }
     case GroupBy(up, _) => storageFor(up, path)
   }
@@ -47,13 +53,13 @@ object Samza {
 
     val baseConfigMap = baseConfig.asScala.toMap
 
-    val configs = flow.bindings.map { case (name -> element) =>
+    val configs = flow.bindings.map { case (name -> sink) =>
 
-      val inputs = sourcesFor(element)
+      val inputs = sourcesFor(sink.element)
 
-      val factory: MessageSink.Factory = new MessageSink.FromElement(element)
+      val storage = storageFor(sink.element, List(name))
 
-      val storage = storageFor(element, List(name))
+      val factory: MessageSink.Factory = new MessageSink.FromElement(sink)
 
       val configMap = Map(
 
@@ -65,6 +71,7 @@ object Samza {
         "task.inputs" -> inputs.map { i => s"$system.$i"}.mkString(","),
 
         "serializers.registry.string.class" -> "org.apache.samza.serializers.StringSerdeFactory",
+        "serializers.registry.bytes.class" -> "org.apache.samza.serializers.ByteSerdeFactory",
 
         // Coast-specific
         TaskKey -> SerializationUtil.toBase64(factory),
@@ -72,12 +79,19 @@ object Samza {
       )
 
       val storageMap = storage
-        .map { name =>
+        .map { case Storage(name, keyFormat, msgFormat) =>
+
+          val keyName = s"coast-key-$name"
+          val msgName = s"coast-msg-$name"
 
           Map(
             s"stores.$name.factory" -> "org.apache.samza.storage.kv.KeyValueStorageEngineFactory",
-            s"stores.$name.key.serde" -> "string",
-            s"stores.$name.msg.serde" -> "string"
+            s"stores.$name.key.serde" -> keyName,
+            s"stores.$name.msg.serde" -> msgName,
+            s"serializers.registry.$keyName.class" -> "com.monovore.coast.samza.CoastSerdeFactory",
+            s"serializers.registry.$keyName.serialized.base64" -> keyFormat,
+            s"serializers.registry.$msgName.class" -> "com.monovore.coast.samza.CoastSerdeFactory",
+            s"serializers.registry.$msgName.serialized.base64" -> msgFormat
           )
         }
         .flatten.toMap

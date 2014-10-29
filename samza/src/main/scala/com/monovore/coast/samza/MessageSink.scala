@@ -21,7 +21,7 @@ object MessageSink {
     def make(config: Config, context: TaskContext, sink: ByteSink): ByteSink
   }
 
-  class FromElement[A, B](element: Element[A, B]) extends Factory {
+  class FromElement[A, B](sink: Sink[A, B]) extends Factory {
 
     override def make(config: Config, context: TaskContext, finalSink: ByteSink) = {
 
@@ -31,8 +31,8 @@ object MessageSink {
 
           override def execute(stream: String, key: Bytes, value: Bytes): Unit = {
 
-            val a = new String(key, Charsets.UTF_8).asInstanceOf[A]
-            val b = new String(value, Charsets.UTF_8).asInstanceOf[B]
+            val a = source.keyFormat.read(key)
+            val b = source.valueFormat.read(value)
 
             if (stream == source.source) sink.execute(stream, a, b)
           }
@@ -41,7 +41,7 @@ object MessageSink {
 
       def compileAggregate[S, A, B, B0](trans: Aggregate[S, A, B0, B], sink: MessageSink[A, B], prefix: List[String]) = {
 
-        val store = context.getStore(Samza.formatPath(prefix)).asInstanceOf[KeyValueStore[String, String]]
+        val store = context.getStore(Samza.formatPath(prefix)).asInstanceOf[KeyValueStore[A, S]]
 
         val transformed = new MessageSink[A, B0] {
 
@@ -49,14 +49,11 @@ object MessageSink {
 
             val update = trans.transformer(key)
 
-            val keyString = SerializationUtil.toBase64(key)
-
-            val state = Option(store.get(keyString))
-              .map(SerializationUtil.fromBase64[S])
+            val state = Option(store.get(key))
               .getOrElse(trans.init)
 
             val (newState, output) = update(state, value)
-            store.put(keyString, SerializationUtil.toBase64(newState))
+            store.put(key, newState)
             output.foreach(sink.execute(stream, key, _))
           }
         }
@@ -119,8 +116,8 @@ object MessageSink {
 
         override def execute(stream: String, key: A, value: B): Unit = {
 
-          val keyBytes = key.asInstanceOf[String].getBytes(Charsets.UTF_8)
-          val valueBytes = value.asInstanceOf[String].getBytes(Charsets.UTF_8)
+          val keyBytes = sink.keyFormat.write(key)
+          val valueBytes = sink.valueFormat.write(value)
 
           finalSink.execute(stream, keyBytes, valueBytes)
         }
@@ -128,7 +125,7 @@ object MessageSink {
 
       val name = config.get(Samza.TaskName)
 
-      compile(element, last, List(name))
+      compile(sink.element, last, List(name))
     }
   }
 }
