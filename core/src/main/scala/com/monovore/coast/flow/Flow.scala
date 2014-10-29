@@ -1,7 +1,7 @@
 package com.monovore.coast
 package flow
 
-import model.Sink
+import model._
 
 /**
  * A mechanism for maintaining name bindings.

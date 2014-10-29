@@ -8,7 +8,7 @@ package object format {
 
   object javaSerialization {
 
-    implicit def forAnything[A] = new WireFormat[A] {
+    implicit def formatFor[A] = new WireFormat[A] {
 
       override def write(value: A): Array[Byte] = {
         val baos = new ByteArrayOutputStream()

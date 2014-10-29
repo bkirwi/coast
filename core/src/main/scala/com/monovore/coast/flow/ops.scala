@@ -72,6 +72,35 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
     new PoolDef(init, Transform(self.element, init, context.unwrap(transformer)))
   }
 
+  def grouped[B0 >: B](size: Int)(
+    implicit isGrouped: G <:< Grouped, keyFormat: WireFormat[A], stateFormat: WireFormat[Seq[B0]]
+  ): Stream[A, Seq[B0]] = {
+
+    stream.transform(Vector.empty[B0]: Seq[B0]) { (buffer, next) =>
+
+      if (buffer.size >= size) Vector.empty[B0] -> Seq(buffer)
+      else (buffer :+ (next: B0)) -> Seq.empty[Seq[B0]]
+    }
+  }
+
+  def windowed[S](size: Int)(init: S)(function: (S, B) => S)(
+    implicit isGrouped: G <:< Grouped, keyFormat: WireFormat[A], stateFormat: WireFormat[(S, Int)]
+  ): Stream[A, S] = {
+
+    require(size > 0, "Expected a positive window size")
+
+    stream.transform(init -> 0) { (buffer, next) =>
+
+      val (state, count) = buffer
+
+      val newState = function(state, next)
+      val newCount = count + 1
+
+      if (newCount >= size) (init -> 0) -> Seq(newState)
+      else (newState -> newCount) -> Seq.empty[S]
+    }
+  }
+
   def latestOr[B0 >: B](init: B0): PoolDef[G, A, B0] =
     new PoolDef(init, element)
 

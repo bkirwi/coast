@@ -4,7 +4,7 @@ package example
 import com.monovore.coast
 import org.specs2.mutable._
 
-import format.javaSerialization.forAnything
+import format.javaSerialization._
 
 class ExampleSpec extends Specification {
 
