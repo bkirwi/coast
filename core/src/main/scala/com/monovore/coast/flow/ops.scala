@@ -98,7 +98,7 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
     }
   }
 
-  def latestOr[B0 >: B](init: B0): PoolDef[G, A, B0] =
+  def pool[B0 >: B](init: B0): PoolDef[G, A, B0] =
     new PoolDef(init, element)
 
   def groupBy[A0](func: B => A0): StreamDef[AnyGrouping, A0, B] =
@@ -137,7 +137,7 @@ class PoolDef[+G <: AnyGrouping, A, +B](
   def stream: StreamDef[G, A, B] = new StreamDef(element)
 
   def map[B0](function: B => B0): PoolDef[G, A, B0] =
-    stream.map(function).latestOr(function(initial))
+    stream.map(function).pool(function(initial))
 
   def join[B0 >: B, B1](other: Pool[A, B1])(
     implicit isGrouped: IsGrouped[G], keyFormat: WireFormat[A], pairFormat: WireFormat[(B0, B1)]

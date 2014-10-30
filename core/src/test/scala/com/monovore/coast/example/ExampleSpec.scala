@@ -78,7 +78,7 @@ class ExampleSpec extends Specification {
 
       // Roll up clubs under their id
       clubPool <- coast.label("club-pool") {
-        coast.source(clubs).latestOr(Club())
+        coast.source(clubs).pool(Club())
       }
 
       // Join, and a trivial transformation

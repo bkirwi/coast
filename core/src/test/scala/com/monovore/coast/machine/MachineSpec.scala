@@ -167,7 +167,7 @@ class MachineSpec extends Specification with ScalaCheck {
 
       "pool.map(identity) === pool" in {
 
-        val pool = coast.source(integers).latestOr(0)
+        val pool = coast.source(integers).pool(0)
 
         val original = coast.sink(output) { pool.stream }
         val mapped = coast.sink(output) { pool.map(identity).stream }
@@ -184,7 +184,7 @@ class MachineSpec extends Specification with ScalaCheck {
         val f: (Int => Int) = { _ * 2 }
         val g: (Int => Int) = { _ + 6 }
 
-        val pool = coast.source(integers).latestOr(0)
+        val pool = coast.source(integers).pool(0)
 
         val original = coast.sink(output) { pool.map(f andThen g).stream }
         val mapped = coast.sink(output) { pool.map(f).map(g).stream }
