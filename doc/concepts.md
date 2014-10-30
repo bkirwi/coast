@@ -14,35 +14,45 @@ A stream is an ordered, unbounded series of values. Over time, new values appear
 at the end. Every individual event can be uniquely identified by how far they
 are from the beginning.
 
+### Sources and Sinks
+
 A log is this, as a data structure. Kafka is built around this as a central
 concept, Raft and MultiPaxos have a log at their heart, and many databases use
 logs internally.
 
-## Transforming
+### Transforming and Aggregating Streams
 
-Taking a stream and, for every element, mapping it to zero or more elements in
-the new stream. `map`, `filter`, `flatMap`.
+One of the most basic operations you can do on a stream is to take each value,
+apply some transformation, and make zero or more new values out of it.
+(Splitting a sentence into a list of words, dropping invalid json.)
+Chaining the resulting values together gives you a derivative stream.
 
-## Aggregating
+Some of these operations require maintaining some state. (Dropping consecutive
+duplicates.) `coast` calls operations like this 'aggregations'.
 
-Like the above, but with some extra state. `fold`, etc. This is enough to
-implement state machines and other things.
+### Merging
 
-## Merging
+Combines two streams into a single stream by interleaving them together. This
+preserves ordering within a stream, but in general there's no guarantees about
+in what order they're interleaved.
 
-Combines two streams into a single stream. This preserves ordering within a
-stream, but in general there's no guarantees about in what order they're
-interleaved.
-
-## Partitioning
+## Keys and Partitioning
 
 The above already gives you a pretty rich API, but it's not workable in a Big
 Data Universe -- it's just not practical to funnel billions of events through a
 single node in order. For this reason, we partition a stream up into many
 smaller streams.
 
-## Grouping
+Every value in the stream has an associated key. Under a given key, all the
+operations are ordered. Transformations put their values under the same key, and
+merges merge values under the same key together. Since each partition is
+independent, this is easy to parallelize: we just process the events for
+different partitions on different machines.
 
-Sometimes you need to roll up information between distinct streams. Grouping
-operations are here for this.
+### Grouping
 
+Sometimes you need to pull values from multiple streams together; for this,
+`coast` offers one additional primitive: grouping. (If you're familiar with
+Hadoop-style M/R, this corresponds to a reduce or shuffle operation.) Since this
+step involves changing the way a particular event is partitioned, this usually
+requires sending data across the network.
