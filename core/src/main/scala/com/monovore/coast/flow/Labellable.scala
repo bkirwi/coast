@@ -4,6 +4,9 @@ package flow
 import format._
 import model._
 
+import scala.annotation.implicitNotFound
+
+@implicitNotFound("Can't label a value of type ${A}. Check that you're trying to label a stream or flow.")
 sealed trait Labellable[-A] {
 
   type Labelled
