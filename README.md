@@ -7,9 +7,13 @@ friendliness.
 
 ## Why Another Streaming Framework?
 
-Writing a correct, scalable stream processing application is notoriously difficult; in fact, the designer of the leading stream processing framework advocates throwing away your results and starting from scratch every few hours. This severely limits the number of applications you can build on this infrastructure.
+Consider this simple stream processing task: we want to write a job that pulls data from an input stream and write it to an output stream. (Let's say the input and output are stored in Kafka.) We'd like to copy the stream *exactly*: the first message in the input is the first message in the output, and so on.
 
-It doesn't have to be this way. With careful design, and by leaning heavily on log-backed storage, it's possible to recover most of the simplicity of batch processing in a streaming context.
+None of the common large-scale streaming frameworks has support for this. (This includes Storm, Trident, Samza, and Spark Streaming.) Of course, it's sometimes possible to make things work -- but such a simple job shouldn't require a distributed systems engineer to write.
+
+This isn't an isolated case: many streaming calculations are similarly error-prone. Mistakes are common enough that many experts advocate using streaming frameworks for only [approximate, disposable calculations](http://en.wikipedia.org/wiki/Lambda_architecture#Speed_layer), and reproducing all the work in another system; this works, but it's a lot of effort, and it severely limits the number of applications you can build.
+
+`coast` dreams of a better way.
 
 ## What's Here?
 
@@ -19,7 +23,7 @@ This project comprises:
 - A small, in-memory backend of `coast`'s streaming model. This captures the nondeterminism that would be present in a distributed system, so testing with this helps you understand how your streaming job will behave on a real cluster.
 - A pretty-printer that exports the DAG of your stream processing job to GraphViz format.
 
-A backend that compiles the DAG into a set of Samza jobs is also in progress, but not complete.
+A backend that compiles the DAG into a set of Samza jobs is also in progress, but not complete. A [fork of the `hello-samza` project](https://github.com/bkirwi/incubator-samza-hello-samza/tree/hello-coast) has some examples.
 
 ## Mandatory Word Count Example
 
@@ -36,7 +40,7 @@ val flow = for {
   
   // add up the counts for each word, and stream out the list of changes
   _ <- coast.sink(WordCounts) {
-    byWord
+    countsByWord
       .fold(0) { _ + _ }
       .stream
   }
