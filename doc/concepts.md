@@ -1,13 +1,5 @@
 # Concepts
 
-Most stream-processing systems lead to code that is hard to understand: message
-ordering, reprocessing, cascading failures, etc. Entire architectures have been
-designed around the idea that streaming data is fundamentally difficult, and
-that the results of real-time processing just can't be trusted.
-
-`coast` is designed around a simple set of abstractions, with the concepts of
-exactly-once streaming at their heart. Etc., etc.
-
 ## Streams
 
 A stream is an ordered, unbounded series of values. Over time, new values appear
@@ -16,9 +8,10 @@ are from the beginning.
 
 ### Sources and Sinks
 
-A log is this, as a data structure. Kafka is built around this as a central
-concept, Raft and MultiPaxos have a log at their heart, and many databases use
-logs internally.
+The data-structure equivalent of a stream is a *log*, and it's the basic
+abstraction offered by messaging systems like Kafka. All `coast` jobs start by
+pulling input from one or more sources like this, and they end by sinking their
+results to a different set of external logs.
 
 ### Transforming and Aggregating Streams
 
@@ -56,3 +49,10 @@ Sometimes you need to pull values from multiple streams together; for this,
 Hadoop-style M/R, this corresponds to a reduce or shuffle operation.) Since this
 step involves changing the way a particular event is partitioned, this usually
 requires sending data across the network.
+
+## Flow Graphs
+
+Assembling all these different operations together, you get a streaming graph:
+sources at the top, sinks at the bottom, and a rich network of interleaving
+data flows connecting them together. This graph, or 'flow', is a complete
+definition of a streaming job.
