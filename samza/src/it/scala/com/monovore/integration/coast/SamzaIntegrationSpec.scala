@@ -9,10 +9,15 @@ import kafka.server.{KafkaConfig, KafkaServer}
 import kafka.utils.{TestUtils, TestZKUtils}
 import kafka.zk.EmbeddedZookeeper
 import org.apache.samza.job.local.LocalJobFactory
+import org.apache.samza.serializers.CheckpointSerde
+import org.apache.samza.system.SystemStream
 import org.specs2.ScalaCheck
 import org.specs2.mutable._
 
-class SamzaSpec extends Specification with ScalaCheck {
+import scala.annotation.tailrec
+import scala.collection.JavaConverters._
+
+class SamzaIntegrationSpec extends Specification with ScalaCheck {
 
   sequential // I'll run out of ports otherwise
 
@@ -60,7 +65,7 @@ case class Messages(messages: Map[String, Map[Seq[Byte], Seq[Seq[Byte]]]] = Map.
   }
 }
 
-object Messages extends Messages()
+object Messages extends Messages(Map.empty)
 
 object IntegrationTest {
 
@@ -111,6 +116,7 @@ object IntegrationTest {
 
       val configs = coast.samza.configureFlow(flow)(
         baseConfig = coast.samza.config(
+          "task.checkpoint.replication.factor" -> "1",
           "systems.kafka.samza.offset.default" -> "oldest",
           "systems.kafka.samza.factory" -> "org.apache.samza.system.kafka.KafkaSystemFactory",
           "systems.kafka.consumer.zookeeper.connect" -> zkString,
@@ -124,24 +130,67 @@ object IntegrationTest {
 
       jobs.foreach { _.submit() }
 
-      Thread.sleep(15000)
+      consumer = Consumer.create(new ConsumerConfig(config))
+
+      val checkpointStreams = flow.bindings.map { case (name, _) => s"__samza_checkpoint_${name}_1" }
+
+      val outputStreams = flow.bindings.map { case (name, _) => name }
+
+      val streams = consumer.createMessageStreams(
+        (checkpointStreams ++ outputStreams).map { _ -> 1 }.toMap
+      )
+
+      val inputSize = input.messages.mapValues { _.values.map { _.size }.sum }
+
+      flow.bindings.map { case (name, _) =>
+
+        val cp = s"__samza_checkpoint_${name}_1"
+
+        val List(stream) = streams(cp)
+        val config = configs(name)
+
+        val inputs = config.get("task.inputs").split(",").toSeq
+          .map { _.split("\\.").toSeq }
+          .map { case Seq(system, stream) => new SystemStream(system, stream) }
+
+        val iterator = stream.iterator()
+
+        val serde = new CheckpointSerde
+
+        def poll(): Unit = {
+          val next = iterator.next() // Blocking!
+
+          val checkpoint = serde.fromBytes(next.message())
+
+          val finished = inputs
+            .forall { ss =>
+              val offset = Option(checkpoint.getOffsets.get(ss)).map { _.toLong + 1 }.getOrElse(0L)
+              offset >= inputSize.getOrElse(ss.getStream, 0)
+            }
+
+          if (finished) ()
+          else poll()
+        }
+
+        poll()
+      }
 
       jobs.foreach { _.kill() }
 
       simple = new SimpleConsumer("localhost", port0, ConsumerConfig.SocketTimeout, ConsumerConfig.SocketBufferSize, ConsumerConfig.DefaultClientId)
 
-      consumer = Consumer.create(new ConsumerConfig(config))
-
-      val requests = flow.bindings.map { case (k, _) => k -> 1 }.toMap
-
-      val offsets = requests
-        .map { case (name, _) =>
+      val offsets = outputStreams
+        .map { case name =>
           name -> simple.earliestOrLatestOffset(TopicAndPartition(name, 0), -1L, 77)
         }
+        .toMap
 
       val outputMessages =
-        consumer.createMessageStreams(requests)
-          .map { case (name, List(stream)) =>
+        outputStreams
+          .map { case name =>
+
+            val List(stream) = streams(name)
+
             name -> stream.take(offsets(name).toInt)
               .map { msg => msg.key().toSeq -> msg.message().toSeq }
               .toList
