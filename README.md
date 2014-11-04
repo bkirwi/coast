@@ -27,7 +27,7 @@ A backend that compiles the DAG into a set of Samza jobs is also in progress, bu
 
 ```scala
 // declare the names of the input and output streams
-val Sentences =  coast.Name[String, String]("sentences")
+val Sentences = coast.Name[String, String]("sentences")
 val WordCounts = coast.Name[String, Int]("word-counts")
 
 val flow = for {
