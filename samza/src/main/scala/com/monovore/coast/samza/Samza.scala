@@ -72,6 +72,10 @@ package object samza {
         "serializers.registry.string.class" -> "org.apache.samza.serializers.StringSerdeFactory",
         "serializers.registry.bytes.class" -> "org.apache.samza.serializers.ByteSerdeFactory",
 
+        // TODO: checkpoints should be configurable
+        "task.checkpoint.factory" -> "org.apache.samza.checkpoint.kafka.KafkaCheckpointManagerFactory",
+        "task.checkpoint.system" -> system,
+
         // Coast-specific
         TaskKey -> SerializationUtil.toBase64(factory),
         TaskName -> name
@@ -87,6 +91,7 @@ package object samza {
             s"stores.$name.factory" -> "org.apache.samza.storage.kv.KeyValueStorageEngineFactory",
             s"stores.$name.key.serde" -> keyName,
             s"stores.$name.msg.serde" -> msgName,
+            s"stores.$name.changelog" -> s"$system.coast-cl-$name",
             s"serializers.registry.$keyName.class" -> "com.monovore.coast.samza.CoastSerdeFactory",
             s"serializers.registry.$keyName.serialized.base64" -> keyFormat,
             s"serializers.registry.$msgName.class" -> "com.monovore.coast.samza.CoastSerdeFactory",
