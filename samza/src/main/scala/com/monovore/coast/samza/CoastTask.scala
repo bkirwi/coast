@@ -3,6 +3,7 @@ package samza
 
 import org.apache.samza.config.Config
 import org.apache.samza.system.{SystemStream, OutgoingMessageEnvelope, IncomingMessageEnvelope}
+import org.apache.samza.task.TaskCoordinator.RequestScope
 import org.apache.samza.task._
 
 class CoastTask extends StreamTask with InitableTask {
@@ -41,5 +42,7 @@ class CoastTask extends StreamTask with InitableTask {
     this.collector = collector
 
     sink.execute(stream, key, message)
+
+    coordinator.commit(RequestScope.CURRENT_TASK)
   }
 }

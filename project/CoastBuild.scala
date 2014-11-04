@@ -42,5 +42,5 @@ object CoastBuild extends Build {
     base = file("samza")
   ) dependsOn (
     core
-  )
+  ) configs( IntegrationTest ) settings ( Defaults.itSettings : _*)
 }
