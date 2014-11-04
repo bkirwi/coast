@@ -9,9 +9,7 @@ friendliness.
 
 Consider this simple stream processing task: we want to write a job that pulls data from an input stream and write it to an output stream. (Let's say the input and output are stored in Kafka.) We'd like to copy the stream exactly: the first message in the input is the first message in the output, and so on.
 
-None of the common large-scale streaming frameworks can do this without dropping, duplicating or reordering messages. (This includes Storm, Trident, Samza, Spark Streaming, and Kafka's MirrorMaker tool.) Of course, it's sometimes possible to make things work -- but such a simple job shouldn't require a distributed systems engineer to write.
-
-This isn't an isolated case: many streaming calculations are similarly error-prone. Mistakes are common enough that many experts advocate using streaming frameworks for only [approximate, disposable calculations](http://en.wikipedia.org/wiki/Lambda_architecture#Speed_layer), and reproducing all the work in another system; this works, but it's a lot of effort, and it severely limits the number of applications you can build.
+In the current generation of streaming frameworks, this is surprisingly difficult; in the presence of failures, most implementations will drop, duplicate, or reorder messages. (Getting it right involves careful, manual offset tracking.) When a job this trivial is this tricky to get right, it's hard to build reliable applications on top. Mistakes are common enough that many experts advocate using streaming frameworks for only [approximate, disposable calculations](http://en.wikipedia.org/wiki/Lambda_architecture#Speed_layer), and reproducing all the work in another system; this works, but it's a lot of effort, and it limits the kind of applications you can build.
 
 `coast` dreams of a better way.
 
@@ -55,6 +53,8 @@ val flow = for {
 ## Future Work
 
 - The Samza backend is incomplete, and all components need both polish and documentation.
+
+- It would be nice to support multiple frontends, possibly in other languages. (Java, Clojure, Ruby, etc.) This might require moving a small amount of code to Java.
 
 - The current API only works nicely for small, pure functions. In the future, `coast` should have better support for processing that is asynchronous, nondeterministic, or requires initialization.
 
