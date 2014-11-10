@@ -72,52 +72,48 @@ class SamzaIntegrationSpec extends Specification with ScalaCheck {
       output("bar") must_== inputData("bar").flatMap { n => Seq.fill(3)(n) }
     }
 
-//    "accumulate state" in {
-//
-//      val flow = coast.sink(Bar) {
-//        coast.source(Foo).fold(0) { (n, _) => n + 1 }.stream
-//      }
-//
-//      val inputData = Map("bar" -> (1 to BigNumber))
-//
-//      val input = Messages().add(Foo, inputData)
-//
-//      val output = IntegrationTest.fuzz(flow, input).get(Bar)
-//
-//      for (Seq(first, second) <- output("bar").sliding(2)) {
-//        first must_== (second - 1)
-//      }
-//
-//      // collections are very large, so fail fast!
-//      output("bar").size must_== inputData("bar").size
-//
-//      output("bar") must_== inputData("bar")
-//    }
-//
-//    "compose well across multiple Samza jobs" in {
-//
-//      val flow = for {
-//
-//        once <- coast.label("testing") {
-//          coast.source(Foo).fold(1) { (n, _) => n + 1 }.stream
-//        }
-//
-//        _ <- coast.sink(Bar) { once.map { _ + 1 } }
-//
-//      } yield ()
-//
-//      val inputData = Map("bar" -> (1 to BigNumber))
-//
-//      val input = Messages().add(Foo, inputData)
-//
-//      val output = IntegrationTest.fuzz(flow, input).get(Bar)
-//
-//      // collections are very large, so fail fast!
-//      output("bar").size must_== inputData("bar").size
-//
-//      output("bar") must_== inputData("bar").map { _ + 2 }
-//    }
-//
+    "accumulate state" in {
+
+      val flow = coast.sink(Bar) {
+        coast.source(Foo).fold(0) { (n, _) => n + 1 }.stream
+      }
+
+      val inputData = Map("bar" -> (1 to BigNumber))
+
+      val input = Messages().add(Foo, inputData)
+
+      val output = IntegrationTest.fuzz(flow, input).get(Bar)
+
+      // collections are very large, so fail fast!
+      output("bar").size must_== inputData("bar").size
+
+      output("bar") must_== inputData("bar")
+    }
+
+    "compose well across multiple Samza jobs" in {
+
+      val flow = for {
+
+        once <- coast.label("testing") {
+          coast.source(Foo).fold(1) { (n, _) => n + 1 }.stream
+        }
+
+        _ <- coast.sink(Bar) { once.map { _ + 1 } }
+
+      } yield ()
+
+      val inputData = Map("bar" -> (1 to BigNumber))
+
+      val input = Messages().add(Foo, inputData)
+
+      val output = IntegrationTest.fuzz(flow, input).get(Bar)
+
+      // collections are very large, so fail fast!
+      output("bar").size must_== inputData("bar").size
+
+      output("bar") must_== inputData("bar").map { _ + 2 }
+    }
+
 //    "do a merge" in {
 //
 //      val Foo2 = coast.Name[String, Int]("foo-2")

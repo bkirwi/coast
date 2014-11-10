@@ -39,7 +39,7 @@ package object samza {
     case Source(_) => Seq(Storage(
       name = formatPath(path),
       keyString = SerializationUtil.toBase64(format.pretty.UnitFormat),
-      valueString = SerializationUtil.toBase64(format.pretty.LongFormat)
+      valueString = SerializationUtil.toBase64(format.pretty.UnitFormat)
     ))
     case PureTransform(up, _) => storageFor(up, path)
     case Merge(ups) => {

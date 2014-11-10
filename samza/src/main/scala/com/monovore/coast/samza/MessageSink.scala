@@ -33,28 +33,17 @@ object MessageSink {
 
         new MessageSink[Bytes, Bytes] with Logging {
 
-          val store = context.getStore(formatPath(prefix)).asInstanceOf[CoastStore[Unit, Long]]
-
-          info(s"Restored ${formatPath(prefix)} with next offset ${store.nextOffset}")
+          val store = context.getStore(formatPath(prefix)).asInstanceOf[CoastStore[Unit, Unit]]
 
           override def execute(stream: String, offset: Long, key: Bytes, value: Bytes): Long = {
 
-            if (offset >= store.nextOffset) {
-
-              val (_, downstreamOffset) = store.getOrElse(unit, 0L)
-
-              if (downstreamOffset == 0 && store.nextOffset != 0) sys.error(s"$downstreamOffset ${store.nextOffset}")
+            store.handle(offset, unit, unit) { (downstreamOffset, _) =>
 
               val a = source.keyFormat.read(key)
               val b = source.valueFormat.read(value)
 
-              val nextOffset = sink.execute(stream, downstreamOffset, a, b)
-
-              store.put(unit, nextOffset)
-
+              sink.execute(stream, downstreamOffset, a, b) -> unit
             }
-
-            store.nextOffset
           }
 
           override def flush(): Unit = {
@@ -81,30 +70,32 @@ object MessageSink {
       }
 
       def compileAggregate[S, A, B, B0](trans: Aggregate[S, A, B0, B], sink: MessageSink[A, B], prefix: List[String]) = {
-//
-//        val store = context.getStore(samza.formatPath(prefix)).asInstanceOf[KeyValueStore[A, S]]
-//
-//        val transformed = new MessageSink[A, B0] {
-//
-//          override def execute(stream: String, key: A, value: B0): Unit = {
-//
-//            val update = trans.transformer(key)
-//
-//            val state = Option(store.get(key))
-//              .getOrElse(trans.init)
-//
-//            val (newState, output) = update(state, value)
-//            store.put(key, newState)
-//            output.foreach(sink.execute(stream, key, _))
-//          }
-//
-//          override def nextOffset(offset: Long): Unit = {
-//
-//          }
-//        }
-//
-//        compile(trans.upstream, transformed, "aggregated" :: prefix)
-        ???
+
+        val transformed = new MessageSink[A, B0] with Logging {
+
+          val store = context.getStore(samza.formatPath(prefix)).asInstanceOf[CoastStore[A, S]]
+
+          override def execute(stream: String, offset: Long, key: A, value: B0): Long = {
+
+            store.handle(offset, key, trans.init) { (downstreamOffset, state) =>
+
+              val update = trans.transformer(key)
+
+              val (newState, output) = update(state, value)
+
+              val newDownstreamOffset = output.foldLeft(downstreamOffset)(sink.execute(stream, _, key, _))
+
+              newDownstreamOffset -> newState
+            }
+          }
+
+          override def flush(): Unit = {
+            sink.flush()
+            store.flush()
+          }
+        }
+
+        compile(trans.upstream, transformed, "aggregated" :: prefix)
       }
 
       def compileGroupBy[A, B, A0](gb: GroupBy[A, B, A0], sink: MessageSink[A, B], prefix: List[String]) = {

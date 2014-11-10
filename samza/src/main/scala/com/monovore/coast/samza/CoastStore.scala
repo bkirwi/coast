@@ -16,7 +16,7 @@ import org.apache.samza.util.Logging
 import collection.JavaConverters._
 
 class CoastStore[A, B](
-  underlying: KeyValueStore[A, (Long, B)],
+  underlying: KeyValueStore[A, B],
   keySerde: Serde[A],
   valueSerde: Serde[B],
   collector: MessageCollector,
@@ -25,9 +25,9 @@ class CoastStore[A, B](
 
   val partition: Int = ssp.getPartition.getPartitionId
 
-  var upstreamOffset: Long = 0L
-
   var nextOffset: Long = 0L
+
+  var downstreamOffset: Long = 0L
 
   override def restore(messages: util.Iterator[IncomingMessageEnvelope]): Unit = {
 
@@ -36,24 +36,47 @@ class CoastStore[A, B](
       val offset = message.getOffset.toLong
 
       val key = keySerde.fromBytes(message.getKey.asInstanceOf[Array[Byte]])
-      val value = valueSerde.fromBytes(message.getMessage.asInstanceOf[Array[Byte]])
 
-      underlying.put(key, offset -> value)
+      val valueBytes = message.getMessage.asInstanceOf[Array[Byte]]
 
-      nextOffset = offset + 1
+      nextOffset = Longs.fromByteArray(valueBytes.slice(0, 8))
+      downstreamOffset = Longs.fromByteArray(valueBytes.slice(8, 16))
+
+      underlying.put(key, valueSerde.fromBytes(valueBytes.drop(16)))
     }
-  }
-  
-  def put(key: A, value: B): Unit = {
 
-    collector.send(new OutgoingMessageEnvelope(ssp, partition, keySerde.toBytes(key), valueSerde.toBytes(value)))
+    info(s"Restored offsets for $ssp: [upstream: $nextOffset, downstream: $downstreamOffset]")
+  }
+
+  def handle(offset: Long, key: A, default: B)(block: (Long, B) => (Long, B)): Long = {
+
+    if (offset >= nextOffset) {
+
+      val value = getOrElse(key, default)
+
+      val (newOffset, newValue) = block(downstreamOffset, value)
+
+      downstreamOffset = newOffset
+
+      put(key, newValue)
+    }
+
+    nextOffset
+  }
+
+  def put(key: A, value: B): Unit = {
 
     nextOffset += 1
 
-    underlying.put(key, nextOffset -> value)
+    val valueBytes =
+      Longs.toByteArray(nextOffset) ++ Longs.toByteArray(downstreamOffset) ++ valueSerde.toBytes(value)
+
+    collector.send(new OutgoingMessageEnvelope(ssp, partition, keySerde.toBytes(key), valueBytes))
+
+    underlying.put(key, value)
   }
 
-  def getOrElse(key: A, default: B): (Long, B) = Option(underlying.get(key)).getOrElse(0L -> default)
+  def getOrElse(key: A, default: B): B = Option(underlying.get(key)).getOrElse(default)
 
   override def flush(): Unit = {
 
@@ -87,16 +110,7 @@ class CoastStoreFactory[A, B] extends StorageEngineFactory[A, B] {
     val underlying =
       backingFactory.getKVStore(storeName, storeDir, registry, changeLogSystemStreamPartition, containerContext)
 
-    val serialized = new SerializedKeyValueStore[A, (Long, B)](underlying, keySerde, new Serde[(Long, B)] {
-
-      override def toBytes(pair: (Long, B)): Array[Byte] = {
-        Longs.toByteArray(pair._1) ++ msgSerde.toBytes(pair._2)
-      }
-
-      override def fromBytes(bytes: Array[Byte]): (Long, B) = {
-        Longs.fromByteArray(bytes.take(8)) -> msgSerde.fromBytes(bytes.drop(8))
-      }
-    })
+    val serialized = new SerializedKeyValueStore[A, B](underlying, keySerde, msgSerde)
 
     new CoastStore[A, B](serialized, keySerde, msgSerde, collector, changeLogSystemStreamPartition)
   }
