@@ -8,7 +8,17 @@
         </encoder>
     </appender>
 
-    <root level="ERROR">
+    <!--<logger name="org.apache.samza.system.kafka.KafkaSystemProducer" level="TRACE"/>-->
+
+    <!--<logger name="org.apache.samza.task" level="INFO"/>-->
+
+    <logger name="kafka.producer" level="TRACE"/>
+
+    <logger name="org.apache.samza" level="WARN"/>
+
+    <logger name="com.monovore.coast.samza" level="DEBUG"/>
+
+    <root level="WARN">
         <appender-ref ref="STDOUT" />
     </root>
 </configuration>

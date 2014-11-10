@@ -33,8 +33,6 @@ class SamzaSpec extends Specification with ScalaCheck {
 
       val config = configs("bigger-ints")
 
-      println(JsonConfigSerializer.toJson(config))
-
       config.get(samza.TaskName) must_== "bigger-ints"
 
       config.get("stores./bigger-ints.factory") must_!= null
