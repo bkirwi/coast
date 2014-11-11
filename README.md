@@ -3,7 +3,9 @@
 An experiment in streaming, with a focus on correctness, concision, and
 friendliness.
 
-**Caveat Haxxor:** This project is unreleased, immature, and changing rapidly. If you don't like what you see now, check back in a few weeks.
+## Caveat Haxxor
+
+This project is unreleased, immature, and changing rapidly. If you don't like what you see now, check back in a few weeks.
 
 ## Why Another Streaming Framework?
 
