@@ -93,7 +93,12 @@ class SamzaIntegrationSpec extends Specification with ScalaCheck {
 
       val Foo2 = coast.Name[String, Int]("foo-2")
 
-      val flow = coast.sink(Bar) { coast.merge(coast.source(Foo), coast.source(Foo2)) }
+      val flow = coast.sink(Bar) {
+        coast.merge(
+          "foo-1" -> coast.source(Foo),
+          "foo-2" -> coast.source(Foo2)
+        )
+      }
 
       val input = Messages
         .add(Foo, Map("test" -> (1 to BigNumber by 2)))

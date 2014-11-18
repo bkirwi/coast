@@ -151,8 +151,8 @@ object MessageSink {
           }
         }
 
-        val upstreamSinks = merge.upstreams.zipWithIndex
-          .map { case (up, i) => compile(up, downstreamSink, s"merge-$i" :: prefix) }
+        val upstreamSinks = merge.upstreams
+          .map { case (name, up) => compile(up, downstreamSink, name :: prefix) }
 
         new MessageSink[Bytes, Bytes] {
 

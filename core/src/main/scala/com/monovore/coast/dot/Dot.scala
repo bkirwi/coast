@@ -34,7 +34,7 @@ object Dot {
       }
       case Merge(upstreams) => {
         val id = newID("merge")
-        upstreams.map { up => sources(id, up) }.flatten ++ Seq(id -> downstream)
+        upstreams.map { case (name -> up) => sources(id, up) }.flatten ++ Seq(id -> downstream)
       }
       case GroupBy(upstream, _) => {
         val id = newID("groupBy")

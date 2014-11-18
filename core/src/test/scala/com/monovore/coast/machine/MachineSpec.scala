@@ -66,7 +66,11 @@ class MachineSpec extends Specification with ScalaCheck {
         val integers2 = Name[String, Int]("integers-2")
 
         val graph = coast.sink(output) {
-          coast.merge(coast.source(integers), coast.source(integers2))
+
+          coast.merge(
+            "ints" -> coast.source(integers),
+            "more" -> coast.source(integers2)
+          )
         }
 
         prop { (input: Map[String, Seq[Int]], input2: Map[String, Seq[Int]]) =>

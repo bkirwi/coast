@@ -22,7 +22,7 @@ package object samza {
   private[this] def sourcesFor[A, B](element: Node[A, B]): Set[String] = element match {
     case Source(name) => Set(name)
     case Transform(up, _, _) => sourcesFor(up)
-    case Merge(ups) => ups.flatMap(sourcesFor).toSet
+    case Merge(ups) => ups.flatMap { case (_, up) => sourcesFor(up) }.toSet
     case GroupBy(up, _) => sourcesFor(up)
   }
 
@@ -45,8 +45,7 @@ package object samza {
     ))
     case PureTransform(up, _) => storageFor(up, path)
     case Merge(ups) => {
-      ups.zipWithIndex
-        .flatMap { case (up, i) => storageFor(up, s"merge-$i" :: path)}
+      ups.flatMap { case (branch, up) => storageFor(up, branch :: path)}
     }
     case agg @ Aggregate(up, _, _) => {
       val upstreamed = storageFor(up, "aggregated" :: path)
