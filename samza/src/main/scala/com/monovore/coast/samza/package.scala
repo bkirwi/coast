@@ -12,6 +12,8 @@ package object samza {
   val TaskKey = "coast.task.serialized.base64"
   val TaskName = "coast.task.name"
 
+  val CoastSystem = "coast-system"
+
   def formatPath(path: List[String]): String = {
     if (path.isEmpty) "."
     else path.reverse.mkString(".")
@@ -58,7 +60,6 @@ package object samza {
   }
 
   def configureFlow(flow: Flow[_])(
-    system: String = "kafka",
     baseConfig: Config = new MapConfig()
   ): Map[String, Config] = {
 
@@ -66,9 +67,13 @@ package object samza {
 
     val configs = flow.bindings.map { case (name -> sink) =>
 
-      val inputs = sourcesFor(sink.element)
+      val inputs = (sourcesFor(sink.element) + s"coast.merge.$name")
+        .map { i => s"$CoastSystem.$i" }
 
       val storage = storageFor(sink.element, List(name))
+
+      val streamDelays = storage
+        .map { case Storage(s, _, _) => s -> (s.count { _ == '.'} + 1) }
 
       val factory: MessageSink.Factory = new MessageSink.FromElement(sink)
 
@@ -79,14 +84,23 @@ package object samza {
 
         // Task
         "task.class" -> "com.monovore.coast.samza.CoastTask",
-        "task.inputs" -> inputs.map { i => s"$system.$i"}.mkString(","),
+        "task.inputs" -> inputs.mkString(","),
 
         "serializers.registry.string.class" -> "org.apache.samza.serializers.StringSerdeFactory",
         "serializers.registry.bytes.class" -> "org.apache.samza.serializers.ByteSerdeFactory",
 
         // TODO: checkpoints should be configurable
         "task.checkpoint.factory" -> "org.apache.samza.checkpoint.kafka.KafkaCheckpointManagerFactory",
-        "task.checkpoint.system" -> system,
+        "task.checkpoint.system" -> "coast-system",
+
+        // Kafka system
+        s"systems.$CoastSystem.samza.offset.default" -> "oldest",
+        s"systems.$CoastSystem.producer.producer.type" -> "sync",
+        s"systems.$CoastSystem.producer.message.send.max.retries" -> "0",
+        s"systems.$CoastSystem.producer.request.required.acks" -> "1",
+        s"systems.$CoastSystem.samza.offset.default" -> "oldest",
+        s"systems.$CoastSystem.samza.factory" -> "com.monovore.coast.samza.CoastKafkaSystemFactory",
+        s"systems.$CoastSystem.delays" -> streamDelays.map { case (s, i) => s"coast.changelog.$s/$i" }.mkString(","),
 
         // Coast-specific
         TaskKey -> SerializationUtil.toBase64(factory),
@@ -110,7 +124,7 @@ package object samza {
             s"stores.$name.subfactory" -> "org.apache.samza.storage.kv.inmemory.InMemoryKeyValueStorageEngineFactory",
             s"stores.$name.key.serde" -> keyName,
             s"stores.$name.msg.serde" -> msgName,
-            s"stores.$name.changelog" -> s"$system.coast-cl-$name",
+            s"stores.$name.changelog" -> s"$CoastSystem.coast.changelog.$name",
             s"serializers.registry.$keyName.class" -> "com.monovore.coast.samza.CoastSerdeFactory",
             s"serializers.registry.$keyName.serialized.base64" -> keyFormat,
             s"serializers.registry.$msgName.class" -> "com.monovore.coast.samza.CoastSerdeFactory",

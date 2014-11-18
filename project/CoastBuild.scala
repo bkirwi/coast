@@ -23,7 +23,7 @@ object CoastBuild extends Build {
     test := (),
 
     libraryDependencies in ThisBuild ++= Seq(
-      "org.specs2" %% "specs2" % "2.4.7" % "test",
+      "org.specs2" %% "specs2" % "2.4.11" % "test",
       "org.scalacheck" %% "scalacheck" % "1.11.5" % "test"
     ),
 

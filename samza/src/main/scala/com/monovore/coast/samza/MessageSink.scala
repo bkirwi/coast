@@ -8,6 +8,8 @@ import org.apache.samza.util.Logging
 
 trait MessageSink[-K, -V] extends Serializable {
 
+  def init(offset: Long): Unit // FIXME: laaaame
+
   def execute(stream: String, offset: Long, key: K, value: V): Long
 
   def flush(): Unit
@@ -37,19 +39,23 @@ object MessageSink {
 
           override def execute(stream: String, offset: Long, key: Bytes, value: Bytes): Long = {
 
-            store.handle(offset, unit, unit) { (downstreamOffset, _) =>
+            if (stream == source.source) {
+              store.handle(offset, unit, unit) { (downstreamOffset, _) =>
 
-              val a = source.keyFormat.read(key)
-              val b = source.valueFormat.read(value)
+                val a = source.keyFormat.read(key)
+                val b = source.valueFormat.read(value)
 
-              sink.execute(stream, downstreamOffset, a, b) -> unit
-            }
+                sink.execute(stream, downstreamOffset, a, b) -> unit
+              }
+            } else offset
           }
 
           override def flush(): Unit = {
             sink.flush()
             store.flush()
           }
+
+          override def init(offset: Long): Unit = sink.init(store.downstreamOffset)
         }
       }
 
@@ -64,6 +70,8 @@ object MessageSink {
           }
 
           override def flush(): Unit = sink.flush()
+
+          override def init(offset: Long): Unit = sink.init(offset)
         }
 
         compile(trans.upstream, transformed, prefix)
@@ -76,16 +84,22 @@ object MessageSink {
           val store = context.getStore(samza.formatPath(prefix)).asInstanceOf[CoastStore[A, S]]
 
           override def execute(stream: String, offset: Long, key: A, value: B0): Long = {
+            try {
+              store.handle(offset, key, trans.init) { (downstreamOffset, state) =>
 
-            store.handle(offset, key, trans.init) { (downstreamOffset, state) =>
+                val update = trans.transformer(key)
 
-              val update = trans.transformer(key)
+                val (newState, output) = update(state, value)
 
-              val (newState, output) = update(state, value)
+                val newDownstreamOffset = output.foldLeft(downstreamOffset)(sink.execute(stream, _, key, _))
 
-              val newDownstreamOffset = output.foldLeft(downstreamOffset)(sink.execute(stream, _, key, _))
-
-              newDownstreamOffset -> newState
+                newDownstreamOffset -> newState
+              }
+            } catch {
+              case e => {
+                error(s"Dying from input: $stream $offset $key $value")
+                throw e
+              }
             }
           }
 
@@ -93,6 +107,8 @@ object MessageSink {
             sink.flush()
             store.flush()
           }
+
+          override def init(offset: Long): Unit = sink.init(store.downstreamOffset)
         }
 
         compile(trans.upstream, transformed, "aggregated" :: prefix)
@@ -108,26 +124,49 @@ object MessageSink {
           }
 
           override def flush(): Unit = sink.flush()
+
+          override def init(offset: Long): Unit = sink.init(offset)
         }
 
         compile(gb.upstream, task, prefix)
       }
 
       def compileMerge[A, B](merge: Merge[A, B], sink: MessageSink[A, B], prefix: List[String]) = {
-//
-//        val upstreamSinks = merge.upstreams.zipWithIndex
-//          .map { case (up, i) => compile(up, sink, s"merged-$i" :: prefix) }
-//
-//        new MessageSink[Bytes, Bytes] {
-//
-//          override def execute(stream: String, key: Bytes, value: Bytes): Unit = {
-//
-//            upstreamSinks.foreach { _.execute(stream, key, value) }
-//          }
-//
-//          override def nextOffset(offset: Long): Unit = sink.nextOffset(offset)
-//        }
-        ???
+
+        val downstreamSink = new MessageSink[A, B] with Logging {
+
+          private[this] var maxOffset: Long = 0L
+
+          override def execute(stream: String, offset: Long, key: A, value: B): Long = {
+            maxOffset = math.max(maxOffset, offset)
+            maxOffset = sink.execute(stream, maxOffset, key, value)
+            maxOffset
+          }
+
+          override def flush(): Unit = sink.flush()
+
+          override def init(offset: Long): Unit = {
+            maxOffset = math.max(maxOffset, offset)
+            sink.init(maxOffset)
+          }
+        }
+
+        val upstreamSinks = merge.upstreams.zipWithIndex
+          .map { case (up, i) => compile(up, downstreamSink, s"merge-$i" :: prefix) }
+
+        new MessageSink[Bytes, Bytes] {
+
+          override def execute(stream: String, offset: Long, key: Bytes, value: Bytes): Long = {
+
+            upstreamSinks.foreach { s => s.execute(stream, offset, key, value) }
+
+            offset
+          }
+
+          override def flush(): Unit = upstreamSinks.foreach { _.flush() }
+
+          override def init(offset: Long): Unit = upstreamSinks.foreach { _.init(offset) }
+        }
       }
 
       def compile[A, B](ent: Node[A, B], sink: MessageSink[A, B], prefix: List[String]): ByteSink = {
@@ -158,6 +197,8 @@ object MessageSink {
         }
 
         override def flush(): Unit = finalSink.flush()
+
+        override def init(offset: Long): Unit = finalSink.init(offset)
       }
 
       val name = config.get(samza.TaskName)

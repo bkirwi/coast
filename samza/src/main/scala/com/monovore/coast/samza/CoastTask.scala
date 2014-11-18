@@ -1,6 +1,7 @@
 package com.monovore.coast
 package samza
 
+import com.monovore.coast.format.WireFormat
 import org.apache.samza.config.Config
 import org.apache.samza.system._
 import org.apache.samza.task._
@@ -10,6 +11,10 @@ import scala.collection.JavaConverters._
 
 class CoastTask extends StreamTask with InitableTask with WindowableTask with Logging {
 
+  var taskName: String = _
+
+  var mergeStream: String = _
+
   var collector: MessageCollector = _
 
   var sink: MessageSink.ByteSink = _
@@ -18,14 +23,16 @@ class CoastTask extends StreamTask with InitableTask with WindowableTask with Lo
 
     val factory = SerializationUtil.fromBase64[MessageSink.Factory](config.get(samza.TaskKey))
 
-    val output = config.get(samza.TaskName)
+    taskName = config.get(samza.TaskName)
+
+    mergeStream = s"coast.merge.$taskName"
 
     val offsetThreshold = {
 
-      val systemFactory = config.getNewInstance[SystemFactory]("systems.kafka.samza.factory")
-      val admin = systemFactory.getAdmin("kafka", config)
-      val meta = admin.getSystemStreamMetadata(Set(output).asJava).asScala
-        .getOrElse(output, sys.error(s"Couldn't find metadata on output stream $output"))
+      val systemFactory = config.getNewInstance[SystemFactory](s"systems.$CoastSystem.samza.factory")
+      val admin = systemFactory.getAdmin(CoastSystem, config)
+      val meta = admin.getSystemStreamMetadata(Set(taskName).asJava).asScala
+        .getOrElse(taskName, sys.error(s"Couldn't find metadata on output stream $taskName"))
       val partitionMeta = meta.getSystemStreamPartitionMetadata.asScala
       assert(partitionMeta.size == 1, "FIXME: assuming a single partition here")
       partitionMeta.values.head.getUpcomingOffset.toLong
@@ -35,7 +42,7 @@ class CoastTask extends StreamTask with InitableTask with WindowableTask with Lo
 
     val finalSink = new MessageSink.ByteSink {
 
-      val outputStream = new SystemStream("kafka", output)
+      val outputStream = new SystemStream(CoastSystem, taskName)
 
       override def execute(stream: String, offset: Long, key: Array[Byte], value: Array[Byte]): Long = {
 
@@ -48,12 +55,15 @@ class CoastTask extends StreamTask with InitableTask with WindowableTask with Lo
       }
 
       override def flush(): Unit = {
-        info(s"Flushing output stream $outputStream")
-        collector.flush(outputStream)
+        debug(s"Flushing output stream $outputStream")
       }
+
+      override def init(offset: Long): Unit = {}
     }
 
     sink = factory.make(config, context, finalSink)
+
+    sink.init(0L)
   }
 
   override def process(
@@ -62,23 +72,43 @@ class CoastTask extends StreamTask with InitableTask with WindowableTask with Lo
     coordinator: TaskCoordinator
   ): Unit = {
 
-    val inputOffset = envelope.getOffset.toLong
+    if (envelope.getSystemStreamPartition.getSystemStream.getStream == mergeStream) {
 
-    val stream = envelope.getSystemStreamPartition.getSystemStream.getStream
-    val key = Option(envelope.getKey.asInstanceOf[Array[Byte]]).getOrElse(Array.empty[Byte])
-    val message = envelope.getMessage.asInstanceOf[Array[Byte]]
+      val key = Option(envelope.getKey.asInstanceOf[Array[Byte]]).getOrElse(Array.empty[Byte])
 
-    this.collector = collector
+      val message = envelope.getMessage.asInstanceOf[Array[Byte]]
 
-    sink.execute(stream, inputOffset, key, message)
+      val fullMessage = WireFormat.read[FullMessage](message)
+
+      this.collector = collector
+
+      sink.execute(fullMessage.stream, fullMessage.offset, key, fullMessage.value)
+
+    } else {
+
+      val inputOffset = envelope.getOffset.toLong
+
+      val stream = envelope.getSystemStreamPartition.getSystemStream.getStream
+      val key = Option(envelope.getKey.asInstanceOf[Array[Byte]]).getOrElse(Array.empty[Byte])
+      val message = envelope.getMessage.asInstanceOf[Array[Byte]]
+
+      collector.send(new OutgoingMessageEnvelope(
+        new SystemStream(CoastSystem, mergeStream),
+        envelope.getSystemStreamPartition.getPartition.getPartitionId,
+        key,
+        WireFormat.write(
+          FullMessage(stream, 0, inputOffset, message)
+        )
+      ))
+    }
   }
 
   override def window(collector: MessageCollector, coordinator: TaskCoordinator): Unit = {
 
-    this.collector = collector
+//    this.collector = collector
 
-    sink.flush()
+//    sink.flush()
 
-    coordinator.commit(TaskCoordinator.RequestScope.CURRENT_TASK)
+//    coordinator.commit(TaskCoordinator.RequestScope.CURRENT_TASK)
   }
 }

@@ -8,15 +8,15 @@
         </encoder>
     </appender>
 
-    <!--<logger name="org.apache.samza.system.kafka.KafkaSystemProducer" level="TRACE"/>-->
+    <!--<logger name="org.apache.samza.system.SystemConsumers" level="TRACE"/>-->
 
-    <!--<logger name="org.apache.samza.task" level="INFO"/>-->
+    <!--<logger name="org.apache.samza.container" level="DEBUG"/>-->
 
-    <logger name="kafka.producer" level="TRACE"/>
+    <!--<logger name="com.monovore.integration.coast" level="TRACE"/>-->
 
-    <logger name="org.apache.samza" level="WARN"/>
+    <!--<logger name="org.apache.samza" level="WARN"/>-->
 
-    <logger name="com.monovore.coast.samza" level="DEBUG"/>
+    <logger name="com.monovore.coast.samza" level="INFO"/>
 
     <root level="WARN">
         <appender-ref ref="STDOUT" />

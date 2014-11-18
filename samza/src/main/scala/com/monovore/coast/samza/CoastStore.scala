@@ -33,8 +33,6 @@ class CoastStore[A, B](
 
     for (message <- messages.asScala) {
 
-      val offset = message.getOffset.toLong
-
       val key = keySerde.fromBytes(message.getKey.asInstanceOf[Array[Byte]])
 
       val valueBytes = message.getMessage.asInstanceOf[Array[Byte]]
@@ -59,9 +57,11 @@ class CoastStore[A, B](
       downstreamOffset = newOffset
 
       put(key, newValue)
-    }
 
-    nextOffset
+      nextOffset
+    } else {
+      offset + 1
+    }
   }
 
   def put(key: A, value: B): Unit = {
@@ -79,10 +79,6 @@ class CoastStore[A, B](
   def getOrElse(key: A, default: B): B = Option(underlying.get(key)).getOrElse(default)
 
   override def flush(): Unit = {
-
-    info(s"Flushing system stream ${ssp.getSystemStream}")
-    collector.flush(ssp)
-
     underlying.flush()
   }
 
