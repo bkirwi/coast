@@ -16,6 +16,8 @@ object Dot {
 
   case class Label(global: LabelType, pretty: String)
 
+  case class Edge(from: Label, to: Label, tag: Option[String] = None)
+
   def apply(graph: Flow[Unit]): String = {
 
     val newID: String => Label = {
@@ -23,33 +25,40 @@ object Dot {
       (pretty) => { Label(Private(atomic.getAndIncrement), pretty) }
     }
 
-    def sources[A, B](downstream: Label, flow: Node[A, B]): Seq[(Label, Label)] = flow match {
+    def sources[A, B](downstream: Label, flow: Node[A, B]): Seq[Edge] = flow match {
       case Source(name) => {
         val label = Label(Public(name), name)
-        Seq(label -> downstream)
+        Seq(Edge(label, downstream))
       }
-      case Transform(upstream, _, _) => {
+      case PureTransform(upstream, _) => {
         val id = newID("transform")
-        sources(id, upstream) ++ Seq(id -> downstream)
+        sources(id, upstream) ++ Seq(Edge(id, downstream))
+      }
+      case Aggregate(upstream, _, _) => {
+        val id = newID("aggregate")
+        sources(id, upstream) ++ Seq(Edge(id, downstream))
       }
       case Merge(upstreams) => {
         val id = newID("merge")
-        upstreams.map { case (name -> up) => sources(id, up) }.flatten ++ Seq(id -> downstream)
+        upstreams.map { case (name -> up) => sources(id, up) }.flatten ++ Seq(Edge(id, downstream))
       }
       case GroupBy(upstream, _) => {
         val id = newID("groupBy")
-        sources(id, upstream) ++ Seq(id -> downstream)
+        sources(id, upstream) ++ Seq(Edge(id, downstream))
       }
     }
 
-    val chain = graph.bindings
-      .flatMap { case (name -> Sink(flow)) =>
-        sources(Label(Public(name), name), flow)
+    val chains = graph.bindings
+      .map { case (name -> Sink(flow)) =>
+        name -> sources(Label(Public(name), name), flow)
       }
+      .toMap
 
-    val nodes = chain
-      .flatMap { case (k, v) => Seq(k, v) }.toSet
-      .map { label: Label =>
+    val subgraphs = for ((label, chain) <- chains) yield {
+
+      val nodes = chain
+        .flatMap { case Edge(k, v, _) => Seq(k, v) }.toSet
+        .map { label: Label =>
 
         val Label(global, pretty) = label
 
@@ -62,15 +71,28 @@ object Dot {
         s"""$global [shape=$shape, label="${pretty}"];"""
       }
 
-    val edges = chain.map { case (Label(k, _), Label(v, _)) => s"$k -> $v;" }
+      val edges = chain.map { case Edge(Label(k, _), Label(v, _), tag) =>
+        val options = tag.map { t => s"""[label="${t}"]""" }.getOrElse("")
+        s"$k -> $v; $options"
+      }
 
-    s"""digraph {
+      s"""  subgraph "cluster-$label" {
+         |
+         |    label="$label"
+         |    labeljust=l
+         |
+         |    // nodes
+         |    ${ nodes.mkString("\n    ") }
+         |
+         |    // edges
+         |    ${ edges.mkString("\n    ") }
+         |  }
+         """.stripMargin
+    }
+
+    s"""digraph flow {
        |
-       |  // nodes
-       |  ${ nodes.mkString("\n  ") }
-       |
-       |  // edges
-       |  ${ edges.mkString("\n  ") }
+       |${subgraphs.mkString("\n")}
        |}
        |""".stripMargin
   }
