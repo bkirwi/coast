@@ -27,7 +27,11 @@ class SamzaIntegrationSpec extends Specification with ScalaCheck {
         coast.source(Foo)
       }
 
-      val inputData = Map("bar" -> (1 to BigNumber))
+      val inputData = Map(
+        "foo" -> (1 to BigNumber),
+        "bar" -> (1 to BigNumber),
+        "baz" -> (1 to BigNumber)
+      )
 
       val input = Messages().add(Foo, inputData)
 
@@ -42,7 +46,10 @@ class SamzaIntegrationSpec extends Specification with ScalaCheck {
         coast.source(Foo).flatMap { n => Seq.fill(3)(n) }
       }
 
-      val inputData = Map("bar" -> (1 to BigNumber))
+      val inputData = Map(
+        "foo" -> (1 to BigNumber),
+        "bar" -> (1 to BigNumber)
+      )
 
       val input = Messages().add(Foo, inputData)
 
@@ -57,7 +64,10 @@ class SamzaIntegrationSpec extends Specification with ScalaCheck {
         coast.source(Foo).fold(0) { (n, _) => n + 1 }.stream
       }
 
-      val inputData = Map("bar" -> (1 to BigNumber))
+      val inputData = Map(
+        "foo" -> (1 to BigNumber),
+        "bar" -> (1 to BigNumber)
+      )
 
       val input = Messages().add(Foo, inputData)
 
@@ -80,7 +90,10 @@ class SamzaIntegrationSpec extends Specification with ScalaCheck {
 
       } yield ()
 
-      val inputData = Map("bar" -> (1 to BigNumber))
+      val inputData = Map(
+        "foo" -> (1 to BigNumber),
+        "bar" -> (1 to BigNumber)
+      )
 
       val input = Messages().add(Foo, inputData)
 

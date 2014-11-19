@@ -1,9 +1,11 @@
 package com.monovore.integration.coast
 
+import java.nio.ByteBuffer
+import java.util
 import java.util.Properties
 
 import com.monovore.coast
-import kafka.api.{TopicMetadataRequest, OffsetRequest}
+import kafka.api.{PartitionFetchInfo, FetchRequest, TopicMetadataRequest, OffsetRequest}
 import kafka.common.{UnknownTopicOrPartitionException, TopicAndPartition}
 import kafka.consumer.{Consumer, ConsumerConfig, ConsumerConnector, SimpleConsumer}
 import kafka.producer.{KeyedMessage, Producer, ProducerConfig}
@@ -23,6 +25,7 @@ object IntegrationTest {
 
     val broker0 = TestUtils.createBrokerConfig(0, port0)
     broker0.setProperty("auto.create.topics.enable", "true")
+    broker0.setProperty("num.partitions", "3")
 
     val config = new java.util.Properties()
 
@@ -66,8 +69,6 @@ object IntegrationTest {
     val factory = new ThreadJobFactory
 
     var producer: Producer[Array[Byte], Array[Byte]] = null
-    var consumer: ConsumerConnector = null
-    var simple: SimpleConsumer = null
 
     IntegrationTest.withKafkaCluster { config =>
 
@@ -75,16 +76,18 @@ object IntegrationTest {
 
       try {
 
+        // Give Kafka a chance to create the partitions
         IntegrationTest.slurp(input.messages.keySet, config)
+        Thread.sleep(500)
 
         producer = new Producer(producerConfig)
 
         for {
           (name, messages) <- input.messages
           (key, values) <- messages
-          value <- values.grouped(1000)
+          value <- values.grouped(100)
         } {
-          producer.send(value.map { value => new KeyedMessage(name, key.toArray, value.toArray)}: _*)
+          producer.send(value.map { value => new KeyedMessage(name, key.toArray, util.Arrays.hashCode(key.toArray), value.toArray)}: _*)
         }
 
         val configs = coast.samza.configureFlow(flow)(
@@ -100,7 +103,7 @@ object IntegrationTest {
 
         // FLAIL!
 
-        val sleeps = (0 until 4).map { _ => Random.nextInt(500) + 800} ++ Seq(8000)
+        val sleeps = (0 until 4).map { _ => Random.nextInt(800) + 600} ++ Seq(8000)
 
         for (sleepTime <- sleeps) {
 
@@ -129,63 +132,14 @@ object IntegrationTest {
           }
         }
 
-        // TODO: why doesn't this work?
-
-        //      val inputSize = input.messages.mapValues { _.values.map { _.size }.sum }
-        //
-        //      flow.bindings.map { case (name, _) =>
-        //
-        //        val cp = s"__samza_checkpoint_${name}_1"
-        //
-        //        val List(stream) = streams(cp)
-        //        val config = configs(name)
-        //
-        //        val inputs = config.get("task.inputs").split(",").toSeq
-        //          .map { _.split("\\.").toSeq }
-        //          .map { case Seq(system, stream) => new SystemStream(system, stream) }
-        //
-        //        val iterator = stream.iterator()
-        //
-        //        val serde = new CheckpointSerde
-        //
-        //        def poll(): Unit = {
-        //          val next = iterator.next() // Blocking!
-        //
-        //          val checkpoint = serde.fromBytes(next.message())
-        //
-        //          println(checkpoint, inputs)
-        //
-        //          val finished = inputs
-        //            .forall { ss =>
-        //              val offset = Option(checkpoint.getOffsets.get(ss)).map { _.toLong + 1 }.getOrElse(0L)
-        //              offset >= inputSize.getOrElse(ss.getStream, 0)
-        //            }
-        //
-        //          if (finished) ()
-        //          else poll()
-        //        }
-        //
-        //        poll()
-        //      }
-
-//        val checkpointStreams = flow.bindings.map { case (name, _) => s"__samza_checkpoint_${name}_1"}
-
         val outputStreams = flow.bindings.map { case (name, _) => name}
 
         IntegrationTest.slurp(outputStreams.toSet, config)
 
       } finally {
 
-        if (simple != null) {
-          simple.close()
-        }
-
         if (producer != null) {
           producer.close()
-        }
-
-        if (consumer != null) {
-          consumer.shutdown()
         }
       }
     }
@@ -193,47 +147,54 @@ object IntegrationTest {
 
   def slurp(topics: Set[String], config: Properties): Messages = {
 
-    var consumer: ConsumerConnector = null
-    var simple: SimpleConsumer = null
+    var simple: Map[Int, SimpleConsumer] = null
 
     try {
 
-      val port0 = config.getProperty("metadata.broker.list").split(":")(1).toInt
+      val ports = config.getProperty("metadata.broker.list").split(",")
+        .map { _.split(":")(1).toInt }
 
-      simple = new SimpleConsumer("localhost", port0, ConsumerConfig.SocketTimeout, ConsumerConfig.SocketBufferSize, ConsumerConfig.DefaultClientId)
-
-      val offsets = topics
-        .map { case name =>
-
-          def thing(): Long = try {
-            simple.earliestOrLatestOffset(TopicAndPartition(name, 0), OffsetRequest.LatestTime, 153)
-          } catch {
-            case e: UnknownTopicOrPartitionException => {
-              simple.send(new TopicMetadataRequest(Seq(name), 29))
-              thing()
-            }
-          }
-
-          name -> thing()
+      simple = ports
+        .map { port =>
+          port -> new SimpleConsumer("localhost", port, ConsumerConfig.SocketTimeout, ConsumerConfig.SocketBufferSize, ConsumerConfig.DefaultClientId)
         }
         .toMap
 
-      consumer = Consumer.create(new ConsumerConfig(config))
+      val meta = simple.values.head.send(new TopicMetadataRequest(topics.toSeq, 236))
 
-      val streams = consumer.createMessageStreams(
-        topics.map { _ -> 1 }.toMap
-      )
+      def toByteSeq(bb: ByteBuffer): Seq[Byte] = {
+        val bytes = Array.ofDim[Byte](bb.remaining())
+        bb.duplicate().get(bytes)
+        bytes.toSeq
+      }
 
-      val outputMessages = topics
-        .map { case name =>
+      val outputMessages = meta.topicsMetadata
+        .map { topic =>
+          val messages = topic.partitionsMetadata
+            .flatMap { partition =>
+              val broker = partition.leader.get.port
 
-          val List(stream) = streams(name)
+              val consumer = simple(broker)
 
-          name -> stream.take(offsets(name).toInt)
-            .map { msg => msg.key().toSeq -> msg.message().toSeq}
-            .groupBy { _._1 }
-            .mapValues { _.map { _._2 }.toVector
-          }
+              val tp = TopicAndPartition(topic.topic, partition.partitionId)
+
+              val offset = consumer.earliestOrLatestOffset(tp, OffsetRequest.LatestTime, 153)
+
+              val response = consumer.fetch(new FetchRequest(
+                correlationId = Random.nextInt(),
+                clientId = ConsumerConfig.DefaultClientId,
+                maxWait = ConsumerConfig.MaxFetchWaitMs,
+                minBytes = 0,
+                requestInfo = Map(
+                  tp -> PartitionFetchInfo(0L, Int.MaxValue)
+                )
+              ))
+
+              response.data(tp).messages.toSeq
+                .map { mao => toByteSeq(mao.message.key) -> toByteSeq(mao.message.payload) }
+            }
+
+          topic.topic -> messages.groupBy { _._1 }.mapValues { _.unzip._2 }
         }
         .toMap
 
@@ -242,11 +203,7 @@ object IntegrationTest {
     } finally {
 
       if (simple != null) {
-        simple.close()
-      }
-
-      if (consumer != null) {
-        consumer.shutdown()
+        simple.values.foreach { _.close() }
       }
     }
   }

@@ -42,6 +42,7 @@ class CoastKafkaSystemSpec extends Specification with ScalaCheck {
         val messages = for (i <- 1 to BigNumber) yield {
           new OutgoingMessageEnvelope(
             new SystemStream("producer-test", "test"),
+            "empty".##,
             WireFormat.write("empty"),
             WireFormat.write(i)
           )
@@ -85,6 +86,7 @@ class CoastKafkaSystemSpec extends Specification with ScalaCheck {
         val messages = for (i <- 1 to BigNumber) yield {
           new OutgoingMessageEnvelope(
             new SystemStream("producer-test", if (i % 2 == 0) "even" else "odd"),
+            "empty".##,
             WireFormat.write("empty"),
             WireFormat.write(i)
           )

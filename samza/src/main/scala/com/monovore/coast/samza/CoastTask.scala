@@ -1,7 +1,10 @@
 package com.monovore.coast
 package samza
 
+import java.util
+
 import com.monovore.coast.format.WireFormat
+import org.apache.samza.Partition
 import org.apache.samza.config.Config
 import org.apache.samza.system._
 import org.apache.samza.task._
@@ -15,6 +18,8 @@ class CoastTask extends StreamTask with InitableTask with WindowableTask with Lo
 
   var mergeStream: String = _
 
+  var partitionIndex: Int = _
+
   var collector: MessageCollector = _
 
   var sink: MessageSink.ByteSink = _
@@ -27,18 +32,21 @@ class CoastTask extends StreamTask with InitableTask with WindowableTask with Lo
 
     mergeStream = s"coast.merge.$taskName"
 
+    partitionIndex = context.getTaskName.getTaskName.split("\\W+").last.toInt // ICK!
+
     val offsetThreshold = {
 
       val systemFactory = config.getNewInstance[SystemFactory](s"systems.$CoastSystem.samza.factory")
       val admin = systemFactory.getAdmin(CoastSystem, config)
       val meta = admin.getSystemStreamMetadata(Set(taskName).asJava).asScala
         .getOrElse(taskName, sys.error(s"Couldn't find metadata on output stream $taskName"))
+
       val partitionMeta = meta.getSystemStreamPartitionMetadata.asScala
-      assert(partitionMeta.size == 1, "FIXME: assuming a single partition here")
-      partitionMeta.values.head.getUpcomingOffset.toLong
+
+      partitionMeta(new Partition(partitionIndex)).getUpcomingOffset.toLong
     }
 
-    info(s"Starting task with output offset of $offsetThreshold")
+    info(s"Starting task: [$taskName $partitionIndex] at offset $offsetThreshold")
 
     val finalSink = new MessageSink.ByteSink {
 
@@ -47,7 +55,7 @@ class CoastTask extends StreamTask with InitableTask with WindowableTask with Lo
       override def execute(stream: String, offset: Long, key: Array[Byte], value: Array[Byte]): Long = {
 
         if (offset >= offsetThreshold) {
-          val out = new OutgoingMessageEnvelope(outputStream, key, value)
+          val out = new OutgoingMessageEnvelope(outputStream, util.Arrays.hashCode(key), key, value)
           collector.send(out)
         }
 
@@ -94,7 +102,7 @@ class CoastTask extends StreamTask with InitableTask with WindowableTask with Lo
 
       collector.send(new OutgoingMessageEnvelope(
         new SystemStream(CoastSystem, mergeStream),
-        envelope.getSystemStreamPartition.getPartition.getPartitionId,
+        partitionIndex,
         key,
         WireFormat.write(
           FullMessage(stream, 0, inputOffset, message)

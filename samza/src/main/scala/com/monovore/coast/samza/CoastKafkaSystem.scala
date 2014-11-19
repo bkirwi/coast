@@ -52,7 +52,7 @@ object CoastKafkaSystem {
 
       if (produceThread != null) {
         produceThread.interrupt()
-        produceThread.join()
+        produceThread.join(1000)
       }
 
       producer.close()

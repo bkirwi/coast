@@ -31,8 +31,6 @@ object MessageSink {
 
       def compileSource[A, B](source: Source[A, B], sink: MessageSink[A, B], prefix: List[String]) = {
 
-        // TODO: offset pairs!
-
         new MessageSink[Bytes, Bytes] with Logging {
 
           val store = context.getStore(formatPath(prefix)).asInstanceOf[CoastStore[Unit, Unit]]
