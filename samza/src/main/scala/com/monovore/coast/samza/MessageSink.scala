@@ -82,22 +82,15 @@ object MessageSink {
           val store = context.getStore(samza.formatPath(prefix)).asInstanceOf[CoastStore[A, S]]
 
           override def execute(stream: String, offset: Long, key: A, value: B0): Long = {
-            try {
-              store.handle(offset, key, trans.init) { (downstreamOffset, state) =>
+            store.handle(offset, key, trans.init) { (downstreamOffset, state) =>
 
-                val update = trans.transformer(key)
+              val update = trans.transformer(key)
 
-                val (newState, output) = update(state, value)
+              val (newState, output) = update(state, value)
 
-                val newDownstreamOffset = output.foldLeft(downstreamOffset)(sink.execute(stream, _, key, _))
+              val newDownstreamOffset = output.foldLeft(downstreamOffset)(sink.execute(stream, _, key, _))
 
-                newDownstreamOffset -> newState
-              }
-            } catch {
-              case e => {
-                error(s"Dying from input: $stream $offset $key $value")
-                throw e
-              }
+              newDownstreamOffset -> newState
             }
           }
 
