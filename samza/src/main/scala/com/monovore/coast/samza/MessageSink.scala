@@ -11,9 +11,6 @@ trait MessageSink[-K, -V] extends Serializable {
   def init(offset: Long): Unit // FIXME: laaaame
 
   def execute(stream: String, offset: Long, key: K, value: V): Long
-
-  def flush(): Unit
-
 }
 
 object MessageSink {
@@ -48,11 +45,6 @@ object MessageSink {
             } else offset
           }
 
-          override def flush(): Unit = {
-            sink.flush()
-            store.flush()
-          }
-
           override def init(offset: Long): Unit = sink.init(store.downstreamOffset)
         }
       }
@@ -66,8 +58,6 @@ object MessageSink {
             val output = update(value)
             output.foldLeft(offset)(sink.execute(stream, _, key, _))
           }
-
-          override def flush(): Unit = sink.flush()
 
           override def init(offset: Long): Unit = sink.init(offset)
         }
@@ -94,11 +84,6 @@ object MessageSink {
             }
           }
 
-          override def flush(): Unit = {
-            sink.flush()
-            store.flush()
-          }
-
           override def init(offset: Long): Unit = sink.init(store.downstreamOffset)
         }
 
@@ -113,8 +98,6 @@ object MessageSink {
             val newKey = gb.groupBy(key)(value)
             sink.execute(stream, offset, newKey, value)
           }
-
-          override def flush(): Unit = sink.flush()
 
           override def init(offset: Long): Unit = sink.init(offset)
         }
@@ -134,8 +117,6 @@ object MessageSink {
             maxOffset
           }
 
-          override def flush(): Unit = sink.flush()
-
           override def init(offset: Long): Unit = {
             maxOffset = math.max(maxOffset, offset)
             sink.init(maxOffset)
@@ -153,8 +134,6 @@ object MessageSink {
 
             offset
           }
-
-          override def flush(): Unit = upstreamSinks.foreach { _.flush() }
 
           override def init(offset: Long): Unit = upstreamSinks.foreach { _.init(offset) }
         }
@@ -186,8 +165,6 @@ object MessageSink {
 
           finalSink.execute(stream, offset, keyBytes, valueBytes)
         }
-
-        override def flush(): Unit = finalSink.flush()
 
         override def init(offset: Long): Unit = finalSink.init(offset)
       }

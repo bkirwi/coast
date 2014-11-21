@@ -62,10 +62,6 @@ class CoastTask extends StreamTask with InitableTask with WindowableTask with Lo
         offset + 1
       }
 
-      override def flush(): Unit = {
-        debug(s"Flushing output stream $outputStream")
-      }
-
       override def init(offset: Long): Unit = {}
     }
 
