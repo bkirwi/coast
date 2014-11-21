@@ -34,7 +34,7 @@ object Denormalize extends ExampleMain {
     // Join, and a trivial transformation
     _ <- coast.sink(Denormalized) {
 
-      val groups = coast.source(Groups).latestOrNone
+      val groups = coast.source(Groups).latestOption
 
       val usersPool = usersByKey.fold(Map.empty[UserID, String]) { _ + _ }
 
