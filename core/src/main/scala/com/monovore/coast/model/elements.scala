@@ -1,7 +1,7 @@
 package com.monovore.coast
 package model
 
-import format.WireFormat
+import com.monovore.coast.wire.{Partitioner, WireFormat}
 
 sealed trait Node[A, +B]
 
@@ -55,4 +55,8 @@ case class Merge[A, +B](upstreams: Seq[String -> Node[A, B]]) extends Node[A, B]
 
 case class GroupBy[A, B, A0](upstream: Node[A0, B], groupBy: A0 => B => A) extends Node[A, B]
 
-case class Sink[A, B](element: Node[A, B])(implicit val keyFormat: WireFormat[A], val valueFormat: WireFormat[B])
+case class Sink[A, B](element: Node[A, B])(
+  implicit val keyFormat: WireFormat[A],
+  val valueFormat: WireFormat[B],
+  val keyPartitioner: Partitioner[A]
+)

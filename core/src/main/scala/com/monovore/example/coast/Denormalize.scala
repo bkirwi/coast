@@ -6,7 +6,7 @@ import scala.collection.immutable.SortedSet
 
 object Denormalize extends ExampleMain {
 
-  import coast.format.javaSerialization._
+  import coast.wire.ugly._
 
   type GroupID = Long
   type UserID = Long

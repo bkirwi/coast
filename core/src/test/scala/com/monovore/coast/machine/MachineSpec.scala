@@ -12,7 +12,7 @@ class MachineSpec extends Specification with ScalaCheck {
   // Tweak me
   val InputSize = 10
 
-  import coast.format.javaSerialization._
+  import coast.wire.ugly._
 
   "a compiled flow" should {
 

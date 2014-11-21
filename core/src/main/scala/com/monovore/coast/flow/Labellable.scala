@@ -1,7 +1,7 @@
 package com.monovore.coast
 package flow
 
-import format._
+import com.monovore.coast.wire._
 import model._
 
 import scala.annotation.implicitNotFound
@@ -16,7 +16,7 @@ sealed trait Labellable[-A] {
 
 object Labellable {
 
-  implicit def labelStreams[A : WireFormat, B : WireFormat] = new Labellable[StreamDef[AnyGrouping, A, B]] {
+  implicit def labelStreams[A : WireFormat : Partitioner, B : WireFormat] = new Labellable[StreamDef[AnyGrouping, A, B]] {
 
     type Labelled = Stream[A, B]
 
@@ -25,7 +25,7 @@ object Labellable {
     }
   }
 
-  implicit def labelPools[A : WireFormat, B : WireFormat] = new Labellable[PoolDef[AnyGrouping, A, B]] {
+  implicit def labelPools[A : WireFormat : Partitioner, B : WireFormat] = new Labellable[PoolDef[AnyGrouping, A, B]] {
 
     type Labelled = Pool[A, B]
 

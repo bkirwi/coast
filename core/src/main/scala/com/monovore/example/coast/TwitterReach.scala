@@ -7,7 +7,7 @@ object TwitterReach extends ExampleMain {
   // Two lazy decisions here: using Java serialization, and modelling IDs / URLs as strings
   // In real life, you'd want a more efficient wire format, and probably some more appropriate types
 
-  import com.monovore.coast.format.javaSerialization._
+  import coast.wire.ugly._
 
   type UserID = String
   type FollowerID = String

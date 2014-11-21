@@ -3,7 +3,7 @@ package flow
 
 import model._
 
-import com.monovore.coast.format.WireFormat
+import com.monovore.coast.wire.WireFormat
 
 import scala.language.higherKinds
 

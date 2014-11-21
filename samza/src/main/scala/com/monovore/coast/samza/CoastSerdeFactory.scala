@@ -1,6 +1,6 @@
 package com.monovore.coast.samza
 
-import com.monovore.coast.format.WireFormat
+import com.monovore.coast.wire.WireFormat
 import org.apache.samza.config.Config
 import org.apache.samza.config.serializers.JsonConfigSerializer
 import org.apache.samza.serializers.{Serde, SerdeFactory}

@@ -1,7 +1,7 @@
 package com.monovore.integration.coast
 
 import com.monovore.coast
-import com.monovore.coast.format.WireFormat
+import com.monovore.coast.wire.WireFormat
 import com.monovore.coast.samza.CoastKafkaSystem
 import kafka.producer.{ProducerConfig, Producer}
 import org.apache.samza.system.{SystemStream, OutgoingMessageEnvelope}
@@ -16,7 +16,7 @@ class CoastKafkaSystemSpec extends Specification with ScalaCheck {
 
   "a ratcheted kafka producer" should {
 
-    import coast.format.pretty._
+    import coast.wire.pretty._
 
     def stream(name: String) = coast.Name[String, Int](name)
 

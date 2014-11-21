@@ -1,6 +1,6 @@
 package com.monovore.coast
 
-import com.monovore.coast.format.WireFormat
+import com.monovore.coast.wire.WireFormat
 import com.monovore.coast.model.{Source, Merge}
 
 package object flow {

@@ -1,7 +1,7 @@
 package com.monovore.coast
 
 import com.google.common.primitives.{Ints, Longs}
-import com.monovore.coast.format.WireFormat
+import com.monovore.coast.wire.WireFormat
 import com.monovore.coast.model._
 import org.apache.samza.config.{Config, MapConfig}
 
@@ -40,8 +40,8 @@ package object samza {
   private[this] def storageFor[A, B](element: Node[A, B], path: List[String]): Seq[Storage] = element match {
     case Source(_) => Seq(Storage(
       name = formatPath(path),
-      keyString = SerializationUtil.toBase64(format.pretty.UnitFormat),
-      valueString = SerializationUtil.toBase64(format.pretty.UnitFormat)
+      keyString = SerializationUtil.toBase64(wire.pretty.UnitFormat),
+      valueString = SerializationUtil.toBase64(wire.pretty.UnitFormat)
     ))
     case PureTransform(up, _) => storageFor(up, path)
     case Merge(ups) => {

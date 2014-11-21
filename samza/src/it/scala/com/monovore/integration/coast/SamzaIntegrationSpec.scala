@@ -1,7 +1,7 @@
 package com.monovore.integration.coast
 
 import com.monovore.coast
-import com.monovore.coast.format.WireFormat
+import com.monovore.coast.wire.WireFormat
 import org.specs2.ScalaCheck
 import org.specs2.mutable._
 
@@ -15,7 +15,7 @@ class SamzaIntegrationSpec extends Specification with ScalaCheck {
 
   "a running samza-based job" should {
 
-    import coast.format.pretty._
+    import coast.wire.pretty._
 
     val Foo = coast.Name[String, Int]("foo")
 

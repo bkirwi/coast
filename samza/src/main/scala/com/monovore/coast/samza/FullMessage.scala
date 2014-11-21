@@ -2,7 +2,7 @@ package com.monovore.coast.samza
 
 import java.io.{DataInputStream, ByteArrayInputStream, DataOutputStream, ByteArrayOutputStream}
 
-import com.monovore.coast.format.WireFormat
+import com.monovore.coast.wire.WireFormat
 
 case class FullMessage(
   stream: String,

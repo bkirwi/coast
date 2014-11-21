@@ -1,7 +1,7 @@
 package com.monovore
 
 import com.monovore.coast.flow._
-import com.monovore.coast.format.WireFormat
+import com.monovore.coast.wire.{Partitioner, WireFormat}
 import com.monovore.coast.model.{Merge, Source, Sink}
 
 package object coast {
@@ -24,7 +24,7 @@ package object coast {
   def source[A : WireFormat, B : WireFormat](name: Name[A,B]): Stream[A, B] =
     new StreamDef[Grouped, A, B](Source[A, B](name.name))
 
-  def sink[A : WireFormat, B : WireFormat](name: Name[A, B])(flow: StreamDef[Grouped, A, B]): Flow[Unit] = {
+  def sink[A : WireFormat : Partitioner, B : WireFormat](name: Name[A, B])(flow: StreamDef[Grouped, A, B]): Flow[Unit] = {
     Flow(Seq(name.name -> Sink(flow.element)), ())
   }
 

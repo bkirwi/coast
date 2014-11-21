@@ -12,7 +12,7 @@ class SamzaSpec extends Specification with ScalaCheck {
 
     "compile a simple flow" in {
 
-      import coast.format.pretty._
+      import coast.wire.pretty._
 
       val source = Name[String, Int]("ints")
       val sink = Name[String, Int]("bigger-ints")

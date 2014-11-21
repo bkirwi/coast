@@ -3,7 +3,7 @@ package samza
 
 import java.util
 
-import com.monovore.coast.format.WireFormat
+import com.monovore.coast.wire.WireFormat
 import org.apache.samza.Partition
 import org.apache.samza.config.Config
 import org.apache.samza.system._

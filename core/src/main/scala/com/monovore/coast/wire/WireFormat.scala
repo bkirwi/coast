@@ -1,4 +1,4 @@
-package com.monovore.coast.format
+package com.monovore.coast.wire
 
 import scala.annotation.implicitNotFound
 
