@@ -104,8 +104,8 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
   def latestOrNone: PoolDef[G, A, Option[B]] =
     stream.map { b => Some(b) }.pool(None)
 
-  def groupBy[A0](func: B => A0): StreamDef[AnyGrouping, A0, B] =
-    new StreamDef[G, A0, B](GroupBy(self.element, func))
+  def groupBy[A0](func: WithKey[B => A0]): StreamDef[AnyGrouping, A0, B] =
+    new StreamDef[G, A0, B](GroupBy(self.element, context.unwrap(func)))
 
   def groupByKey[A0, B0](implicit asPair: B <:< (A0, B0)) =
     stream.groupBy { _._1 }.map { _._2 }

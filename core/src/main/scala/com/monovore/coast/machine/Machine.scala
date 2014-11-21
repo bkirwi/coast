@@ -68,8 +68,8 @@ object Machine {
 
         val (nodes, edges) = compile(id, upstream)
 
-        val actor = Actor(State(unit), { case (s, _, input) =>
-          val group = groupBy(input.cast)
+        val actor = Actor(State(unit), { case (s, key, input) =>
+          val group = groupBy(key.cast)(input.cast)
           (s, Map(Key(group) -> Seq(input)))
         })
 

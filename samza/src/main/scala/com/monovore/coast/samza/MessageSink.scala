@@ -117,7 +117,7 @@ object MessageSink {
         val task = new MessageSink[A0, B] {
 
           override def execute(stream: String, offset: Long, key: A0, value: B): Long = {
-            val newKey = gb.groupBy(value)
+            val newKey = gb.groupBy(key)(value)
             sink.execute(stream, offset, newKey, value)
           }
 
