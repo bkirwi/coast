@@ -49,7 +49,9 @@ object Machine {
         val id = newID()
 
         val (nodes, edges) = upstreams
-          .foldLeft(Map.empty[Label, Actor] -> Seq.empty[Label -> Label]) { (soFar, upstream) =>
+          .foldLeft(Map.empty[Label, Actor] -> Seq.empty[Label -> Label]) { (soFar, upstreamPair) =>
+
+            val (name -> upstream) = upstreamPair
 
             val (nodes, edges) = soFar
 

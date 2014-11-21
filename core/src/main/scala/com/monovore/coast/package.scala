@@ -12,8 +12,14 @@ package object coast {
 
   type Flow[A] = flow.Flow[A]
 
-  def merge[G <: AnyGrouping, A, B](upstreams: StreamDef[G, A, B]*): StreamDef[G, A, B] =
-    new StreamDef[G, A, B](Merge(upstreams.map { _.element }))
+  def merge[G <: AnyGrouping, A, B](upstreams: (String -> StreamDef[G, A, B])*): StreamDef[G, A, B] = {
+
+    for ((branch -> streams) <- upstreams.groupByKey) {
+      require(streams.size == 1, s"merged branches must be unique ($branch is specified ${streams.size} times)")
+    }
+
+    new StreamDef[G, A, B](Merge(upstreams.map { case (name, stream) => name -> stream.element}))
+  }
 
   def source[A : WireFormat, B : WireFormat](name: Name[A,B]): Stream[A, B] =
     new StreamDef[Grouped, A, B](Source[A, B](name.name))

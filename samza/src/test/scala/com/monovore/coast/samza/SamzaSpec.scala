@@ -22,9 +22,7 @@ class SamzaSpec extends Specification with ScalaCheck {
       }
 
       val configs = samza.configureFlow(sampleFlow)(
-        system = "whatever",
-        baseConfig = samza.config(
-        )
+        baseConfig = samza.config()
       )
 
       configs must haveSize(1)
@@ -33,11 +31,9 @@ class SamzaSpec extends Specification with ScalaCheck {
 
       val config = configs("bigger-ints")
 
-      println(JsonConfigSerializer.toJson(config))
-
       config.get(samza.TaskName) must_== "bigger-ints"
 
-      config.get("stores./bigger-ints.factory") must_!= null
+      config.get("stores.bigger-ints.factory") must_!= null
     }
   }
 }

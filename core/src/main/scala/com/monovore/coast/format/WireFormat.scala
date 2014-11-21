@@ -8,3 +8,8 @@ trait WireFormat[A] extends Serializable {
   def write(value: A): Array[Byte]
   def read(bytes: Array[Byte]): A
 }
+
+object WireFormat {
+  def write[A](value: A)(implicit fmt: WireFormat[A]): Array[Byte] = fmt.write(value)
+  def read[A](bytes: Array[Byte])(implicit fmt: WireFormat[A]): A = fmt.read(bytes)
+}

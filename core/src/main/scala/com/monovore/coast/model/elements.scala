@@ -51,7 +51,7 @@ object Transform {
     Aggregate(e, i, t)
 }
 
-case class Merge[A, +B](upstreams: Seq[Node[A, B]]) extends Node[A, B]
+case class Merge[A, +B](upstreams: Seq[String -> Node[A, B]]) extends Node[A, B]
 
 case class GroupBy[A, B, A0](upstream: Node[A0, B], groupBy: B => A) extends Node[A, B]
 

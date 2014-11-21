@@ -101,6 +101,9 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
   def pool[B0 >: B](init: B0): PoolDef[G, A, B0] =
     new PoolDef(init, element)
 
+  def latestOrNone: PoolDef[G, A, Option[B]] =
+    stream.map { b => Some(b) }.pool(None)
+
   def groupBy[A0](func: B => A0): StreamDef[AnyGrouping, A0, B] =
     new StreamDef[G, A0, B](GroupBy(self.element, func))
 
@@ -113,7 +116,7 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
     implicit isGrouped: IsGrouped[G], keyFormat: WireFormat[A], b0Format: WireFormat[B0]
   ): Stream[A, B -> B0] = {
 
-    merge(pool.stream.map(Left(_)), isGrouped.stream(this.stream).map(Right(_)))
+    merge("stream" -> pool.stream.map(Left(_)), "pool" -> isGrouped.stream(this.stream).map(Right(_)))
       .aggregate(pool.initial) { (state: B0, msg: Either[B0, B]) =>
         msg match {
           case Left(newState) => newState -> Seq.empty
@@ -143,7 +146,10 @@ class PoolDef[+G <: AnyGrouping, A, +B](
     implicit isGrouped: IsGrouped[G], keyFormat: WireFormat[A], pairFormat: WireFormat[(B0, B1)]
   ): PoolDef[Grouped, A, (B0, B1)] = {
 
-    val merged = merge(isGrouped.pool(this).stream.map(Left(_)), other.stream.map(Right(_)))
+    val merged = merge(
+      "left" -> isGrouped.pool(this).stream.map(Left(_)),
+      "right" -> other.stream.map(Right(_))
+    )
 
     merged
       .fold(initial: B0, other.initial) { (state, update) =>

@@ -5,22 +5,22 @@ import org.apache.samza.config.Config
 import org.apache.samza.config.serializers.JsonConfigSerializer
 import org.apache.samza.serializers.{Serde, SerdeFactory}
 
+class CoastSerde[A](format: WireFormat[A]) extends Serde[A] {
+
+  override def fromBytes(bytes: Array[Byte]): A = format.read(bytes)
+
+  override def toBytes(value: A): Array[Byte] = format.write(value)
+}
+
 class CoastSerdeFactory[A] extends SerdeFactory[A] {
 
   override def getSerde(name: String, config: Config): Serde[A] = {
-
-    println(JsonConfigSerializer.toJson(config))
 
     val format = SerializationUtil.fromBase64[WireFormat[A]](
       config.get(ConfigSerdeFactory.keyForSerde(name, "serialized", "base64"))
     )
 
-    new Serde[A] {
-
-      override def fromBytes(bytes: Array[Byte]): A = format.read(bytes)
-
-      override def toBytes(value: A): Array[Byte] = format.write(value)
-    }
+    new CoastSerde[A](format)
   }
 }
 
