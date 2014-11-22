@@ -1,7 +1,7 @@
 package com.monovore.integration.coast
 
 import com.monovore.coast
-import com.monovore.coast.wire.WireFormat
+import com.monovore.coast.wire.{Partitioner, WireFormat}
 import org.specs2.ScalaCheck
 import org.specs2.mutable._
 
@@ -11,7 +11,7 @@ class SamzaIntegrationSpec extends Specification with ScalaCheck {
   // this helps make results more reproducible
   sequential
 
-  val BigNumber = 50000 // pretty big?
+  val BigNumber = 120000 // pretty big?
 
   "a running samza-based job" should {
 
@@ -119,18 +119,47 @@ class SamzaIntegrationSpec extends Specification with ScalaCheck {
 
       val output = IntegrationTest.fuzz(flow, input).get(Bar)
 
+      output("test").filter { _ % 2 == 1 }.grouped(2).foreach { case Seq(a, b) => (a + 2) must_== b }
+      output("test").filter { _ % 2 == 0 }.grouped(2).foreach { case Seq(a, b) => (a + 2) must_== b }
+
       output("test").filter { _ % 2 == 1 } must_== (1 to BigNumber by 2)
       output("test").filter { _ % 2 == 0 } must_== (2 to BigNumber by 2)
+    }
+
+    "regroup" in {
+
+      val flow = for {
+
+        grouped <- coast.label("grouped") {
+          coast.source(Foo).groupBy { n => (n % 10).toString }
+        }
+
+        _ <- coast.sink(Bar) { grouped }
+      } yield ()
+
+      val input = Messages
+        .add(Foo, Map("test" -> (1 to BigNumber)))
+
+      val output = IntegrationTest.fuzz(flow, input).get(Bar)
+
+      for {
+        i <- 0 until 10
+        n <- output(i.toString)
+      } {
+        (n % 10) must_== i
+      }
+
+      output must not be empty
     }
   }
 }
 
-case class Messages(messages: Map[String, Map[Seq[Byte], Seq[Seq[Byte]]]] = Map.empty) {
+case class Messages(messages: Map[String, Map[Seq[Byte], (Int, Seq[Seq[Byte]])]] = Map.empty) {
 
-  def add[A : WireFormat, B : WireFormat](name: coast.Name[A,B], messages: Map[A, Seq[B]]): Messages = {
+  def add[A : WireFormat : Partitioner, B : WireFormat](name: coast.Name[A,B], messages: Map[A, Seq[B]]): Messages = {
 
     val formatted = messages.map { case (k, vs) =>
-      WireFormat.write(k).toSeq -> vs.map { v => WireFormat.write(v).toSeq }
+      WireFormat.write(k).toSeq -> (Partitioner.hash(k).asInt, vs.map { v => WireFormat.write(v).toSeq })
     }
 
     Messages(this.messages.updated(name.name, formatted))
@@ -140,7 +169,7 @@ case class Messages(messages: Map[String, Map[Seq[Byte], Seq[Seq[Byte]]]] = Map.
 
     val data = messages.getOrElse(name.name, Map.empty)
 
-    data.map { case (k, vs) =>
+    data.map { case (k, (_, vs) ) =>
       WireFormat.read[A](k.toArray) -> vs.map { v => WireFormat.read[B](v.toArray) }
     }.withDefaultValue(Seq.empty[B])
   }

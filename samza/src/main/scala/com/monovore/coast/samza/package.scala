@@ -11,12 +11,20 @@ package object samza {
 
   val TaskKey = "coast.task.serialized.base64"
   val TaskName = "coast.task.name"
+  val RegroupedStreams = "coast.streams.regrouped"
 
   val CoastSystem = "coast-system"
 
   def formatPath(path: List[String]): String = {
     if (path.isEmpty) "."
     else path.reverse.mkString(".")
+  }
+
+  def isRegrouped[A, B](node: Node[A, B]): Boolean = node match {
+    case _: Source[_, _] => false
+    case trans: Transform[_, _, _, _] => isRegrouped(trans.upstream)
+    case merge: Merge[_, _] => merge.upstreams.exists { case (_, up) => isRegrouped(up) }
+    case group: GroupBy[_, _, _] => true
   }
 
   private[this] def sourcesFor[A, B](element: Node[A, B]): Set[String] = element match {
@@ -64,6 +72,11 @@ package object samza {
 
     val baseConfigMap = baseConfig.asScala.toMap
 
+    val regrouped = flow.bindings
+      .flatMap { case (name, sink) =>
+        Some(name).filter { _ => isRegrouped(sink.element) }
+      }
+
     val configs = flow.bindings.map { case (name -> sink) =>
 
       val inputs = (sourcesFor(sink.element) + s"coast.merge.$name")
@@ -103,7 +116,8 @@ package object samza {
 
         // Coast-specific
         TaskKey -> SerializationUtil.toBase64(factory),
-        TaskName -> name
+        TaskName -> name,
+        RegroupedStreams -> regrouped.mkString(",")
       )
 
 //      val offsetStorage = Storage(

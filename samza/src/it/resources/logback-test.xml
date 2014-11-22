@@ -14,9 +14,9 @@
 
     <!--<logger name="com.monovore.integration.coast" level="TRACE"/>-->
 
-    <!--<logger name="org.apache.samza" level="WARN"/>-->
+    <logger name="org.apache.samza" level="INFO"/>
 
-    <logger name="com.monovore.coast.samza" level="INFO"/>
+    <logger name="com.monovore.coast.samza" level="DEBUG"/>
 
     <root level="WARN">
         <appender-ref ref="STDOUT" />

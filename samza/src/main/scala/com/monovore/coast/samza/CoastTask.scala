@@ -1,23 +1,16 @@
 package com.monovore.coast
 package samza
 
-import java.util
-
-import com.monovore.coast.samza.MessageSink.Bytes
-import com.monovore.coast.wire.WireFormat
-import org.apache.samza.Partition
 import org.apache.samza.config.Config
 import org.apache.samza.system._
 import org.apache.samza.task._
 import org.apache.samza.util.Logging
 
-import scala.collection.JavaConverters._
-
 class CoastTask extends StreamTask with InitableTask with Logging {
 
   var collector: MessageCollector = _
 
-  var initialSink: MessageSink.ByteSink = _
+  var sink: MessageSink.ByteSink = _
 
   override def init(config: Config, context: TaskContext): Unit = {
 
@@ -27,15 +20,14 @@ class CoastTask extends StreamTask with InitableTask with Logging {
 
       override def execute(stream: String, partition: Int, offset: Long, key: Array[Byte], value: Array[Byte]): Long = {
 
-        val out = new OutgoingMessageEnvelope(new SystemStream(CoastSystem, stream), util.Arrays.hashCode(key), key, value)
-
+        val out = new OutgoingMessageEnvelope(new SystemStream(CoastSystem, stream), partition, key, value)
         collector.send(out)
 
         offset + 1
       }
     }
 
-    initialSink = factory.make(config, context, finalSink)
+    sink = factory.make(config, context, finalSink)
   }
 
   override def process(
@@ -45,18 +37,14 @@ class CoastTask extends StreamTask with InitableTask with Logging {
   ): Unit = {
 
     val stream = envelope.getSystemStreamPartition.getSystemStream.getStream
-
     val partition = envelope.getSystemStreamPartition.getPartition.getPartitionId
-
     val offset = envelope.getOffset.toLong
-
     val key = envelope.getKey.asInstanceOf[Array[Byte]]
-
     val message = envelope.getMessage.asInstanceOf[Array[Byte]]
 
     this.collector = collector
 
-    initialSink.execute(stream, partition, offset, key, message)
+    sink.execute(stream, partition, offset, key, message)
 
     this.collector = null
   }

@@ -1,10 +1,9 @@
 package com.monovore.coast.wire
 
-import com.google.common.hash.{Hashing, HashFunction}
-import com.monovore.coast.wire.{GuavaPartitioning, Partitioner}
+import com.google.common.hash.{HashFunction, Hashing}
 import org.scalacheck.Arbitrary
-import org.specs2.mutable._
 import org.specs2.ScalaCheck
+import org.specs2.mutable._
 
 class GuavaSpec extends Specification with ScalaCheck {
 

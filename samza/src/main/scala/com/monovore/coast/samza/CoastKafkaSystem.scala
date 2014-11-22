@@ -45,6 +45,8 @@ object CoastKafkaSystem {
 
       produceThread = new Thread(runProducer, "coast-kafka-produce-thread")
 
+      produceThread.setDaemon(true)
+
       produceThread.start()
     }
 

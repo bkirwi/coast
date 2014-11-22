@@ -76,18 +76,16 @@ object IntegrationTest {
 
       try {
 
-        // Give Kafka a chance to create the partitions
-        IntegrationTest.slurp(input.messages.keySet, config)
-        Thread.sleep(500)
+        IntegrationTest.expect(input.messages.keySet, config)
 
         producer = new Producer(producerConfig)
 
         for {
           (name, messages) <- input.messages
-          (key, values) <- messages
+          (key, (partition, values)) <- messages
           value <- values.grouped(100)
         } {
-          producer.send(value.map { value => new KeyedMessage(name, key.toArray, util.Arrays.hashCode(key.toArray), value.toArray)}: _*)
+          producer.send(value.map { value => new KeyedMessage(name, key.toArray, partition, value.toArray)}: _*)
         }
 
         val configs = coast.samza.configureFlow(flow)(
@@ -142,6 +140,11 @@ object IntegrationTest {
     }
   }
 
+  def expect(topics: Set[String], config: Properties): Unit = {
+    slurp(topics, config)
+    Thread.sleep(300)
+  }
+
   def slurp(topics: Set[String], config: Properties): Messages = {
 
     var simple: Map[Int, SimpleConsumer] = null
@@ -188,10 +191,10 @@ object IntegrationTest {
               ))
 
               response.data(tp).messages.toSeq
-                .map { mao => toByteSeq(mao.message.key) -> toByteSeq(mao.message.payload) }
+                .map { mao => toByteSeq(mao.message.key) -> (partition.partitionId, toByteSeq(mao.message.payload)) }
             }
 
-          topic.topic -> messages.groupBy { _._1 }.mapValues { _.unzip._2 }
+          topic.topic -> messages.groupBy { _._1 }.mapValues { p => (p.unzip._2.head._1, p.unzip._2.unzip._2) }
         }
         .toMap
 

@@ -24,7 +24,7 @@ class CoastKafkaSystemSpec extends Specification with ScalaCheck {
 
       IntegrationTest.withKafkaCluster { props =>
 
-        IntegrationTest.slurp(Set("test"), props)
+        IntegrationTest.expect(Set("test"), props)
 
         val producer = new CoastKafkaSystem.Producer(
           new Producer(new ProducerConfig(props)),
@@ -68,7 +68,7 @@ class CoastKafkaSystemSpec extends Specification with ScalaCheck {
 
       IntegrationTest.withKafkaCluster { clientProps =>
 
-        IntegrationTest.slurp(Set("even", "odd"), clientProps)
+        IntegrationTest.expect(Set("even", "odd"), clientProps)
 
         val producer = new CoastKafkaSystem.Producer(
           new Producer(new ProducerConfig(clientProps)),

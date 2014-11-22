@@ -16,6 +16,10 @@ trait Partitioner[-A] {
   def hash(a: A): HashCode
 }
 
+object Partitioner {
+  def hash[A](a: A)(implicit partitioner: Partitioner[A]): HashCode = partitioner.hash(a)
+}
+
 /**
  * A partitioner that uses the given Guava hash function and funnel.
  */
