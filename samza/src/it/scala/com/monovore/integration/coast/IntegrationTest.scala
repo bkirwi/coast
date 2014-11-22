@@ -121,14 +121,11 @@ object IntegrationTest {
           }
 
           jobs.foreach { job =>
-            def wait() {
-              job.waitForFinish(50) match {
-                case ApplicationStatus.SuccessfulFinish => ()
-                case ApplicationStatus.UnsuccessfulFinish => ()
-                case _ => wait()
-              }
+            job.waitForFinish(2000) match {
+              case ApplicationStatus.SuccessfulFinish => ()
+              case ApplicationStatus.UnsuccessfulFinish => ()
+              case _ => sys.error("Taking a very long time!")
             }
-            wait()
           }
         }
 
