@@ -3,13 +3,15 @@ package samza
 
 import com.monovore.coast.model._
 import com.monovore.coast.wire.WireFormat
+import org.apache.samza.Partition
 import org.apache.samza.config.Config
+import org.apache.samza.system.SystemFactory
 import org.apache.samza.task.TaskContext
 import org.apache.samza.util.Logging
 
-trait MessageSink[-K, -V] extends Serializable {
+import collection.JavaConverters._
 
-  def init(offset: Long): Unit // FIXME: laaaame
+trait MessageSink[-K, -V] extends Serializable {
 
   def execute(stream: String, partition: Int, offset: Long, key: K, value: V): Long
 }
@@ -25,13 +27,41 @@ object MessageSink {
 
   class FromElement[A, B](sink: Sink[A, B]) extends Factory {
 
-    override def make(config: Config, context: TaskContext, finalSink: ByteSink) = {
+    override def make(config: Config, context: TaskContext, whatSink: ByteSink) = {
+
+      val taskName = config.get(samza.TaskName)
+
+      val partitionIndex = context.getTaskName.getTaskName.split("\\W+").last.toInt // ICK!
+
+      val offsetThreshold = {
+
+        val systemFactory = config.getNewInstance[SystemFactory](s"systems.$CoastSystem.samza.factory")
+        val admin = systemFactory.getAdmin(CoastSystem, config)
+        val meta = admin.getSystemStreamMetadata(Set(taskName).asJava).asScala
+          .getOrElse(taskName, sys.error(s"Couldn't find metadata on output stream $taskName"))
+
+        val partitionMeta = meta.getSystemStreamPartitionMetadata.asScala
+
+        partitionMeta(new Partition(partitionIndex)).getUpcomingOffset.toLong
+      }
+
+      val finalSink = new MessageSink.ByteSink {
+
+        override def execute(stream: String, partition: Int, offset: Long, key: Bytes, value: Bytes): Long = {
+
+          if (offset >= offsetThreshold) {
+            whatSink.execute(taskName, partition, offset, key, value)
+          }
+
+          offset + 1
+        }
+      }
 
       def compileSource[A, B](source: Source[A, B], sink: MessageSink[A, B], prefix: List[String]) = {
 
-        new MessageSink[Bytes, Bytes] with Logging {
+        val store = context.getStore(formatPath(prefix)).asInstanceOf[CoastStore[Unit, Unit]]
 
-          val store = context.getStore(formatPath(prefix)).asInstanceOf[CoastStore[Unit, Unit]]
+        store.downstreamOffset -> new MessageSink[Bytes, Bytes] with Logging {
 
           override def execute(stream: String, partition: Int, offset: Long, key: Bytes, value: Bytes): Long = {
 
@@ -45,8 +75,6 @@ object MessageSink {
               }
             } else offset
           }
-
-          override def init(offset: Long): Unit = sink.init(store.downstreamOffset)
         }
       }
 
@@ -59,8 +87,6 @@ object MessageSink {
             val output = update(value)
             output.foldLeft(offset)(sink.execute(stream, partition, _, key, _))
           }
-
-          override def init(offset: Long): Unit = sink.init(offset)
         }
 
         compile(trans.upstream, transformed, prefix)
@@ -84,8 +110,6 @@ object MessageSink {
               newDownstreamOffset -> newState
             }
           }
-
-          override def init(offset: Long): Unit = sink.init(store.downstreamOffset)
         }
 
         compile(trans.upstream, transformed, "aggregated" :: prefix)
@@ -99,8 +123,6 @@ object MessageSink {
             val newKey = gb.groupBy(key)(value)
             sink.execute(stream, partition, offset, newKey, value)
           }
-
-          override def init(offset: Long): Unit = sink.init(offset)
         }
 
         compile(gb.upstream, task, prefix)
@@ -108,26 +130,24 @@ object MessageSink {
 
       def compileMerge[A, B](merge: Merge[A, B], sink: MessageSink[A, B], prefix: List[String]) = {
 
-        val downstreamSink = new MessageSink[A, B] with Logging {
+        var maxOffset: Long = 0L
 
-          private[this] var maxOffset: Long = 0L
+        val downstreamSink = new MessageSink[A, B] with Logging {
 
           override def execute(stream: String, partition: Int, offset: Long, key: A, value: B): Long = {
             maxOffset = math.max(maxOffset, offset)
             maxOffset = sink.execute(stream, partition, maxOffset, key, value)
             maxOffset
           }
-
-          override def init(offset: Long): Unit = {
-            maxOffset = math.max(maxOffset, offset)
-            sink.init(maxOffset)
-          }
         }
 
-        val upstreamSinks = merge.upstreams
+        val (offsets, upstreamSinks) = merge.upstreams
           .map { case (name, up) => compile(up, downstreamSink, name :: prefix) }
+          .unzip
 
-        new MessageSink[Bytes, Bytes] {
+        maxOffset = offsets.max // FIXME: This seems to not matter?
+
+        offsets.max -> new MessageSink[Bytes, Bytes] {
 
           override def execute(stream: String, partition: Int, offset: Long, key: Bytes, value: Bytes): Long = {
 
@@ -135,12 +155,10 @@ object MessageSink {
 
             offset
           }
-
-          override def init(offset: Long): Unit = upstreamSinks.foreach { _.init(offset) }
         }
       }
 
-      def compile[A, B](ent: Node[A, B], sink: MessageSink[A, B], prefix: List[String]): ByteSink = {
+      def compile[A, B](ent: Node[A, B], sink: MessageSink[A, B], prefix: List[String]): Long -> ByteSink = {
 
         ent match {
           case source @ Source(_) => compileSource(source, sink, prefix)
@@ -162,13 +180,38 @@ object MessageSink {
 
           finalSink.execute(stream, partition, offset, keyBytes, valueBytes)
         }
-
-        override def init(offset: Long): Unit = finalSink.init(offset)
       }
 
       val name = config.get(samza.TaskName)
 
-      compile(sink.element, last, List(name))
+      val (_, thing) = compile(sink.element, last, List(name))
+
+      val mergeStream = s"coast.merge.$taskName"
+
+      new MessageSink.ByteSink {
+
+        override def execute(stream: String, partition: Int, offset: Long, key: Bytes, value: Bytes): Long = {
+
+          if (stream == mergeStream) {
+
+            val fullMessage = WireFormat.read[FullMessage](value)
+
+            thing.execute(fullMessage.stream, partition, fullMessage.offset, key, fullMessage.value)
+
+          } else {
+
+            whatSink.execute(
+              mergeStream,
+              partitionIndex,
+              0,
+              key,
+              WireFormat.write(
+                FullMessage(stream, 0, offset, value)
+              )
+            )
+          }
+        }
+      }
     }
   }
 }

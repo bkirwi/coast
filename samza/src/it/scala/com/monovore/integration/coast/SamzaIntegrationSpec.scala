@@ -11,7 +11,7 @@ class SamzaIntegrationSpec extends Specification with ScalaCheck {
   // this helps make results more reproducible
   sequential
 
-  val BigNumber = 80000 // pretty big?
+  val BigNumber = 50000 // pretty big?
 
   "a running samza-based job" should {
 
