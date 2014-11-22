@@ -2,6 +2,7 @@ package com.monovore.coast
 package samza
 
 import com.monovore.coast.model._
+import com.monovore.coast.wire.WireFormat
 import org.apache.samza.config.Config
 import org.apache.samza.task.TaskContext
 import org.apache.samza.util.Logging
@@ -10,13 +11,13 @@ trait MessageSink[-K, -V] extends Serializable {
 
   def init(offset: Long): Unit // FIXME: laaaame
 
-  def execute(stream: String, offset: Long, key: K, value: V): Long
+  def execute(stream: String, partition: Int, offset: Long, key: K, value: V): Long
 }
 
 object MessageSink {
 
   type Bytes = Array[Byte]
-  type ByteSink = MessageSink[Array[Byte], Array[Byte]]
+  type ByteSink = MessageSink[Bytes, Bytes]
 
   trait Factory extends Serializable {
     def make(config: Config, context: TaskContext, sink: ByteSink): ByteSink
@@ -32,7 +33,7 @@ object MessageSink {
 
           val store = context.getStore(formatPath(prefix)).asInstanceOf[CoastStore[Unit, Unit]]
 
-          override def execute(stream: String, offset: Long, key: Bytes, value: Bytes): Long = {
+          override def execute(stream: String, partition: Int, offset: Long, key: Bytes, value: Bytes): Long = {
 
             if (stream == source.source) {
               store.handle(offset, unit, unit) { (downstreamOffset, _) =>
@@ -40,7 +41,7 @@ object MessageSink {
                 val a = source.keyFormat.read(key)
                 val b = source.valueFormat.read(value)
 
-                sink.execute(stream, downstreamOffset, a, b) -> unit
+                sink.execute(stream, partition, downstreamOffset, a, b) -> unit
               }
             } else offset
           }
@@ -53,10 +54,10 @@ object MessageSink {
 
         val transformed = new MessageSink[A, B0] {
 
-          override def execute(stream: String, offset: Long, key: A, value: B0): Long = {
+          override def execute(stream: String, partition: Int, offset: Long, key: A, value: B0): Long = {
             val update = trans.function(key)
             val output = update(value)
-            output.foldLeft(offset)(sink.execute(stream, _, key, _))
+            output.foldLeft(offset)(sink.execute(stream, partition, _, key, _))
           }
 
           override def init(offset: Long): Unit = sink.init(offset)
@@ -71,14 +72,14 @@ object MessageSink {
 
           val store = context.getStore(samza.formatPath(prefix)).asInstanceOf[CoastStore[A, S]]
 
-          override def execute(stream: String, offset: Long, key: A, value: B0): Long = {
+          override def execute(stream: String, partition: Int, offset: Long, key: A, value: B0): Long = {
             store.handle(offset, key, trans.init) { (downstreamOffset, state) =>
 
               val update = trans.transformer(key)
 
               val (newState, output) = update(state, value)
 
-              val newDownstreamOffset = output.foldLeft(downstreamOffset)(sink.execute(stream, _, key, _))
+              val newDownstreamOffset = output.foldLeft(downstreamOffset)(sink.execute(stream, partition, _, key, _))
 
               newDownstreamOffset -> newState
             }
@@ -94,9 +95,9 @@ object MessageSink {
 
         val task = new MessageSink[A0, B] {
 
-          override def execute(stream: String, offset: Long, key: A0, value: B): Long = {
+          override def execute(stream: String, partition: Int, offset: Long, key: A0, value: B): Long = {
             val newKey = gb.groupBy(key)(value)
-            sink.execute(stream, offset, newKey, value)
+            sink.execute(stream, partition, offset, newKey, value)
           }
 
           override def init(offset: Long): Unit = sink.init(offset)
@@ -111,9 +112,9 @@ object MessageSink {
 
           private[this] var maxOffset: Long = 0L
 
-          override def execute(stream: String, offset: Long, key: A, value: B): Long = {
+          override def execute(stream: String, partition: Int, offset: Long, key: A, value: B): Long = {
             maxOffset = math.max(maxOffset, offset)
-            maxOffset = sink.execute(stream, maxOffset, key, value)
+            maxOffset = sink.execute(stream, partition, maxOffset, key, value)
             maxOffset
           }
 
@@ -128,9 +129,9 @@ object MessageSink {
 
         new MessageSink[Bytes, Bytes] {
 
-          override def execute(stream: String, offset: Long, key: Bytes, value: Bytes): Long = {
+          override def execute(stream: String, partition: Int, offset: Long, key: Bytes, value: Bytes): Long = {
 
-            upstreamSinks.foreach { s => s.execute(stream, offset, key, value) }
+            upstreamSinks.foreach { s => s.execute(stream, partition, offset, key, value) }
 
             offset
           }
@@ -154,16 +155,12 @@ object MessageSink {
 
         var nextOffset: Long = _
 
-//        val storage = context.getStore("offsets").asInstanceOf[CoastStore[Unit, Unit]]
-
-//        info(s"Starting thing at ${storage.nextOffset}")
-
-        override def execute(stream: String, offset: Long, key: A, value: B): Long = {
+        override def execute(stream: String, partition: Int, offset: Long, key: A, value: B): Long = {
 
           val keyBytes = sink.keyFormat.write(key)
           val valueBytes = sink.valueFormat.write(value)
 
-          finalSink.execute(stream, offset, keyBytes, valueBytes)
+          finalSink.execute(stream, partition, offset, keyBytes, valueBytes)
         }
 
         override def init(offset: Long): Unit = finalSink.init(offset)

@@ -52,7 +52,7 @@ class CoastTask extends StreamTask with InitableTask with WindowableTask with Lo
 
       val outputStream = new SystemStream(CoastSystem, taskName)
 
-      override def execute(stream: String, offset: Long, key: Array[Byte], value: Array[Byte]): Long = {
+      override def execute(stream: String, partition: Int, offset: Long, key: Array[Byte], value: Array[Byte]): Long = {
 
         if (offset >= offsetThreshold) {
           val out = new OutgoingMessageEnvelope(outputStream, util.Arrays.hashCode(key), key, value)
@@ -76,25 +76,25 @@ class CoastTask extends StreamTask with InitableTask with WindowableTask with Lo
     coordinator: TaskCoordinator
   ): Unit = {
 
+    val stream = envelope.getSystemStreamPartition.getSystemStream.getStream
+
+    val key = Option(envelope.getKey.asInstanceOf[Array[Byte]]).getOrElse(Array.empty[Byte])
+
+    val message = envelope.getMessage.asInstanceOf[Array[Byte]]
+
+    val partition = envelope.getSystemStreamPartition.getPartition.getPartitionId
+
     if (envelope.getSystemStreamPartition.getSystemStream.getStream == mergeStream) {
-
-      val key = Option(envelope.getKey.asInstanceOf[Array[Byte]]).getOrElse(Array.empty[Byte])
-
-      val message = envelope.getMessage.asInstanceOf[Array[Byte]]
 
       val fullMessage = WireFormat.read[FullMessage](message)
 
       this.collector = collector
 
-      sink.execute(fullMessage.stream, fullMessage.offset, key, fullMessage.value)
+      sink.execute(fullMessage.stream, partition, fullMessage.offset, key, fullMessage.value)
 
     } else {
 
       val inputOffset = envelope.getOffset.toLong
-
-      val stream = envelope.getSystemStreamPartition.getSystemStream.getStream
-      val key = Option(envelope.getKey.asInstanceOf[Array[Byte]]).getOrElse(Array.empty[Byte])
-      val message = envelope.getMessage.asInstanceOf[Array[Byte]]
 
       collector.send(new OutgoingMessageEnvelope(
         new SystemStream(CoastSystem, mergeStream),
