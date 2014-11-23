@@ -66,3 +66,53 @@ original stream, and feeds it into the task.
 
 A nuance: the merge stream should be a bootstrap stream, so we can be sure the
 high-water marks are updated before new data comes in.
+
+## Lazy Merge Design
+
+Simplest possible design: dump all incoming data to a single stream (including
+stream name, partition, offset, payload), then consume that stream and
+deduplicate before spilling it in to the main processing.
+
+This avoids the need for a special-purpose merge stream. But it *is* pretty
+heavy.
+
+## State I Have
+
+- Sources
+    - state: (Map[partition, upstream], downstream)
+    - frame: partition -> (upstream, downstream)
+
+That's 4 extra bytes per message even for single-partition inputs -- I can
+deal with that.
+
+- Aggregations
+    - state: (upstream, downstream, Map[key, value])
+    - frame: key -> (upstream, downstream, value)
+
+Can't push the offsets to the values: we always need to know the latest
+downstream offset, and it involves a lot of repetition in LevelDB or whatever.
+
+- Minimal Unification
+    - state: (Map[partition, upstream], downstream, Map[key, value])
+    - frame: (key, partition) -> (upstream, downstream, value)
+
+Where {partition,key,value} might all be unit, depending.
+
+Not the worst thing in the universe: there should be no wire overhead with
+a good serialization format.
+
+Is there ever a case where you'd want all of them together? Maybe if you
+had something like `coast.source(In).fold(0) { _ + _ }`... you'd be able to
+elide the original dedup.
+
+Schematic control flow:
+
+```scala
+if (inputOffset >= offsets.get(partition) {
+  val value = state.get(key)
+  val (newDownstream, newValue) = doSomething(downstream, value)
+  state.put(key)
+  offsets.set(partition)
+
+}
+```
