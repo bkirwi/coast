@@ -1,7 +1,7 @@
 package com.monovore.coast
 
 import com.google.common.primitives.{Ints, Longs}
-import com.monovore.coast.wire.WireFormat
+import com.monovore.coast.wire.BinaryFormat
 import com.monovore.coast.model._
 import org.apache.samza.config.{Config, MapConfig}
 
@@ -34,7 +34,7 @@ package object samza {
     case GroupBy(up, _) => sourcesFor(up)
   }
 
-  val longPairFormat = new WireFormat[(Long, Long)] {
+  val longPairFormat = new BinaryFormat[(Long, Long)] {
     override def write(value: (Long, Long)): Array[Byte] = {
       Longs.toByteArray(value._1) ++ Longs.toByteArray(value._2)
     }

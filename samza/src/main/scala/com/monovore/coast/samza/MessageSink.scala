@@ -2,7 +2,7 @@ package com.monovore.coast
 package samza
 
 import com.monovore.coast.model._
-import com.monovore.coast.wire.{DataFormat, WireFormat}
+import com.monovore.coast.wire.{DataFormat, BinaryFormat}
 import org.apache.samza.Partition
 import org.apache.samza.config.Config
 import org.apache.samza.system.SystemFactory
@@ -84,7 +84,7 @@ object MessageSink {
 
           val payload =
             if (regroupedStreams(taskName)) {
-              WireFormat.write(FullMessage(taskName, partitionIndex, offset, valueBytes))
+              BinaryFormat.write(FullMessage(taskName, partitionIndex, offset, valueBytes))
             } else {
               valueBytes
             }
@@ -110,7 +110,7 @@ object MessageSink {
 
           if (stream == mergeStream) {
 
-            val fullMessage = WireFormat.read[FullMessage](value)
+            val fullMessage = BinaryFormat.read[FullMessage](value)
 
             thing.execute(fullMessage.stream, partition, fullMessage.offset, key, fullMessage.value)
 
@@ -130,7 +130,7 @@ object MessageSink {
               partitionIndex,
               -1,
               key,
-              WireFormat.write(
+              BinaryFormat.write(
                 FullMessage(stream, 0, offset, value)
               )
             )

@@ -5,7 +5,7 @@ import com.google.common.hash.HashCode
 /**
  * Importing coast.wire.evil._ gives you a partitioner and wire format for all
  * types. As the name suggests, this is probably not what you want:
- * `hashCode()`s are not necessarily consistent across JVMs, and serialization
+ * `Object.hashCode()`s are not necessarily consistent across JVMs, and serialization
  * is slow and can fail at runtime.
  *
  * Nevertheless, this is sometimes useful for prototyping and testing. But be
@@ -17,5 +17,5 @@ object ugly {
     override def hash(a: A): HashCode = HashCode.fromInt(a.hashCode())
   }
 
-  implicit def anyFormat[A]: WireFormat[A] = javaSerialization.formatFor[A]
+  implicit def anyFormat[A]: BinaryFormat[A] = javaSerialization.formatFor[A]
 }

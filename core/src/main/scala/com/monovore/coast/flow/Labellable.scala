@@ -16,7 +16,7 @@ sealed trait Labellable[-A] {
 
 object Labellable {
 
-  implicit def labelStreams[A : WireFormat : Partitioner, B : WireFormat] = new Labellable[StreamDef[AnyGrouping, A, B]] {
+  implicit def labelStreams[A : BinaryFormat : Partitioner, B : BinaryFormat] = new Labellable[StreamDef[AnyGrouping, A, B]] {
 
     type Labelled = Stream[A, B]
 
@@ -25,7 +25,7 @@ object Labellable {
     }
   }
 
-  implicit def labelPools[A : WireFormat : Partitioner, B : WireFormat] = new Labellable[PoolDef[AnyGrouping, A, B]] {
+  implicit def labelPools[A : BinaryFormat : Partitioner, B : BinaryFormat] = new Labellable[PoolDef[AnyGrouping, A, B]] {
 
     type Labelled = Pool[A, B]
 

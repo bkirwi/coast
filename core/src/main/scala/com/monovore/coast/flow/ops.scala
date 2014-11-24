@@ -3,7 +3,7 @@ package flow
 
 import model._
 
-import com.monovore.coast.wire.WireFormat
+import com.monovore.coast.wire.BinaryFormat
 
 import scala.language.higherKinds
 
@@ -46,7 +46,7 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
     flatMap(context.map(func) { func => func andThen { b => Seq(b)} })
 
   def aggregate[S, B0](init: S)(func: WithKey[(S, B) => (S, Seq[B0])])(
-    implicit isGrouped: IsGrouped[G], keyFormat: WireFormat[A], stateFormat: WireFormat[S]
+    implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], stateFormat: BinaryFormat[S]
   ): Stream[A, B0] = {
 
     val keyedFunc = context.unwrap(func)
@@ -55,7 +55,7 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
   }
 
   def fold[B0](init: B0)(func: WithKey[(B0, B) => B0])(
-    implicit isGrouped: IsGrouped[G], keyFormat: WireFormat[A], stateFormat: WireFormat[B0]
+    implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], stateFormat: BinaryFormat[B0]
   ): Pool[A, B0] = {
 
     val transformer = context.map(func) { fn =>
@@ -70,7 +70,7 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
   }
 
   def grouped[B0 >: B](size: Int)(
-    implicit isGrouped: IsGrouped[G], keyFormat: WireFormat[A], stateFormat: WireFormat[Seq[B0]]
+    implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], stateFormat: BinaryFormat[Seq[B0]]
   ): Stream[A, Seq[B0]] = {
 
     stream.aggregate(Vector.empty[B0]: Seq[B0]) { (buffer, next) =>
@@ -81,7 +81,7 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
   }
 
   def windowed[S](size: Int)(init: S)(function: (S, B) => S)(
-    implicit isGrouped: IsGrouped[G], keyFormat: WireFormat[A], stateFormat: WireFormat[(S, Int)]
+    implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], stateFormat: BinaryFormat[(S, Int)]
   ): Stream[A, S] = {
 
     require(size > 0, "Expected a positive window size")
@@ -98,11 +98,11 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
     }
   }
 
-  def pool[B0 >: B](init: B0): PoolDef[G, A, B0] =
+  def latestOr[B0 >: B](init: B0): PoolDef[G, A, B0] =
     new PoolDef(init, element)
 
   def latestOption: PoolDef[G, A, Option[B]] =
-    stream.map { b => Some(b) }.pool(None)
+    stream.map { b => Some(b) }.latestOr(None)
 
   def groupBy[A0](func: WithKey[B => A0]): StreamDef[AnyGrouping, A0, B] =
     new StreamDef[G, A0, B](GroupBy(self.element, context.unwrap(func)))
@@ -113,10 +113,10 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
   def flatten[B0](implicit func: B => Traversable[B0]) = stream.flatMap(func andThen { _.toSeq })
 
   def join[B0](pool: Pool[A, B0])(
-    implicit isGrouped: IsGrouped[G], keyFormat: WireFormat[A], b0Format: WireFormat[B0]
+    implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], b0Format: BinaryFormat[B0]
   ): Stream[A, B -> B0] = {
 
-    merge("stream" -> pool.stream.map(Left(_)), "pool" -> isGrouped.stream(this.stream).map(Right(_)))
+    merge("stream" -> pool.updateStream.map(Left(_)), "pool" -> isGrouped.stream(this.stream).map(Right(_)))
       .aggregate(pool.initial) { (state: B0, msg: Either[B0, B]) =>
         msg match {
           case Left(newState) => newState -> Seq.empty
@@ -137,18 +137,18 @@ class PoolDef[+G <: AnyGrouping, A, +B](
   private[coast] val element: Node[A, B]
 ) { self =>
 
-  def stream: StreamDef[G, A, B] = new StreamDef(element)
+  def updateStream: StreamDef[G, A, B] = new StreamDef(element)
 
   def map[B0](function: B => B0): PoolDef[G, A, B0] =
-    stream.map(function).pool(function(initial))
+    updateStream.map(function).latestOr(function(initial))
 
   def join[B0 >: B, B1](other: Pool[A, B1])(
-    implicit isGrouped: IsGrouped[G], keyFormat: WireFormat[A], pairFormat: WireFormat[(B0, B1)]
+    implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], pairFormat: BinaryFormat[(B0, B1)]
   ): PoolDef[Grouped, A, (B0, B1)] = {
 
     val merged = merge(
-      "left" -> isGrouped.pool(this).stream.map(Left(_)),
-      "right" -> other.stream.map(Right(_))
+      "left" -> isGrouped.pool(this).updateStream.map(Left(_)),
+      "right" -> other.updateStream.map(Right(_))
     )
 
     merged

@@ -28,7 +28,7 @@ object CustomerTransactions extends ExampleMain {
     transactionsByCustomer <- coast.label("transactions-by-customer") {
 
       (coast.source(Transactions).latestOption join coast.source(CustomerTransactions).latestOption)
-        .stream
+        .updateStream
         .flatMap { case (latestTransaction, allCustomers) =>
 
           val both = for {
@@ -48,7 +48,7 @@ object CustomerTransactions extends ExampleMain {
       val latestCustomerInfo = coast.source(Customers).latestOption
 
       (latestCustomerInfo join allCustomerTransactions)
-        .stream
+        .updateStream
         .flatMap { case (customerOption, transactions) =>
 
           customerOption

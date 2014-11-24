@@ -44,7 +44,7 @@ object Denormalize extends ExampleMain {
             DenormalizedGroup(group.name, members.values.toSet)
           }
         }
-        .stream
+        .updateStream
     }
   } yield ()
 }

@@ -4,7 +4,7 @@ import java.io.File
 import java.util
 
 import com.google.common.primitives.Longs
-import com.monovore.coast.wire.{DataFormat, WireFormat}
+import com.monovore.coast.wire.{DataFormat, BinaryFormat}
 import org.apache.samza.container.SamzaContainerContext
 import org.apache.samza.metrics.MetricsRegistry
 import org.apache.samza.serializers.Serde

@@ -7,6 +7,10 @@ import com.google.common.io.Files
 import com.monovore.coast
 import com.monovore.coast.Flow
 
+/**
+ * A simple main method for running the example jobs. At the moment, it just pretty-prints
+ * the flows in GraphViz format.
+ */
 trait ExampleMain {
 
   def flow: Flow[Unit]

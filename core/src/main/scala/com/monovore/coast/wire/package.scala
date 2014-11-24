@@ -6,7 +6,7 @@ package object wire {
 
   object javaSerialization {
 
-    def formatFor[A] = new WireFormat[A] {
+    def formatFor[A] = new BinaryFormat[A] {
 
       override def write(value: A): Array[Byte] = {
         val baos = new ByteArrayOutputStream()

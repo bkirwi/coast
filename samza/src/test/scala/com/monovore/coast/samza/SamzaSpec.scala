@@ -18,7 +18,7 @@ class SamzaSpec extends Specification with ScalaCheck {
       val sink = Name[String, Int]("bigger-ints")
 
       val sampleFlow = coast.sink(sink) {
-        coast.source(source).fold(0) { _ + _ }.stream
+        coast.source(source).fold(0) { _ + _ }.updateStream
       }
 
       val configs = samza.configureFlow(sampleFlow)(

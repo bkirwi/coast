@@ -2,7 +2,7 @@ package com.monovore.coast.samza
 
 import java.io.{DataInputStream, ByteArrayInputStream, DataOutputStream, ByteArrayOutputStream}
 
-import com.monovore.coast.wire.WireFormat
+import com.monovore.coast.wire.BinaryFormat
 
 case class FullMessage(
   stream: String,
@@ -13,7 +13,7 @@ case class FullMessage(
 
 object FullMessage {
 
-  implicit val messageFormat = new WireFormat[FullMessage] {
+  implicit val messageFormat = new BinaryFormat[FullMessage] {
 
     override def write(value: FullMessage): Array[Byte] = {
 

@@ -1,7 +1,7 @@
 package com.monovore.integration.coast
 
 import com.monovore.coast
-import com.monovore.coast.wire.{Partitioner, WireFormat}
+import com.monovore.coast.wire.{Partitioner, BinaryFormat}
 import org.specs2.ScalaCheck
 import org.specs2.mutable._
 
@@ -61,7 +61,7 @@ class SamzaIntegrationSpec extends Specification with ScalaCheck {
     "accumulate state" in {
 
       val flow = coast.sink(Bar) {
-        coast.source(Foo).fold(0) { (n, _) => n + 1 }.stream
+        coast.source(Foo).fold(0) { (n, _) => n + 1 }.updateStream
       }
 
       val inputData = Map(
@@ -83,7 +83,7 @@ class SamzaIntegrationSpec extends Specification with ScalaCheck {
       val flow = for {
 
         once <- coast.label("testing") {
-          coast.source(Foo).fold(1) { (n, _) => n + 1 }.stream
+          coast.source(Foo).fold(1) { (n, _) => n + 1 }.updateStream
         }
 
         _ <- coast.sink(Bar) { once.map { _ + 1 } }
@@ -156,21 +156,21 @@ class SamzaIntegrationSpec extends Specification with ScalaCheck {
 
 case class Messages(messages: Map[String, Map[Seq[Byte], (Int, Seq[Seq[Byte]])]] = Map.empty) {
 
-  def add[A : WireFormat : Partitioner, B : WireFormat](name: coast.Name[A,B], messages: Map[A, Seq[B]]): Messages = {
+  def add[A : BinaryFormat : Partitioner, B : BinaryFormat](name: coast.Name[A,B], messages: Map[A, Seq[B]]): Messages = {
 
     val formatted = messages.map { case (k, vs) =>
-      WireFormat.write(k).toSeq -> (Partitioner.hash(k).asInt, vs.map { v => WireFormat.write(v).toSeq })
+      BinaryFormat.write(k).toSeq -> (Partitioner.hash(k).asInt, vs.map { v => BinaryFormat.write(v).toSeq })
     }
 
     Messages(this.messages.updated(name.name, formatted))
   }
 
-  def get[A : WireFormat, B : WireFormat](name: coast.Name[A, B]): Map[A, Seq[B]] = {
+  def get[A : BinaryFormat, B : BinaryFormat](name: coast.Name[A, B]): Map[A, Seq[B]] = {
 
     val data = messages.getOrElse(name.name, Map.empty)
 
     data.map { case (k, (_, vs) ) =>
-      WireFormat.read[A](k.toArray) -> vs.map { v => WireFormat.read[B](v.toArray) }
+      BinaryFormat.read[A](k.toArray) -> vs.map { v => BinaryFormat.read[B](v.toArray) }
     }.withDefaultValue(Seq.empty[B])
   }
 }

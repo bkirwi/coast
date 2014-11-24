@@ -1,7 +1,7 @@
 package com.monovore.integration.coast
 
 import com.monovore.coast
-import com.monovore.coast.wire.WireFormat
+import com.monovore.coast.wire.BinaryFormat
 import com.monovore.coast.samza.CoastKafkaSystem
 import kafka.producer.{ProducerConfig, Producer}
 import org.apache.samza.system.{SystemStream, OutgoingMessageEnvelope}
@@ -43,8 +43,8 @@ class CoastKafkaSystemSpec extends Specification with ScalaCheck {
           new OutgoingMessageEnvelope(
             new SystemStream("producer-test", "test"),
             "empty".##,
-            WireFormat.write("empty"),
-            WireFormat.write(i)
+            BinaryFormat.write("empty"),
+            BinaryFormat.write(i)
           )
         }
 
@@ -87,8 +87,8 @@ class CoastKafkaSystemSpec extends Specification with ScalaCheck {
           new OutgoingMessageEnvelope(
             new SystemStream("producer-test", if (i % 2 == 0) "even" else "odd"),
             "empty".##,
-            WireFormat.write("empty"),
-            WireFormat.write(i)
+            BinaryFormat.write("empty"),
+            BinaryFormat.write(i)
           )
         }
 
