@@ -82,7 +82,7 @@ class SamzaIntegrationSpec extends Specification with ScalaCheck {
 
       val flow = for {
 
-        once <- coast.label("testing") {
+        once <- coast.stream("testing") {
           coast.source(Foo).fold(1) { (n, _) => n + 1 }.updateStream
         }
 
@@ -130,7 +130,7 @@ class SamzaIntegrationSpec extends Specification with ScalaCheck {
 
       val flow = for {
 
-        grouped <- coast.label("grouped") {
+        grouped <- coast.stream("grouped") {
           coast.source(Foo).groupBy { n => (n % 10).toString }
         }
 

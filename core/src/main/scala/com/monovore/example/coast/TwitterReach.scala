@@ -103,13 +103,13 @@ object TwitterReach extends ExampleMain {
   val flow = for {
 
     /**
-     * This defines a stream with the label `followers-by-uri`. A labelled stream
+     * This defines an internal stream called `followers-by-uri`. A labelled stream
      * is a lot like a named stream, but the semantics are a bit different:
      * while a named stream is part of the public API, a labelled stream is internal
      * to a single job. That's why we define it inline this way instead of
      * naming it at the top-level.
      */
-    followersByURI <- coast.label("followers-by-uri") {
+    followersByURI <- coast.stream("followers-by-uri") {
 
       /**
        * This little definition has two parts. The first, `coast.source(Followers)`,
@@ -133,7 +133,7 @@ object TwitterReach extends ExampleMain {
        * URIs, we'll get multiple events in the stream.
        *
        * There's not much to say here, except to note the similarity between this and
-       * the usual Scala collections API.
+       * the usual Scala collections API and the poor quality of my URI validation code.
        */
       val tweetedLinks = coast.source(Tweets)
         .flatMap { _.split("\\s+") }

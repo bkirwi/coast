@@ -24,7 +24,7 @@ class MachineSpec extends Specification with ScalaCheck {
 
       val doubled = Name[String, Int]("doubled")
 
-      val graph = coast.label("doubled") {
+      val graph = coast.stream("doubled") {
         coast.source(integers).map { _ * 2 }
       }
 
@@ -93,7 +93,7 @@ class MachineSpec extends Specification with ScalaCheck {
 
         val graph = for {
 
-          grouped <- coast.label("grouped") {
+          grouped <- coast.stream("grouped") {
             coast.source(integers).groupBy { n => (n % 2 == 0).toString}
           }
 

@@ -25,7 +25,7 @@ object CustomerTransactions extends ExampleMain {
 
   override def flow: coast.Flow[Unit] = for {
 
-    transactionsByCustomer <- coast.label("transactions-by-customer") {
+    transactionsByCustomer <- coast.stream("transactions-by-customer") {
 
       (coast.source(Transactions).latestOption join coast.source(CustomerTransactions).latestOption)
         .updateStream

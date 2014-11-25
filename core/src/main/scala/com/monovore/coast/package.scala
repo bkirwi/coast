@@ -28,8 +28,11 @@ package object coast {
     Flow(Seq(name.name -> Sink(flow.element)), ())
   }
 
-  def label[A : BinaryFormat : Partitioner, B : BinaryFormat](name: String)(stream: StreamDef[AnyGrouping, A, B]): Flow[Stream[A, B]] =
-    Flow(Seq(name -> Sink(stream.element)), new StreamDef[Grouped, A, B](Source[A, B](name)))
+  def stream[A : BinaryFormat : Partitioner, B : BinaryFormat](label: String)(stream: StreamDef[AnyGrouping, A, B]): Flow[Stream[A, B]] =
+    Flow(Seq(label -> Sink(stream.element)), new StreamDef[Grouped, A, B](Source[A, B](label)))
+
+  def pool[A : BinaryFormat : Partitioner, B : BinaryFormat](label: String)(pool: PoolDef[AnyGrouping, A, B]): Flow[Pool[A, B]] =
+    Flow(Seq(label -> Sink(pool.element)), new PoolDef[Grouped, A, B](pool.initial, Source[A, B](label)))
 
   case class Name[A, B](name: String)
 
@@ -37,8 +40,6 @@ package object coast {
   // always-visible utilities; should be hidden within the coast package
 
   private[coast] val unit: Unit = ()
-
-  private[coast] def some[A](a: A): Option[A] = Some(a)
 
   private[coast] type ->[A, B] = (A, B)
 

@@ -23,7 +23,7 @@ object Denormalize extends ExampleMain {
   val flow = for {
 
     // Roll up 'users' under their group id
-    usersByKey <- coast.label("users-pool") {
+    usersByKey <- coast.stream("users-pool") {
       coast.source(Users)
         .withKeys.flatMap { userID => userInfo =>
           userInfo.groupIDs.toSeq.map { _ -> (userID, userInfo.name) }

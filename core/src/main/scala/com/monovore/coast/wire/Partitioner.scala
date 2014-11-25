@@ -13,7 +13,7 @@ import scala.language.existentials
  * to do locality-sensitive hashing without knowing the exact number of partitions.
  * Otherwise, pick a good mixing hash.
  */
-@implicitNotFound("No partitioner for type ${A} in scope")
+@implicitNotFound("No partitioner for key type ${A} in scope")
 trait Partitioner[-A] {
   def hash(a: A): HashCode
 }
