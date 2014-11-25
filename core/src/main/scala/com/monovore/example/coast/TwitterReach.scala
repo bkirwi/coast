@@ -2,7 +2,10 @@ package com.monovore.example.coast
 
 import java.net.URI
 
+import com.google.common.base.Charsets
+import com.google.common.hash.HashCode
 import com.monovore.coast
+import com.monovore.coast.wire.{Partitioner, BinaryFormat}
 
 import scala.util.Try
 
@@ -12,7 +15,7 @@ import scala.util.Try
  * https://storm.apache.org/documentation/Trident-tutorial.html#toc_2
  *
  * Both jobs calculate the 'reach' of a URI on Twitter, which is the total number
- * of Twitter users that have seen a particular link. Both jobs do this by joining
+ * of Twitter users that have seen a particular link, by joining
  * a user's links against their set of followers. However, there are a few
  * major differences between the two:
  *
@@ -70,7 +73,21 @@ object TwitterReach extends ExampleMain {
    * partitioning and java serialization on the wire. I suggest not doing this
    * in production, but it's handy for development.
    */
-  import coast.wire.ugly._
+  import coast.wire.pretty._
+
+  implicit val followerSetFormat =
+    coast.wire.javaSerialization.formatFor[Set[FollowerID]]
+
+  implicit val uriBinaryFormat = new BinaryFormat[URI] {
+
+    override def write(value: URI): Array[Byte] = value.toString.getBytes(Charsets.UTF_8)
+
+    override def read(bytes: Array[Byte]): URI = new URI(new String(bytes, Charsets.UTF_8))
+  }
+
+  implicit val uriPartitioner = new Partitioner[URI] {
+    override def hash(a: URI): HashCode = HashCode.fromInt(a.hashCode())
+  }
 
   /**
    * Now, we come to the job logic. We're building up a `Flow` object here; this
@@ -89,9 +106,8 @@ object TwitterReach extends ExampleMain {
      * This defines a stream with the label `followers-by-uri`. A labelled stream
      * is a lot like a named stream, but the semantics are a bit different:
      * while a named stream is part of the public API, a labelled stream is internal
-     * to a single job. That's why we define it inline this way, instead of
-     * naming it at the top-level. This turns out to be an important distinction,
-     * but we'll get to that in a bit.
+     * to a single job. That's why we define it inline this way instead of
+     * naming it at the top-level.
      */
     followersByURI <- coast.label("followers-by-uri") {
 
@@ -106,8 +122,8 @@ object TwitterReach extends ExampleMain {
        * type here is `Pool[UserID, Set[FollowerID]]`. A `Pool` is like a stream with a
        * current value for each key; or, if you prefer, like a table with a changelog
        * stream. In this case, calculating the current value requires keeping state;
-       * `coast` will take care of this, serializing it when necessary using the formatters
-       * we defined above.
+       * `coast` will take care of this, serializing it when necessary using the
+       * formatters we defined above.
        */
       val followersByUser: coast.Pool[UserID, Set[FollowerID]] =
         coast.source(Followers).fold(Set.empty[FollowerID]) { _ + _ }
