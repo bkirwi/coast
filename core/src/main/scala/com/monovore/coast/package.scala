@@ -28,8 +28,8 @@ package object coast {
     Flow(Seq(name.name -> Sink(flow.element)), ())
   }
 
-  def label[A](name: String)(value: A)(implicit lbl: Labellable[A]): Flow[lbl.Labelled] =
-    lbl.label(name, value)
+  def label[A : BinaryFormat : Partitioner, B : BinaryFormat](name: String)(stream: StreamDef[AnyGrouping, A, B]): Flow[Stream[A, B]] =
+    Flow(Seq(name -> Sink(stream.element)), new StreamDef[Grouped, A, B](Source[A, B](name)))
 
   case class Name[A, B](name: String)
 
