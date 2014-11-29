@@ -27,7 +27,7 @@ object Sample {
 
     def dropMap[A, B](dropValuePrefix: (B, B) => Option[B])(prefix: Map[A, B], other: Map[A, B]): Option[Map[A, B]] = {
 
-      prefix.foldLeft(some(other)) { (acc, kv) =>
+      prefix.foldLeft(Some(other): Option[Map[A, B]]) { (acc, kv) =>
 
         val (key, valuePrefix) = kv
 

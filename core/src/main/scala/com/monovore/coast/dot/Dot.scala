@@ -1,12 +1,9 @@
 package com.monovore.coast
 package dot
 
-import flow._
-import model._
-
 import java.util.concurrent.atomic.AtomicInteger
 
-import com.monovore.coast.model.{Transform, Node}
+import com.monovore.coast.model._
 
 object Dot {
 
@@ -18,7 +15,7 @@ object Dot {
 
   case class Edge(from: Label, to: Label, tag: Option[String] = None)
 
-  def apply(graph: Flow[Unit]): String = {
+  def describe(graph: Graph): String = {
 
     val newID: String => Label = {
       val atomic = new AtomicInteger()

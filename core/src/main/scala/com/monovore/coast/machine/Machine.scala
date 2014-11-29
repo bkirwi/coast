@@ -12,7 +12,7 @@ object Machine {
   case class Named(name: String) extends Label
   case class Anonymous(index: Int) extends Label
 
-  def compile(graph: Flow[_]): Machine = {
+  def compile(graph: Graph): Machine = {
 
     val newID = {
 

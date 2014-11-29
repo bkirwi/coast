@@ -9,11 +9,11 @@ import model._
  * @param value
  * @tparam A
  */
-case class Flow[+A](bindings: Seq[String -> Sink[_, _]], value: A) {
+case class FlowGraph[+A](bindings: Seq[String -> Sink[_, _]], value: A) extends Graph {
 
-  def map[B](func: A => B): Flow[B] = copy(value = func(value))
+  def map[B](func: A => B): FlowGraph[B] = copy(value = func(value))
 
-  def flatMap[B](func: A => Flow[B]): Flow[B] = {
+  def flatMap[B](func: A => FlowGraph[B]): FlowGraph[B] = {
 
     val result = func(value)
 
@@ -23,6 +23,6 @@ case class Flow[+A](bindings: Seq[String -> Sink[_, _]], value: A) {
 
     if (duplicateName) throw new IllegalArgumentException("Reused name binding!")
 
-    Flow(bindings ++ result.bindings, result.value)
+    FlowGraph(bindings ++ result.bindings, result.value)
   }
 }

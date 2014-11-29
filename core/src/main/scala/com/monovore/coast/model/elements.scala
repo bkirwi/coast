@@ -60,3 +60,7 @@ case class Sink[A, B](element: Node[A, B])(
   val valueFormat: BinaryFormat[B],
   val keyPartitioner: Partitioner[A]
 )
+
+trait Graph {
+  def bindings: Seq[String -> Sink[_, _]]
+}

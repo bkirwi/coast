@@ -66,7 +66,7 @@ package object samza {
     case GroupBy(up, _) => storageFor(up, path)
   }
 
-  def configureFlow(flow: Flow[_])(
+  def configureFlow(flow: Graph)(
     baseConfig: Config = new MapConfig()
   ): Map[String, Config] = {
 

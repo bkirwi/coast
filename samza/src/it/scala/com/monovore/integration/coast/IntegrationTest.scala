@@ -5,6 +5,7 @@ import java.util
 import java.util.Properties
 
 import com.monovore.coast
+import com.monovore.coast.model.Graph
 import kafka.api.{PartitionFetchInfo, FetchRequest, TopicMetadataRequest, OffsetRequest}
 import kafka.common.{UnknownTopicOrPartitionException, TopicAndPartition}
 import kafka.consumer.{Consumer, ConsumerConfig, ConsumerConnector, SimpleConsumer}
@@ -64,7 +65,7 @@ object IntegrationTest {
     }
   }
 
-  def fuzz(flow: coast.Flow[Unit], input: Messages): Messages = {
+  def fuzz(flow: Graph, input: Messages): Messages = {
 
     val factory = new ThreadJobFactory
 

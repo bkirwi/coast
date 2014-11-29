@@ -1,6 +1,7 @@
 package com.monovore.integration.coast
 
 import com.monovore.coast
+import com.monovore.coast.flow
 import com.monovore.coast.wire.BinaryFormat
 import com.monovore.coast.samza.CoastKafkaSystem
 import kafka.producer.{ProducerConfig, Producer}
@@ -18,7 +19,7 @@ class CoastKafkaSystemSpec extends Specification with ScalaCheck {
 
     import coast.wire.pretty._
 
-    def stream(name: String) = coast.Name[String, Int](name)
+    def stream(name: String) = flow.Name[String, Int](name)
 
     "eventually write all the data" in {
 

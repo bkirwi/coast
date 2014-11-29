@@ -1,6 +1,7 @@
 package com.monovore.example.coast
 
 import com.monovore.coast
+import coast.flow
 
 import scala.collection.immutable.SortedSet
 
@@ -15,16 +16,17 @@ object Denormalize extends ExampleMain {
   case class User(name: String, groupIDs: SortedSet[GroupID])
   case class DenormalizedGroup(name: String, memberNames: Set[String])
 
-  val Users = coast.Name[UserID, User]("users")
-  val Groups = coast.Name[GroupID, Group]("groups")
+  val Users = flow.Name[UserID, User]("users")
+  val Groups = flow.Name[GroupID, Group]("groups")
   
-  val Denormalized = coast.Name[GroupID, Option[DenormalizedGroup]]("denormalized-groups")
+  val Denormalized = flow.Name[GroupID, Option[DenormalizedGroup]]("denormalized-groups")
 
-  val flow = for {
+  val graph = for {
 
     // Roll up 'users' under their group id
-    usersByKey <- coast.stream("users-pool") {
-      coast.source(Users)
+    usersByKey <- flow.stream("users-pool") {
+
+      flow.source(Users)
         .withKeys.flatMap { userID => userInfo =>
           userInfo.groupIDs.toSeq.map { _ -> (userID, userInfo.name) }
         }
@@ -32,9 +34,9 @@ object Denormalize extends ExampleMain {
     }
 
     // Join, and a trivial transformation
-    _ <- coast.sink(Denormalized) {
+    _ <- flow.sink(Denormalized) {
 
-      val groups = coast.source(Groups).latestOption
+      val groups = flow.source(Groups).latestOption
 
       val usersPool = usersByKey.fold(Map.empty[UserID, String]) { _ + _ }
 
@@ -44,7 +46,7 @@ object Denormalize extends ExampleMain {
             DenormalizedGroup(group.name, members.values.toSet)
           }
         }
-        .updateStream
+        .updates
     }
   } yield ()
 }

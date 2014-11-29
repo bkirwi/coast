@@ -17,5 +17,5 @@ object ugly {
     override def hash(a: A): HashCode = HashCode.fromInt(a.hashCode())
   }
 
-  implicit def anyFormat[A]: BinaryFormat[A] = javaSerialization.formatFor[A]
+  implicit def anyFormat[A]: BinaryFormat[A] = javaSerialization[A]
 }

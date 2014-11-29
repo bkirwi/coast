@@ -1,6 +1,7 @@
 package com.monovore.example.coast
 
 import com.monovore.coast
+import coast.flow
 
 /**
  * Based on the discussion in this thread:
@@ -17,18 +18,18 @@ object CustomerTransactions extends ExampleMain {
   case class Customer()
   case class Transaction()
 
-  val Customers = coast.Name[CustomerID, Customer]("customers")
-  val CustomerTransactions = coast.Name[TransactionID, CustomerID]("customer-transactions")
-  val Transactions = coast.Name[TransactionID, Transaction]("transactions")
+  val Customers = flow.Name[CustomerID, Customer]("customers")
+  val CustomerTransactions = flow.Name[TransactionID, CustomerID]("customer-transactions")
+  val Transactions = flow.Name[TransactionID, Transaction]("transactions")
 
-  val CustomerInfo = coast.Name[CustomerID, (Customer, Seq[Transaction])]("customer-info")
+  val CustomerInfo = flow.Name[CustomerID, (Customer, Seq[Transaction])]("customer-info")
 
-  override def flow: coast.Flow[Unit] = for {
+  override def graph: flow.FlowGraph[Unit] = for {
 
-    transactionsByCustomer <- coast.stream("transactions-by-customer") {
+    transactionsByCustomer <- flow.stream("transactions-by-customer") {
 
-      (coast.source(Transactions).latestOption join coast.source(CustomerTransactions).latestOption)
-        .updateStream
+      (flow.source(Transactions).latestOption join flow.source(CustomerTransactions).latestOption)
+        .updates
         .flatMap { case (latestTransaction, allCustomers) =>
 
           val both = for {
@@ -41,14 +42,14 @@ object CustomerTransactions extends ExampleMain {
         .groupByKey
     }
 
-    _ <- coast.sink(CustomerInfo) {
+    _ <- flow.sink(CustomerInfo) {
 
       val allCustomerTransactions = transactionsByCustomer.fold(Seq.empty[Transaction]) { _ :+ _ }
 
-      val latestCustomerInfo = coast.source(Customers).latestOption
+      val latestCustomerInfo = flow.source(Customers).latestOption
 
       (latestCustomerInfo join allCustomerTransactions)
-        .updateStream
+        .updates
         .flatMap { case (customerOption, transactions) =>
 
           customerOption
