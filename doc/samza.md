@@ -113,6 +113,26 @@ if (inputOffset >= offsets.get(partition) {
   val (newDownstream, newValue) = doSomething(downstream, value)
   state.put(key)
   offsets.set(partition)
-
 }
 ```
+
+### Not Exactly Once
+
+I care a lot about exactly-once, but not everyone does; when trading off between
+efficiency and correctness, most people seem to choose efficiency. While there's
+still a nontrivial overhead to the exactly-once version, I think it makes sense
+to ship both.
+
+Differences:
+
+- No framing for state messages. To avoid messing with the state logic too much,
+  it should be enough to wrap the format.
+
+- No framing for regrouped messages, and no merge stream at all. I think this
+  only requires 'top level' changes; the actual job logic should be unchanged.
+
+- Don't ever check the downstream partition for the current offset. Again, this
+  seems to be just a top-level change.
+
+
+
