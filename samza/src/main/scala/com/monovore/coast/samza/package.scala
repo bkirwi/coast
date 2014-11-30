@@ -34,15 +34,6 @@ package object samza {
     case GroupBy(up, _) => sourcesFor(up)
   }
 
-  val longPairFormat = new BinaryFormat[(Long, Long)] {
-    override def write(value: (Long, Long)): Array[Byte] = {
-      Longs.toByteArray(value._1) ++ Longs.toByteArray(value._2)
-    }
-    override def read(bytes: Array[Byte]): (Long, Long) = {
-      Longs.fromByteArray(bytes.take(8)) -> Longs.fromByteArray(bytes.drop(8))
-    }
-  }
-
   case class Storage(name: String, keyString: String, valueString: String)
 
   private[this] def storageFor[A, B](element: Node[A, B], path: List[String]): Seq[Storage] = element match {
@@ -110,7 +101,6 @@ package object samza {
         s"systems.$CoastSystem.producer.producer.type" -> "sync",
         s"systems.$CoastSystem.producer.message.send.max.retries" -> "0",
         s"systems.$CoastSystem.producer.request.required.acks" -> "1",
-        s"systems.$CoastSystem.samza.offset.default" -> "oldest",
         s"systems.$CoastSystem.samza.factory" -> "com.monovore.coast.samza.CoastKafkaSystemFactory",
         s"systems.$CoastSystem.delays" -> streamDelays.map { case (s, i) => s"coast.changelog.$s/$i" }.mkString(","),
 
@@ -119,12 +109,6 @@ package object samza {
         TaskName -> name,
         RegroupedStreams -> regrouped.mkString(",")
       )
-
-//      val offsetStorage = Storage(
-//        s"offsets",
-//        SerializationUtil.toBase64(format.pretty.UnitFormat),
-//        SerializationUtil.toBase64(format.pretty.UnitFormat)
-//      )
 
       val storageMap = storage
         .map { case Storage(name, keyFormat, msgFormat) =>

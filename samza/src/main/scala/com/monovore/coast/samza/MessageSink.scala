@@ -13,15 +13,6 @@ import scala.collection.JavaConverters._
 
 trait MessageSink[-K, -V] extends Serializable {
 
-  /**
-   *
-   * @param stream
-   * @param partition
-   * @param offset
-   * @param key
-   * @param value
-   * @return
-   */
   def execute(stream: String, partition: Int, offset: Long, key: K, value: V): Long
 }
 
