@@ -37,7 +37,7 @@ package object samza {
   case class Storage(name: String, keyString: String, valueString: String)
 
   private[this] def storageFor[A, B](element: Node[A, B], path: List[String]): Seq[Storage] = element match {
-    case Source(_) => Seq(Storage(
+    case Source(_) => Seq(Storage( // SAFE
       name = formatPath(path),
       keyString = SerializationUtil.toBase64(wire.pretty.UnitFormat),
       valueString = SerializationUtil.toBase64(wire.pretty.UnitFormat)
@@ -70,15 +70,17 @@ package object samza {
 
     val configs = flow.bindings.map { case (name -> sink) =>
 
+      // SAFE
       val inputs = (sourcesFor(sink.element) + s"coast.merge.$name")
         .map { i => s"$CoastSystem.$i" }
 
       val storage = storageFor(sink.element, List(name))
 
+      // SAFE ???
       val streamDelays = storage
         .map { case Storage(s, _, _) => s -> (s.count { _ == '.'} + 1) }
 
-      val factory: MessageSink.Factory = new MessageSink.FromElement(sink)
+      val factory: MessageSink.Factory = new SafeSinkFactory(sink)
 
       val configMap = Map(
 
@@ -89,16 +91,13 @@ package object samza {
         "task.class" -> "com.monovore.coast.samza.CoastTask",
         "task.inputs" -> inputs.mkString(","),
 
-        "serializers.registry.string.class" -> "org.apache.samza.serializers.StringSerdeFactory",
-        "serializers.registry.bytes.class" -> "org.apache.samza.serializers.ByteSerdeFactory",
-
         // TODO: checkpoints should be configurable
         "task.checkpoint.factory" -> "org.apache.samza.checkpoint.kafka.KafkaCheckpointManagerFactory",
         "task.checkpoint.system" -> "coast-system",
 
         // Kafka system
         s"systems.$CoastSystem.samza.offset.default" -> "oldest",
-        s"systems.$CoastSystem.producer.producer.type" -> "sync",
+        s"systems.$CoastSystem.producer.producer.type" -> "sync",           // SAFE
         s"systems.$CoastSystem.producer.message.send.max.retries" -> "0",
         s"systems.$CoastSystem.producer.request.required.acks" -> "1",
         s"systems.$CoastSystem.samza.factory" -> "com.monovore.coast.samza.CoastKafkaSystemFactory",
@@ -107,7 +106,7 @@ package object samza {
         // Coast-specific
         TaskKey -> SerializationUtil.toBase64(factory),
         TaskName -> name,
-        RegroupedStreams -> regrouped.mkString(",")
+        RegroupedStreams -> regrouped.mkString(",")   // SAFE ???
       )
 
       val storageMap = storage
