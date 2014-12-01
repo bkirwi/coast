@@ -80,7 +80,7 @@ package object samza {
       val streamDelays = storage
         .map { case Storage(s, _, _) => s -> (s.count { _ == '.'} + 1) }
 
-      val factory: MessageSink.Factory = new SafeSinkFactory(sink)
+      val factory: MessageSink.Factory = new Safe.SinkFactory(sink)
 
       val configMap = Map(
 

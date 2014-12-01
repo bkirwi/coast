@@ -4,14 +4,14 @@ import com.monovore.coast._
 import com.monovore.coast.model._
 import org.apache.samza.util.Logging
 
-object Compiler {
+private[samza] object TaskCompiler {
 
   trait Context {
     def getStore[P, A, B](path: String, default: B): CoastState[Int, A, B]
   }
 }
 
-class Compiler(context: Compiler.Context) {
+private[samza] class TaskCompiler(context: TaskCompiler.Context) {
 
   import MessageSink.{Bytes, ByteSink}
 
@@ -127,5 +127,27 @@ class Compiler(context: Compiler.Context) {
       case pure @ PureTransform(_, _) => compilePure(pure, sink, prefix)
       case group @ GroupBy(_, _) => compileGroupBy(group, sink, prefix)
     }
+  }
+
+  def compileSink[A, B](sink: Sink[A, B], messageSink: ByteSink, name: String): ByteSink = {
+
+    val formatted = new MessageSink[A, B] with Logging {
+
+      var nextOffset: Long = _
+
+      override def execute(stream: String, partition: Int, offset: Long, key: A, value: B): Long = {
+
+        val keyBytes = sink.keyFormat.write(key)
+        val valueBytes = sink.valueFormat.write(value)
+
+        val newPartition = sink.keyPartitioner.hash(key).asInt()
+
+        messageSink.execute(stream, newPartition, offset, keyBytes, valueBytes)
+      }
+    }
+
+    val (_, compiledNode) = compile(sink.element, formatted, name :: Nil)
+
+    compiledNode
   }
 }
