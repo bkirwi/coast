@@ -1,26 +1,8 @@
 package com.monovore.coast
 package flow
 
-import model._
-
+import com.monovore.coast.model._
 import com.monovore.coast.wire.BinaryFormat
-
-import scala.language.higherKinds
-
-sealed trait Context[K, X[+_]] {
-  def unwrap[A](wrapped: X[A]): (K => A)
-  def map[A, B](wrapped: X[A])(function: A => B): X[B]
-}
-
-class NoContext[K] extends Context[K, Id] {
-  override def unwrap[A](wrapped: Id[A]): (K) => A = { _ => wrapped }
-  override def map[A, B](wrapped: Id[A])(function: (A) => B): Id[B] = function(wrapped)
-}
-
-class FnContext[K] extends Context[K, From[K]#To] {
-  override def unwrap[A](wrapped: From[K]#To[A]): (K) => A = wrapped
-  override def map[A, B](wrapped: From[K]#To[A])(function: (A) => B): From[K]#To[B] = wrapped andThen function
-}
 
 class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
   private[coast] val context: Context[A, WithKey],
@@ -130,33 +112,4 @@ class StreamDef[+G <: AnyGrouping, A, +B](element: Node[A, B]) extends StreamBui
 
   def withKeys: StreamBuilder[From[A]#To, G, A, B] =
     new StreamBuilder[From[A]#To, G, A, B](new FnContext[A], element)
-}
-
-class PoolDef[+G <: AnyGrouping, A, +B](
-  private[coast] val initial: B,
-  private[coast] val element: Node[A, B]
-) { self =>
-
-  def updates: StreamDef[G, A, B] = new StreamDef(element)
-
-  def map[B0](function: B => B0): PoolDef[G, A, B0] =
-    updates.map(function).latestOr(function(initial))
-
-  def join[B0 >: B, B1](other: Pool[A, B1])(
-    implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], pairFormat: BinaryFormat[(B0, B1)]
-  ): PoolDef[Grouped, A, (B0, B1)] = {
-
-    val merged = merge(
-      "left" -> isGrouped.pool(this).updates.map(Left(_)),
-      "right" -> other.updates.map(Right(_))
-    )
-
-    merged
-      .fold(initial: B0, other.initial) { (state, update) =>
-        update.fold(
-          { left => (left, state._2) },
-          { right => (state._1, right) }
-        )
-      }
-  }
 }

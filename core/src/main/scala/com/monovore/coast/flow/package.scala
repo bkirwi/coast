@@ -33,4 +33,7 @@ package object flow {
 
   case class Name[A, B](name: String)
 
+  private[coast] type Id[+A] = A
+
+  private[coast] type From[A] = { type To[+B] = (A => B) }
 }
