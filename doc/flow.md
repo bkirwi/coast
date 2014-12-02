@@ -1,4 +1,6 @@
-# Flow API
+---
+title: Flow API
+---
 
 `coast` defines an API that can express a wide variety of stream
 transformations, including transformations, merges, splits, folds, and joins.
@@ -8,18 +10,21 @@ transformations, including transformations, merges, splits, folds, and joins.
 The `Stream` type just represents a stream of values. The `Pool` type is like a
 stream, but has a 'current' value as well.
 
-It's easy to go back and forth between the two. The `stream.pool(init)` method
+It's easy to go back and forth between the two. The `stream.latestOr(init)` method
 takes an initial value and makes a `Pool` that takes on each of the stream's
-values in turn. Conversely, `pool.stream` returns a stream that has a new event
+values in turn. Conversely, `pool.updates` returns a stream that has a new event
 every time the value of the `Pool` changes.
 
-Internally, these two are implemented using much the same primitives. The
-distinction is just for convenience: it's much simpler to define joins and
-things when you can talk about the 'current value', for example.
+Under the hood, these are both implemented using the same underlying streaming
+model.
 
 # API methods
 
-`coast.source(name)`
+There are a large number of ways to transform streams and combine them together.
+Here, we'll look at a few common ones; refer to the Scaladocs for a complete
+list.
+
+### Stream to Stream transformations
 
 `.map(fn)`, `flatMap(fn)`, `filter(fn)`, etc.
 

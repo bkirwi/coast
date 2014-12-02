@@ -1,0 +1,76 @@
+body {
+  max-width: 40em;
+  margin-left: auto;
+  margin-right: auto;
+  font-family: 'Roboto', sans-serif;
+  font-weight: 300;
+}
+
+h1, h2, h3 {
+  font-family: 'Roboto', sans-serif;
+  font-weight: 300;
+}
+
+h1.title {
+  font-size: 2.6em;
+}
+
+.front h1 {
+  font-size: 4em;
+  font-family: 'Source Code Pro', monospace;
+  font-weight: 300px;
+  display: inline
+}
+
+.front li {
+  display: inline;
+  list-style-type: none;
+  padding-right: 1em;
+}
+
+
+nav {
+  display: inline;
+}
+
+nav ul {
+  display: inline;
+  font-family: 'Roboto', sans-serif;
+  font-weight: 300;
+}
+
+nav a {
+  color: black;
+}
+
+a:link {
+  text-decoration: none;
+  color: #4070a0;
+}
+
+a:visited {
+  color: #4070a0;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+code span.kw {
+  color: black;
+  font-weight: normal;
+}
+
+code {
+  padding: 0px;
+  font-family: 'Source Code Pro', monospace;
+  font-weight: 300;
+}
+
+pre {
+  padding: 1em;
+}
+
+p {
+  line-height: 2em;
+}
