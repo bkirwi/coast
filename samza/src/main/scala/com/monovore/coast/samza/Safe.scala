@@ -5,13 +5,15 @@ import com.monovore.coast.samza
 import com.monovore.coast.samza.MessageSink._
 import com.monovore.coast.wire.BinaryFormat
 import org.apache.samza.Partition
-import org.apache.samza.config.Config
+import org.apache.samza.config.{MapConfig, Config}
 import org.apache.samza.system.SystemFactory
 import org.apache.samza.task.TaskContext
 
 import scala.collection.JavaConverters._
 
-object Safe {
+object Safe extends (Config => ConfigGenerator) {
+
+  def apply(baseConfig: Config = new MapConfig()): ConfigGenerator = new GraphCompiler(baseConfig)
 
   class SinkFactory[A, B](sinkNode: Sink[A, B]) extends MessageSink.Factory {
 
@@ -21,9 +23,9 @@ object Safe {
 
       val partitionIndex = context.getTaskName.getTaskName.split("\\W+").last.toInt // ICK!
 
-      val regroupedStreams = config.get(RegroupedStreams).split(",").filter {
-        _.nonEmpty
-      }.toSet
+      val regroupedStreams = config.get(RegroupedStreams).split(",")
+        .filter { _.nonEmpty }
+        .toSet
 
       val offsetThreshold =
         if (regroupedStreams(taskName)) 0L

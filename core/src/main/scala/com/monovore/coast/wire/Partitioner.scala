@@ -14,7 +14,7 @@ import scala.language.existentials
  * Otherwise, pick a good mixing hash.
  */
 @implicitNotFound("No partitioner for key type ${A} in scope")
-trait Partitioner[-A] {
+trait Partitioner[-A] extends Serializable {
   def hash(a: A): HashCode
 }
 

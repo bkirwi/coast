@@ -6,6 +6,7 @@ import java.util.Properties
 
 import com.monovore.coast
 import com.monovore.coast.model.Graph
+import com.monovore.coast.samza.{GraphCompiler, ConfigGenerator}
 import kafka.api.{PartitionFetchInfo, FetchRequest, TopicMetadataRequest, OffsetRequest}
 import kafka.common.{UnknownTopicOrPartitionException, TopicAndPartition}
 import kafka.consumer.{Consumer, ConsumerConfig, ConsumerConnector, SimpleConsumer}
@@ -65,7 +66,7 @@ object IntegrationTest {
     }
   }
 
-  def fuzz(flow: Graph, input: Messages): Messages = {
+  def fuzz(graph: Graph, input: Messages, simple: Boolean = false): Messages = {
 
     val factory = new ThreadJobFactory
 
@@ -89,20 +90,28 @@ object IntegrationTest {
           producer.send(value.map { value => new KeyedMessage(name, key.toArray, partition, value.toArray)}: _*)
         }
 
-        val configs = coast.samza.configureFlow(flow)(
-          baseConfig = coast.samza.config(
-            "task.commit.ms" -> "500",
-//            "task.window.ms" -> "300",
-//            "task.chooser.class" -> "com.monovore.integration.coast.RandomMessageChooserFactory",
-            "task.checkpoint.replication.factor" -> "1",
-            "systems.coast-system.consumer.zookeeper.connect" -> config.getProperty("zookeeper.connect"),
-            "systems.coast-system.producer.metadata.broker.list" -> config.getProperty("metadata.broker.list")
-          )
+        val baseConfig = coast.samza.config(
+          // toy-problem config
+          "task.commit.ms" -> "300",
+          "task.checkpoint.replication.factor" -> "1",
+          // overridden in safe config generator
+          "systems.coast-system.samza.factory" -> "org.apache.samza.system.kafka.KafkaSystemFactory",
+          // point things at local kafka / zookeeper2
+          "systems.coast-system.consumer.zookeeper.connect" -> config.getProperty("zookeeper.connect"),
+          "systems.coast-system.producer.metadata.broker.list" -> config.getProperty("metadata.broker.list")
         )
+
+        val configGen: ConfigGenerator =
+          if (simple) coast.samza.Simple(baseConfig)
+          else coast.samza.Safe(baseConfig)
+
+        val configs = configGen.configure(graph)
 
         // FLAIL!
 
-        val sleeps = (0 until 4).map { _ => Random.nextInt(800) + 600} ++ Seq(8000)
+        val sleeps =
+          if (simple) Seq(8000)
+          else (0 until 4).map { _ => Random.nextInt(800) + 600} ++ Seq(8000)
 
         for (sleepTime <- sleeps) {
 
@@ -128,7 +137,7 @@ object IntegrationTest {
           }
         }
 
-        val outputStreams = flow.bindings.map { case (name, _) => name}
+        val outputStreams = graph.bindings.map { case (name, _) => name}
 
         IntegrationTest.slurp(outputStreams.toSet, config)
 

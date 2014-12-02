@@ -7,6 +7,7 @@ import org.apache.samza.util.Logging
 private[samza] object TaskCompiler {
 
   trait Context {
+    def getSource(path: String): CoastState[Int, Unit, Unit] = getStore(path, unit)
     def getStore[P, A, B](path: String, default: B): CoastState[Int, A, B]
   }
 }
@@ -17,7 +18,7 @@ private[samza] class TaskCompiler(context: TaskCompiler.Context) {
 
   def compileSource[A, B](source: Source[A, B], sink: MessageSink[A, B], prefix: List[String]) = {
 
-    val store = context.getStore[Int, Unit, Unit](formatPath(prefix), unit)
+    val store = context.getSource(formatPath(prefix))
 
     store.downstream -> new MessageSink[Bytes, Bytes] with Logging {
 
@@ -142,7 +143,7 @@ private[samza] class TaskCompiler(context: TaskCompiler.Context) {
 
         val newPartition = sink.keyPartitioner.hash(key).asInt()
 
-        messageSink.execute(stream, newPartition, offset, keyBytes, valueBytes)
+        messageSink.execute(name, newPartition, offset, keyBytes, valueBytes)
       }
     }
 

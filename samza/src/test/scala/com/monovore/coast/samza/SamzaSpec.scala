@@ -12,7 +12,7 @@ class SamzaSpec extends Specification with ScalaCheck {
 
   "the samza package" should {
 
-    "compile a simple flow" in {
+    "compile a flow" in {
 
       import coast.wire.pretty._
 
@@ -23,9 +23,7 @@ class SamzaSpec extends Specification with ScalaCheck {
         flow.source(source).fold(0) { _ + _ }.updates
       }
 
-      val configs = samza.configureFlow(sampleFlow)(
-        baseConfig = samza.config()
-      )
+      val configs = samza.Safe().configure(sampleFlow)
 
       configs must haveSize(1)
 

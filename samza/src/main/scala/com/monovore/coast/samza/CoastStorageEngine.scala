@@ -1,4 +1,5 @@
-package com.monovore.coast.samza
+package com.monovore.coast
+package samza
 
 import java.io.File
 import java.util
@@ -50,7 +51,9 @@ class CoastStorageEngine[K, V](
   keySerde: Serde[K],
   valueSerde: Serde[V],
   collector: MessageCollector,
-  ssp: SystemStreamPartition
+  ssp: SystemStreamPartition,
+  keyFormat: BinaryFormat[(Int, Array[Byte])],
+  valueFormat: BinaryFormat[(Long, Long, Array[Byte])]
 ) extends StorageEngine with Logging { store =>
 
   val partitionID: Int = ssp.getPartition.getPartitionId
@@ -58,10 +61,6 @@ class CoastStorageEngine[K, V](
   var nextOffset: Map[Int, Long] = Map.empty[Int, Long].withDefaultValue(0L)
 
   var downstreamOffset: Long = 0L
-
-  private[this] val keyFormat = DataFormat.wireFormat[(Int, Array[Byte])]
-
-  private[this] val valueFormat = DataFormat.wireFormat[(Long, Long, Array[Byte])]
 
   override def restore(messages: util.Iterator[IncomingMessageEnvelope]): Unit = {
 
@@ -126,11 +125,29 @@ class CoastStoreFactory[A, B] extends StorageEngineFactory[A, B] {
     val backingFactory = containerContext.config
       .getNewInstance[BaseKeyValueStorageEngineFactory[_, _]](s"stores.$storeName.subfactory")
 
+    val isSimple = containerContext.config.getBoolean(s"stores.$storeName.coast.simple")
+
     val underlying =
       backingFactory.getKVStore(storeName, storeDir, registry, changeLogSystemStreamPartition, containerContext)
 
     val serialized = new SerializedKeyValueStore[A, B](underlying, keySerde, msgSerde)
 
-    new CoastStorageEngine[A, B](serialized, keySerde, msgSerde, collector, changeLogSystemStreamPartition)
+    // ICK: avoid framing when running in 'simple' mode
+    // looking forward to nuking all of this...
+    val keyFormat =
+      if (!isSimple) DataFormat.wireFormat[(Int, Array[Byte])]
+      else new BinaryFormat[(Int, Array[Byte])] {
+        override def write(value: (Int, Array[Byte])): Array[Byte] = value._2
+        override def read(bytes: Array[Byte]): (Int, Array[Byte]) = (0, bytes)
+      }
+
+    val valueFormat =
+      if (!isSimple) DataFormat.wireFormat[(Long, Long, Array[Byte])]
+      else new BinaryFormat[(Long, Long, Array[Byte])] {
+        override def write(value: (Long, Long, Array[Byte])): Array[Byte] = value._3
+        override def read(bytes: Array[Byte]): (Long, Long, Array[Byte]) = (0L, 0L, bytes)
+      }
+
+    new CoastStorageEngine[A, B](serialized, keySerde, msgSerde, collector, changeLogSystemStreamPartition, keyFormat, valueFormat)
   }
 }
