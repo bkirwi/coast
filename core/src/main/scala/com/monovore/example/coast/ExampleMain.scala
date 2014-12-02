@@ -4,9 +4,8 @@ import java.io.File
 
 import com.google.common.base.Charsets
 import com.google.common.io.Files
-import com.monovore.coast
 import com.monovore.coast.dot.Dot
-import com.monovore.coast.flow
+import com.monovore.coast.model.Graph
 
 /**
  * A simple main method for running the example jobs. At the moment, it just
@@ -14,7 +13,7 @@ import com.monovore.coast.flow
  */
 trait ExampleMain {
 
-  def graph: flow.FlowGraph[Unit]
+  def graph: Graph
 
   def main(args: Array[String]): Unit = {
 
