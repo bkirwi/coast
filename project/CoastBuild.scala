@@ -12,7 +12,7 @@ object CoastBuild extends Build {
 
     // global project settings
     scalaVersion  in ThisBuild := "2.10.4",
-    scalacOptions in ThisBuild := Seq("-feature"),
+    scalacOptions in ThisBuild := Seq("-feature", "-language:higherKinds"),
 
     organization in ThisBuild := "com.monovore.coast",
 

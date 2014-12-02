@@ -4,8 +4,6 @@ package flow
 import com.monovore.coast.model._
 import com.monovore.coast.wire.BinaryFormat
 
-import scala.language.higherKinds
-
 class PoolDef[+G <: AnyGrouping, A, +B](
   private[coast] val initial: B,
   private[coast] val element: Node[A, B]
