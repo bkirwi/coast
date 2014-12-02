@@ -130,7 +130,7 @@ private[samza] class TaskCompiler(context: TaskCompiler.Context) {
     }
   }
 
-  def compileSink[A, B](sink: Sink[A, B], messageSink: ByteSink, name: String): ByteSink = {
+  def compileSink[A, B](sink: Sink[A, B], messageSink: ByteSink, name: String, partitions: Int): ByteSink = {
 
     val formatted = new MessageSink[A, B] with Logging {
 
@@ -141,7 +141,7 @@ private[samza] class TaskCompiler(context: TaskCompiler.Context) {
         val keyBytes = sink.keyFormat.write(key)
         val valueBytes = sink.valueFormat.write(value)
 
-        val newPartition = sink.keyPartitioner.hash(key).asInt()
+        val newPartition = sink.keyPartitioner.partition(key, partitions)
 
         messageSink.execute(name, newPartition, offset, keyBytes, valueBytes)
       }

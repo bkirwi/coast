@@ -71,6 +71,7 @@ object IntegrationTest {
     val factory = new ThreadJobFactory
 
     var producer: Producer[Array[Byte], Array[Byte]] = null
+    var consumer: SimpleConsumer = null
 
     IntegrationTest.withKafkaCluster { config =>
 
@@ -80,14 +81,26 @@ object IntegrationTest {
 
         IntegrationTest.expect(input.messages.keySet, config)
 
+        val port = config.getProperty("metadata.broker.list")
+          .split(",")(0)
+          .split(":")(1)
+          .toInt
+
         producer = new Producer(producerConfig)
+        consumer = new SimpleConsumer("localhost", port, ConsumerConfig.SocketTimeout, ConsumerConfig.SocketBufferSize, ConsumerConfig.DefaultClientId)
 
         for {
           (name, messages) <- input.messages
-          (key, (partition, values)) <- messages
+          numPartitions = {
+            val meta = consumer.send(new TopicMetadataRequest(Seq(name), 913))
+            meta.topicsMetadata.find { _.topic == name }.get
+              .partitionsMetadata.size
+          }
+          (key, (partitioner, values)) <- messages
+          partitionId = partitioner(numPartitions)
           value <- values.grouped(100)
         } {
-          producer.send(value.map { value => new KeyedMessage(name, key.toArray, partition, value.toArray)}: _*)
+          producer.send(value.map { value => new KeyedMessage(name, key.toArray, partitionId, value.toArray)}: _*)
         }
 
         val baseConfig = coast.samza.config(
@@ -145,6 +158,10 @@ object IntegrationTest {
 
         if (producer != null) {
           producer.close()
+        }
+
+        if (consumer != null) {
+          consumer.close()
         }
       }
     }
@@ -204,7 +221,12 @@ object IntegrationTest {
                 .map { mao => toByteSeq(mao.message.key) -> (partition.partitionId, toByteSeq(mao.message.payload)) }
             }
 
-          topic.topic -> messages.groupBy { _._1 }.mapValues { p => (p.unzip._2.head._1, p.unzip._2.unzip._2) }
+          topic.topic -> messages.groupBy { _._1 }
+            .mapValues { p =>
+              val (_, pairs) = p.unzip
+              val (partitions, data) = pairs.unzip
+              ({n: Int => partitions.head }, data)
+            }
         }
         .toMap
 

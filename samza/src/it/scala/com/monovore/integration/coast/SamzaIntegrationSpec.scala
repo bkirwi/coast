@@ -180,12 +180,13 @@ class SamzaIntegrationSpec extends Specification with ScalaCheck {
   }
 }
 
-case class Messages(messages: Map[String, Map[Seq[Byte], (Int, Seq[Seq[Byte]])]] = Map.empty) {
+case class Messages(messages: Map[String, Map[Seq[Byte], (Int => Int, Seq[Seq[Byte]])]] = Map.empty) {
 
   def add[A : BinaryFormat : Partitioner, B : BinaryFormat](name: flow.Name[A,B], messages: Map[A, Seq[B]]): Messages = {
 
     val formatted = messages.map { case (k, vs) =>
-      BinaryFormat.write(k).toSeq -> (Partitioner.hash(k).asInt, vs.map { v => BinaryFormat.write(v).toSeq })
+      val pn: (Int => Int) = implicitly[Partitioner[A]].partition(k, _)
+      BinaryFormat.write(k).toSeq -> (pn, vs.map { v => BinaryFormat.write(v).toSeq })
     }
 
     Messages(this.messages.updated(name.name, formatted))

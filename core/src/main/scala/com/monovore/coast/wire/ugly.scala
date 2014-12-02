@@ -1,7 +1,5 @@
 package com.monovore.coast.wire
 
-import com.google.common.hash.HashCode
-
 /**
  * Importing coast.wire.evil._ gives you a partitioner and wire format for all
  * types. As the name suggests, this is probably not what you want:
@@ -13,9 +11,7 @@ import com.google.common.hash.HashCode
  */
 object ugly {
 
-  implicit def anyPartitioner[A]: Partitioner[A] = new Partitioner[A] {
-    override def hash(a: A): HashCode = HashCode.fromInt(a.hashCode())
-  }
+  implicit def anyPartitioner[A]: Partitioner[A] = Partitioner.default
 
   implicit def anyFormat[A]: BinaryFormat[A] = javaSerialization[A]
 }

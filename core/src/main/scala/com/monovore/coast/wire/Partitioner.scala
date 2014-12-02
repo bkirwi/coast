@@ -1,25 +1,32 @@
 package com.monovore.coast.wire
 
 import com.google.common.hash.{Funnel, HashCode, HashFunction}
+import com.google.common.primitives.UnsignedInts
 
 import scala.annotation.implicitNotFound
 import scala.language.existentials
 
 /**
- * Hashes the value A to a hash code.
- *
- * Note: unlike the default Kafka partitioning, lexicographically-similar values
- * of the hash can be expected to go to the same partition. This allows you
- * to do locality-sensitive hashing without knowing the exact number of partitions.
- * Otherwise, pick a good mixing hash.
+ * Hashes the value A to a partition in the range [0, numPartitions]. This is
+ * analogous to Kafka's partitioner class, but meant to be used as a typeclass.
+ * This makes it easier to configure partitioning strategies per-topic, instead
+ * of per-producer-instance.
  */
 @implicitNotFound("No partitioner for key type ${A} in scope")
 trait Partitioner[-A] extends Serializable {
-  def hash(a: A): HashCode
+  def partition(a: A, numPartitions: Int): Int
 }
 
 object Partitioner {
-  def hash[A](a: A)(implicit partitioner: Partitioner[A]): HashCode = partitioner.hash(a)
+
+  /**
+   * Our default partitioner should behave the same as Kafka's default partitioner.
+   */
+  val default = new Partitioner[Any] {
+    override def partition(a: Any, numPartitions: Int): Int = {
+      (a.hashCode & 0x7fffffff) % numPartitions
+    }
+  }
 }
 
 /**
@@ -27,5 +34,6 @@ object Partitioner {
  */
 case class GuavaPartitioner[-A](hashFunction: HashFunction, funnel: Funnel[_ >: A]) extends Partitioner[A] {
 
-  override def hash(a: A): HashCode = hashFunction.hashObject(a, funnel)
+  override def partition(a: A, numPartitions: Int): Int =
+    UnsignedInts.remainder(hashFunction.hashObject(a, funnel).asInt(), numPartitions)
 }

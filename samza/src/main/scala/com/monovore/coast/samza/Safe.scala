@@ -27,19 +27,21 @@ object Safe extends (Config => ConfigGenerator) {
         .filter { _.nonEmpty }
         .toSet
 
-      val offsetThreshold =
-        if (regroupedStreams(taskName)) 0L
-        else {
+      // Left(size) if the stream is regrouped, Right(offset) if it isn't
+      val (numPartitions, offsetThreshold) = {
 
-          val systemFactory = config.getNewInstance[SystemFactory](s"systems.$CoastSystem.samza.factory")
-          val admin = systemFactory.getAdmin(CoastSystem, config)
-          val meta = admin.getSystemStreamMetadata(Set(taskName).asJava).asScala
-            .getOrElse(taskName, sys.error(s"Couldn't find metadata on output stream $taskName"))
+        val systemFactory = config.getNewInstance[SystemFactory](s"systems.$CoastSystem.samza.factory")
+        val admin = systemFactory.getAdmin(CoastSystem, config)
+        val meta = admin.getSystemStreamMetadata(Set(taskName).asJava).asScala
+          .getOrElse(taskName, sys.error(s"Couldn't find metadata on output stream $taskName"))
 
-          val partitionMeta = meta.getSystemStreamPartitionMetadata.asScala
+        val partitionMeta = meta.getSystemStreamPartitionMetadata.asScala
 
-          partitionMeta(new Partition(partitionIndex)).getUpcomingOffset.toLong
+        partitionMeta.size -> {
+          if (regroupedStreams(taskName)) 0L
+          else partitionMeta(new Partition(partitionIndex)).getUpcomingOffset.toLong
         }
+      }
 
       val finalSink = new MessageSink.ByteSink {
 
@@ -67,7 +69,7 @@ object Safe extends (Config => ConfigGenerator) {
           context.getStore(path).asInstanceOf[CoastStorageEngine[A, B]].withDefault(default)
       })
 
-      val compiled = compiler.compileSink(sinkNode, finalSink, name)
+      val compiled = compiler.compileSink(sinkNode, finalSink, name, numPartitions)
 
       val mergeStream = s"coast.merge.$taskName"
 

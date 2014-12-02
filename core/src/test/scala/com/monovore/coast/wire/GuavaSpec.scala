@@ -13,12 +13,14 @@ class GuavaSpec extends Specification with ScalaCheck {
       override protected def guavaHashFunction: HashFunction = Hashing.murmur3_32()
     }
 
+    val NumPartitions = 7
+
     def partitionerTest[A : Arbitrary](partitioner: Partitioner[A]) = {
 
       s"be consistent with equals" in prop { (one: A, other: A) =>
 
         (one != other) || {
-          partitioner.hash(one) == partitioner.hash(other)
+          partitioner.partition(one, NumPartitions) == partitioner.partition(other, NumPartitions)
         }
       }
     }

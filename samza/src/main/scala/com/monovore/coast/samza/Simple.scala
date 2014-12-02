@@ -3,7 +3,9 @@ package samza
 
 import com.monovore.coast.model._
 import com.monovore.coast.samza.MessageSink.ByteSink
+import org.apache.samza.Partition
 import org.apache.samza.config.{Config, MapConfig}
+import org.apache.samza.system.SystemFactory
 import org.apache.samza.task.TaskContext
 
 import scala.collection.JavaConverters._
@@ -67,22 +69,22 @@ object Simple extends (Config => ConfigGenerator) {
         val storageMap = storage
           .map { case Storage(name, keyFormat, msgFormat) =>
 
-          val keyName = s"coast-key-$name"
-          val msgName = s"coast-msg-$name"
+            val keyName = s"coast-key-$name"
+            val msgName = s"coast-msg-$name"
 
-          Map(
-            s"stores.$name.factory" -> "com.monovore.coast.samza.CoastStoreFactory",
-            s"stores.$name.subfactory" -> "org.apache.samza.storage.kv.inmemory.InMemoryKeyValueStorageEngineFactory",
-            s"stores.$name.key.serde" -> keyName,
-            s"stores.$name.msg.serde" -> msgName,
-            s"stores.$name.changelog" -> s"$CoastSystem.coast.changelog.$name",
-            s"stores.$name.coast.simple" -> "true",
-            s"serializers.registry.$keyName.class" -> "com.monovore.coast.samza.CoastSerdeFactory",
-            s"serializers.registry.$keyName.serialized.base64" -> keyFormat,
-            s"serializers.registry.$msgName.class" -> "com.monovore.coast.samza.CoastSerdeFactory",
-            s"serializers.registry.$msgName.serialized.base64" -> msgFormat
-          )
-        }
+            Map(
+              s"stores.$name.factory" -> "com.monovore.coast.samza.CoastStoreFactory",
+              s"stores.$name.subfactory" -> "org.apache.samza.storage.kv.inmemory.InMemoryKeyValueStorageEngineFactory",
+              s"stores.$name.key.serde" -> keyName,
+              s"stores.$name.msg.serde" -> msgName,
+              s"stores.$name.changelog" -> s"$CoastSystem.coast.changelog.$name",
+              s"stores.$name.coast.simple" -> "true",
+              s"serializers.registry.$keyName.class" -> "com.monovore.coast.samza.CoastSerdeFactory",
+              s"serializers.registry.$keyName.serialized.base64" -> keyFormat,
+              s"serializers.registry.$msgName.class" -> "com.monovore.coast.samza.CoastSerdeFactory",
+              s"serializers.registry.$msgName.serialized.base64" -> msgFormat
+            )
+          }
           .flatten.toMap
 
         name -> new MapConfig(
@@ -100,6 +102,19 @@ object Simple extends (Config => ConfigGenerator) {
 
       val taskName = config.get(samza.TaskName)
 
+      // Left(size) if the stream is regrouped, Right(offset) if it isn't
+      val numPartitions = {
+
+        val systemFactory = config.getNewInstance[SystemFactory](s"systems.$CoastSystem.samza.factory")
+        val admin = systemFactory.getAdmin(CoastSystem, config)
+        val meta = admin.getSystemStreamMetadata(Set(taskName).asJava).asScala
+          .getOrElse(taskName, sys.error(s"Couldn't find metadata on output stream $taskName"))
+
+        val partitionMeta = meta.getSystemStreamPartitionMetadata.asScala
+
+        partitionMeta.size
+      }
+
       val compiler = new TaskCompiler(new TaskCompiler.Context {
 
         override def getSource(path: String): CoastState[Int, Unit, Unit] = new CoastState[Int, Unit, Unit] {
@@ -116,7 +131,7 @@ object Simple extends (Config => ConfigGenerator) {
           context.getStore(path).asInstanceOf[CoastStorageEngine[A, B]].withDefault(default)
       })
 
-      compiler.compileSink(sink, messageSink, taskName)
+      compiler.compileSink(sink, messageSink, taskName, numPartitions)
     }
   }
 }
