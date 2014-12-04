@@ -1,6 +1,8 @@
 ---
-title: Concepts
+pagetitle: concepts
 ---
+
+# Concepts
 
 This page explains how `coast` models a stream processing job and some of the
 guarantees it offers.

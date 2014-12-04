@@ -1,0 +1,16 @@
+digraph flow {
+
+  subgraph "cluster-output" {
+
+    label="output"
+    labeljust=l
+
+    // nodes
+    "public-input" [shape=rectangle, label="input"];
+    "public-output" [shape=rectangle, label="output"];
+
+    // edges
+    "public-input" -> "public-output"; 
+  }
+         
+}
