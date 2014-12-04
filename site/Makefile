@@ -1,10 +1,11 @@
 
 PAGES = $(patsubst ../doc/%.md, target/%.html, $(wildcard ../doc/*.md))
 
-IMAGES = target/img/CopyStream.svg
+IMAGES = $(patsubst viz/%.dot, target/img/%.svg, $(wildcard viz/*.dot))
 
 PANDOC = pandoc \
 		--css=main.css \
+		--from=markdown-implicit_figures \
 		'--css=http://fonts.googleapis.com/css?family=Roboto:400,300' \
 		'--css=http://fonts.googleapis.com/css?family=Source+Code+Pro:300' \
 		--metadata=title-prefix:coast \

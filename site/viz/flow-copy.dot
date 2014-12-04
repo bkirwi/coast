@@ -1,0 +1,16 @@
+digraph flow {
+
+  subgraph "cluster-sentences-copy" {
+
+    label="sentences-copy"
+    labeljust=l
+
+    // nodes
+    "public-sentences" [shape=rectangle, label="sentences"];
+    "public-sentences-copy" [shape=rectangle, label="sentences-copy"];
+
+    // edges
+    "public-sentences" -> "public-sentences-copy"; 
+  }
+         
+}

@@ -1,0 +1,33 @@
+digraph flow {
+
+  subgraph "cluster-intermediate" {
+
+    label="intermediate"
+    labeljust=l
+
+    // nodes
+    "public-input" [shape=rectangle, label="input"];
+    "internal-0" [shape=plaintext, label="transform"];
+    "public-intermediate" [shape=rectangle, label="intermediate"];
+
+    // edges
+    "public-input" -> "internal-0"; 
+    "internal-0" -> "public-intermediate"; 
+  }
+         
+  subgraph "cluster-output" {
+
+    label="output"
+    labeljust=l
+
+    // nodes
+    "public-intermediate" [shape=rectangle, label="intermediate"];
+    "internal-1" [shape=plaintext, label="transform"];
+    "public-output" [shape=rectangle, label="output"];
+
+    // edges
+    "public-intermediate" -> "internal-1"; 
+    "internal-1" -> "public-output"; 
+  }
+         
+}

@@ -37,8 +37,8 @@ val sentenceStream = flow.source(Sentences)
 transforming and combining data work directly on this type. For now, though,
 we'll sink it directly to an output:
 
-```
-val OtherSentences = flow.Name[Long, String]("other-sentences")
+```scala
+val OtherSentences = flow.Name[Long, String]("sentences-copy")
 
 val copy = flow.sink(OtherSentences) { sentenceStream }
 ```
@@ -52,7 +52,7 @@ A `FlowGraph` is a complete description of a job. Typically, you'd take this
 description and hand it off to some other code to interpret. If you hand this
 graph off to GraphViz, for example, you get this:
 
-![A simple copy job](examples/CopyStream.svg)\
+![A simple copy job](img/flow-copy.svg)
 
 Or you can pass it to a Samza job runner, and have it execute on the cluster.
 The possibilities are limitless!
@@ -76,9 +76,8 @@ val transform = flow.sink(Output) {
 ```
 
 Don't hesitate to break your stream transformations into small parts like this;
-it shouldn't affect performance.
-
-You can also merge two streams together into a single stream:
+it shouldn't affect performance. You can also merge two streams together into a
+single stream:
 
 ```scala
 val merged = flow.merge(events, moreEvents)
@@ -113,21 +112,30 @@ you see. In this case, we need to 'shuffle' the word across the network. (I, the
 author, make this mistake all the time.) `flow` tracks whether or not you've
 regrouped the stream, and the compiler will warn you if you've made a mistake.
 
+Here's a job that's split in two for no particular reason:
+
 ```scala
 val graph = for {
 
-  first <- flow.stream("intermediate") {
-    stream.groupBy { _.toString }
+  intermediate <- flow.stream("intermediate") {
+    flow.source(Input).map { _ + 3 }
   }
 
   _ <- flow.sink(Output) {
-    first.map { _ * 2 }
+    intermediate.map { _ * 2 }
   }
 } yield ()
 ```
 
 You can see two major sections in that `for` block above -- and indeed, this
 creates a two-stage graph.
+
+![A simple copy job](img/flow-multi.svg)
+
+Here, `intermediate` is an 'internal' stream: it's produced and consumed in the
+same job. These streams are considered 'implementation details'. In particular,
+`coast` assumes this job is the only one accessing these internal streams, so it
+may do some optomizations or add extra metadata.
 
 ## Learning More
 
