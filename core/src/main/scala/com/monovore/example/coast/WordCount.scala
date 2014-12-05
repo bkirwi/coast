@@ -24,10 +24,7 @@ object WordCount extends ExampleMain {
     }
 
     _ <- flow.sink(WordCounts) {
-
-      words
-        .fold(0) { _ + _ }
-        .updates
+      words.sum.updates
     }
 
   } yield ()

@@ -3,6 +3,7 @@ package flow
 
 import com.monovore.coast.model._
 import com.monovore.coast.wire.BinaryFormat
+import com.twitter.algebird.Monoid
 
 class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
   private[coast] val context: Context[A, WithKey],
@@ -92,7 +93,21 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
   def groupByKey[A0, B0](implicit asPair: B <:< (A0, B0)) =
     stream.groupBy { _._1 }.map { _._2 }
 
+  def invert[A0, B0](implicit asPair: B <:< (A0, B0)): StreamDef[AnyGrouping, A0, (A, B0)] = {
+    stream
+      .withKeys.map { key => value => key -> (value: (A0, B0)) }
+      .groupBy { case (_, (k, _)) => k }
+      .map { case (k, (_, v)) => k -> v }
+  }
+
+
   def flatten[B0](implicit func: B => Traversable[B0]) = stream.flatMap(func andThen { _.toSeq })
+
+  def sum[B0 >: B](
+    implicit monoid: Monoid[B0], isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], valueFormat: BinaryFormat[B0]
+  ): Pool[A, B0] = {
+    stream.fold(monoid.zero)(monoid.plus)
+  }
 
   def join[B0](pool: Pool[A, B0])(
     implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], b0Format: BinaryFormat[B0]

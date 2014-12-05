@@ -27,10 +27,10 @@ object Denormalize extends ExampleMain {
     usersByKey <- flow.stream("users-pool") {
 
       flow.source(Users)
-        .withKeys.flatMap { userID => userInfo =>
-          userInfo.groupIDs.toSeq.map { _ -> (userID, userInfo.name) }
+        .flatMap { info =>
+          info.groupIDs.toSeq.map { _ -> info.name }
         }
-        .groupByKey
+        .invert
     }
 
     // Join, and a trivial transformation
