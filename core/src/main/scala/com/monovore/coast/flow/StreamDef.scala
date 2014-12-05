@@ -56,28 +56,12 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
     implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], stateFormat: BinaryFormat[Seq[B0]]
   ): Stream[A, Seq[B0]] = {
 
+    require(size > 0, "Expected a positive group size")
+
     stream.aggregate(Vector.empty[B0]: Seq[B0]) { (buffer, next) =>
 
       if (buffer.size >= size) Vector.empty[B0] -> Seq(buffer)
       else (buffer :+ (next: B0)) -> Seq.empty[Seq[B0]]
-    }
-  }
-
-  def windowed[S](size: Int)(init: S)(function: (S, B) => S)(
-    implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], stateFormat: BinaryFormat[(S, Int)]
-  ): Stream[A, S] = {
-
-    require(size > 0, "Expected a positive window size")
-
-    stream.aggregate(init -> 0) { (buffer, next) =>
-
-      val (state, count) = buffer
-
-      val newState = function(state, next)
-      val newCount = count + 1
-
-      if (newCount >= size) (init -> 0) -> Seq(newState)
-      else (newState -> newCount) -> Seq.empty[S]
     }
   }
 
