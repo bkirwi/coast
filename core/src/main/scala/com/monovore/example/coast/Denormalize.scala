@@ -5,40 +5,77 @@ import coast.flow
 
 import scala.collection.immutable.SortedSet
 
+/**
+ * A sketch of a denormalization flow -- normalized models come in at the top,
+ * and denormalized versions appear at the bottom.
+ *
+ * This is not super appealing at the moment, courtesy of the delete handling.
+ * I suspect there's a pattern that could be abstracted out here,
+ * but I'd like more examples of this relational-style manipulation before I
+ * take a stab at it.
+ */
 object Denormalize extends ExampleMain {
 
   import coast.wire.ugly._
 
-  type GroupID = Long
-  type UserID = Long
+  case class ID(value: Long)
+  type GroupID = ID
+  type UserID = ID
+
+  implicit val IDOrdering = Ordering.by { id: ID => id.value }
 
   case class Group(name: String)
   case class User(name: String, groupIDs: SortedSet[GroupID])
   case class DenormalizedGroup(name: String, memberNames: Set[String])
 
-  val Users = flow.Name[UserID, User]("users")
-  val Groups = flow.Name[GroupID, Group]("groups")
+  // 'Changelog' for users and groups
+  // We expect None when the data is missing or deleted, and Some(user) otherwise
+  val Users = flow.Name[UserID, Option[User]]("users")
+  val Groups = flow.Name[GroupID, Option[Group]]("groups")
   
   val Denormalized = flow.Name[GroupID, Option[DenormalizedGroup]]("denormalized-groups")
 
   val graph = for {
 
     // Roll up 'users' under their group id
-    usersByKey <- flow.stream("users-pool") {
+    usersByKey <- flow.stream[GroupID, (UserID, Option[String])]("users-pool") {
 
       flow.source(Users)
-        .flatMap { info =>
-          info.groupIDs.toSeq.map { _ -> info.name }
+        .latestOr(None)
+        .updatedPairs
+        .flatMap {
+          case (None, Some(User(name, groups))) => {
+            groups.map { _ -> Some(name) }.toSeq
+          }
+          case (Some(User(oldName, oldGroups)), Some(User(newName, newGroups))) => {
+
+            val toAdd = if (oldName == newName) newGroups -- oldGroups else newGroups
+            val toRemove = oldGroups -- newGroups
+
+            toAdd.toSeq.map { _ -> Some(newName) } ++
+              toRemove.toSeq.map { _ -> None }
+          }
+          case (Some(User(_, groups)), None) => {
+            groups.map { _ -> None }.toSeq
+          }
+          case (None, None) => Seq.empty
         }
-        .invert
     }
 
     // Join, and a trivial transformation
     _ <- flow.sink(Denormalized) {
 
-      val groups = flow.source(Groups).latestOption
+      val groups = flow.source(Groups).latestOr(None)
 
-      val usersPool = usersByKey.fold(Map.empty[UserID, String]) { _ + _ }
+      val usersPool = usersByKey
+        .fold(Map.empty[UserID, String]) { (state, newInfo) =>
+
+          val (id, nameOpt) = newInfo
+
+          nameOpt
+            .map { name => state.updated(id, name) }
+            .getOrElse { state - id }
+        }
 
       (groups join usersPool)
         .map { case (groupOption, members) =>
