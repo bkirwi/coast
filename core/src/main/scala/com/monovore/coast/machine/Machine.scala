@@ -51,7 +51,7 @@ object Machine {
         val (nodes, edges) = upstreams
           .foldLeft(Map.empty[Label, Actor] -> Seq.empty[Label -> Label]) { (soFar, upstreamPair) =>
 
-            val (name -> upstream) = upstreamPair
+            val (_ -> upstream) = upstreamPair
 
             val (nodes, edges) = soFar
 
@@ -91,48 +91,43 @@ object Machine {
 
     val nodeMap = nodes.flatten.toMap
 
-    Machine(System(nodes = nodeMap, edges = edgeMap))
+    Machine(System(nodes = nodeMap, edges = edgeMap), System.State())
   }
 }
 
-case class Machine(system: System[Machine.Label]) {
-
-  def push[A, B](name: Name[A, B], pairs: (A -> B)*): Machine = {
-
-    val label = Machine.Named(name.name)
-
-    val pushed = pairs.groupByKey.foldLeft(system) { (system, pair) =>
-      val (key, messages) = pair
-      system.push(label, Key(key), messages.map(Message))
-    }
-
-    Machine(pushed)
-  }
+case class Machine(system: System[Machine.Label], state: System.State[Machine.Label]) {
 
   def push(messages: Messages): Machine = {
 
-    val pairs = for {
-      (name, partitioned) <- messages.messageMap
-      (key, values) <- partitioned
-    } yield (Machine.Named(name), key) -> values
+    val toSend = for {
+      (name, data) <- messages.messageMap
+      label = Machine.Named(name)
+      (key, messages) <- data
+      message <- messages
+    } yield System.Send[Machine.Label](label, key, message)
 
-    val pushed = pairs
-      .foldLeft(system) { (system, pair) =>
-        val (name, key) -> values = pair
-        system.push(name, key, values)
-      }
+    val newState = toSend.foldLeft(state) { (state, send) =>
+      system.update(state, send)._1
+    }
 
-    Machine(pushed)
+    Machine(system, newState)
   }
 
-  def next: Seq[Machine -> Messages] = {
+  def next: Seq[() => (Machine, Messages)] = {
 
-    system.poke.map { case (system, output) =>
-      val cleaned = output flatMap {
-        case (Machine.Named(name) -> value) => Some(name -> value)
-        case _ => None
+    system.commands(state).map { command =>
+      () => {
+
+        val (newState, messageMap) = system.update(state, command)
+
+        val messages = messageMap
+          .flatMap {
+            case (Machine.Named(name) -> value) => Some(name -> value)
+            case _ => None
+          }
+
+        Machine(system, newState) -> Messages(messages)
       }
-      Machine(system) -> Messages(cleaned)
     }
   }
 }

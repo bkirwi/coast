@@ -13,27 +13,30 @@ class SystemSpec extends Specification {
         edges = Map("source" -> Seq("target"))
       )
 
-      val pushed = machine.push("source", Key(0), Seq(Message("message")))
+      val (state, _) = machine.update(
+        System.State(),
+        System.Send("source", Key(0), Message("message"))
+      )
 
-      pushed.state("target")(Key(0)).input must_== Map("source" -> Seq(Message("message")))
+      state.stateMap("target")(Key(0)).input must_== Map("source" -> Seq(Message("message")))
     }
 
     "process a message" in {
 
-      val machine = System[String](
-        state = Map("target" -> Map(Key(0) -> Actor.Data(
-          state = State(unit),
-          input = Map("source" -> Seq(Message("payload")))
-        )))
-      )
+      val machine = System[String]()
 
-      machine.poke must haveSize(1)
+      val state = System.State(Map("target" -> Map(Key(0) -> Actor.Data(
+        state = State(unit),
+        input = Map("source" -> Seq(Message("payload")))
+      ))))
 
-      val (updated, output) = machine.process("target", "source", Key(0))
+      machine.commands(state) must haveSize(1)
 
-      output must_== Map(Key(0) -> Seq(Message("payload")))
+      val (updated, output) = machine.update(state, machine.commands(state).head)
 
-      updated.state("target")(Key(0)).input("source") must beEmpty
+      output("target") must_== Map(Key(0) -> Seq(Message("payload")))
+
+      updated.stateMap("target")(Key(0)).input("source") must beEmpty
     }
   }
 }

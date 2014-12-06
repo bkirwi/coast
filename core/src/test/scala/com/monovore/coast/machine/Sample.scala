@@ -3,19 +3,27 @@ package machine
 
 import org.scalacheck.Gen
 
+import scala.annotation.tailrec
+import scala.util.Random
+
 object Sample {
 
   def complete(machine: Machine): Gen[Messages] = {
 
-    val next = machine.next
+    @tailrec def doComplete(machine: Machine, messages: Messages): Messages = {
 
-    if (next.isEmpty) Gen.const(Messages.empty)
-    else {
-      for {
-        (machine, output) <- Gen.oneOf(next.toSeq)
-        finish <- complete(machine)
-      } yield output ++ finish
+      val next = Random.shuffle(machine.next).headOption
+
+      next match {
+        case Some(shit) => {
+          val (newMachine, newMessages) = shit()
+          doComplete(newMachine, messages ++ newMessages)
+        }
+        case None => messages
+      }
     }
+
+    Gen.wrap { doComplete(machine, Messages.empty) }
   }
 
   def canProduce(machine: Machine, output: Messages): Boolean = {
@@ -45,7 +53,9 @@ object Sample {
     val result =
       if (next.isEmpty) output.isEmpty
       else {
-        next.exists { case (machin, soFar) =>
+        next.exists { case nextFn =>
+
+          val (machin, soFar) = nextFn()
 
           val dropped = dropMap(dropMap[Key, Seq[Message]](dropSeq[Message]))(soFar.messageMap, output.messageMap)
 

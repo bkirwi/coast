@@ -19,59 +19,80 @@ object Actor {
   case class Data[Label](state: State, input: Map[Label, Seq[Message]] = Map.empty[Label, Seq[Message]])
 }
 
+object System {
+
+  case class State[Label](stateMap: Map[Label, Map[Key, Actor.Data[Label]]] = Map.empty[Label, Map[Key, Actor.Data[Label]]])
+
+  sealed trait Command[Label]
+  case class Send[Label](from: Label, partition: Key, message: Message) extends Command[Label]
+  case class Process[Label](actor: Label, from: Label, key: Key) extends Command[Label]
+}
+
 case class System[Label](
   nodes: Map[Label, Actor] = Map.empty[Label, Actor],
-  edges: Map[Label, Seq[Label]] = Map.empty[Label, Seq[Label]],
-  state: Map[Label, Map[Key, Actor.Data[Label]]] = Map.empty[Label, Map[Key, Actor.Data[Label]]]
+  edges: Map[Label, Seq[Label]] = Map.empty[Label, Seq[Label]]
 ) {
 
-  def push(from: Label, partition: Key, messages: Seq[Message]): System[Label] = {
+  def update(state: System.State[Label], command: System.Command[Label]): (System.State[Label], Map[Label, Map[Key, Seq[Message]]]) = {
 
-    val newState = edges.getOrElse(from, Seq.empty)
-      .foldLeft(state) { (state, to) =>
+    command match {
 
-      val targetState = state.getOrElse(to, Map.empty)
-      val partitioned = targetState.getOrElse(partition, Actor.Data(state = nodes.getOrElse(to, Actor.passthrough).initialState))
-      val pushed = partitioned.copy(input = Semigroup.plus(partitioned.input, Map(from -> messages)))
-      state.updated(to, targetState.updated(partition, pushed))
-    }
+      case System.Process(actor, from, key) => {
 
-    copy(state = newState)
-  }
+        val updated = {
 
-  def process(actor: Label, from: Label, key: Key): (System[Label] -> Map[Key, Seq[Message]]) = {
+          val node = nodes.getOrElse(actor, Actor.passthrough)
+          val actorState = state.stateMap.getOrElse(actor, Map.empty)
+          val keyState = actorState.getOrElse(key, Actor.Data(node.initialState))
+          val messages = keyState.input.getOrElse(from, Seq.empty)
 
-    val updated = {
-      val node = nodes.getOrElse(actor, Actor.passthrough)
-      val actorState = state.getOrElse(actor, Map.empty)
-      val keyState = actorState.getOrElse(key, Actor.Data(node.initialState))
-      val messages = keyState.input.getOrElse(from, Seq.empty)
+          assuming(messages.nonEmpty) {
 
-      assuming(messages.nonEmpty) {
+            val (newState, output) = node.push(keyState.state, key, messages.head)
 
-        val (newState, output) = node.push(keyState.state, key, messages.head)
+            val newPartitionState = Actor.Data(newState, keyState.input.updated(from, messages.tail))
 
-        val newPartitionState = Actor.Data(newState, keyState.input.updated(from, messages.tail))
+            val tidied = System.State(state.stateMap.updated(actor, actorState.updated(key, newPartitionState)))
 
-        val tidied = copy(state = state.updated(actor, actorState.updated(key, newPartitionState)))
+            val steps = for {
+              (key, messages) <- output
+              message <- messages
+            } yield System.Send(actor, key, message)
 
-        output.foldLeft(tidied) { (tidied, kv) => tidied.push(actor, kv._1, kv._2) } -> output
+            steps.foldLeft(tidied -> Map.empty[Label, Map[Key, Seq[Message]]]) { (stateMessages, send) =>
+              val (state, messages) = stateMessages
+              val (newState, newMessages) = update(state, send)
+              newState -> Semigroup.plus(messages, newMessages)
+            }
+          }
+        }
+
+        updated getOrElse (state -> Map.empty)
+      }
+
+      case System.Send(from, partition, message) => {
+
+        val newState = edges.getOrElse(from, Seq.empty)
+          .foldLeft(state) { (state, to) =>
+
+            val targetState = state.stateMap.getOrElse(to, Map.empty)
+            val partitioned = targetState.getOrElse(partition, Actor.Data(state = nodes.getOrElse(to, Actor.passthrough).initialState))
+            val pushed = partitioned.copy(input = Semigroup.plus(partitioned.input, Map(from -> Seq(message))))
+            System.State(state.stateMap.updated(to, targetState.updated(partition, pushed)))
+          }
+
+        newState -> Map(from -> Map(partition -> Seq(message)))
       }
     }
-
-    updated getOrElse (this -> Map.empty)
   }
 
-  def poke: Seq[System[Label] -> Map[Label, Map[Key, Seq[Message]]]] = {
+  def commands(state: System.State[Label]): Seq[System.Command[Label]] = {
 
     for {
-      (label -> partitions) <- state.toSeq
+      (label -> partitions) <- state.stateMap.toSeq
       (key -> partitionState) <- partitions
       (from -> messages) <- partitionState.input
       if messages.nonEmpty
-    } yield {
-      val (sent, output) = process(label, from, key)
-      sent -> Map(label -> output)
-    }
+    } yield System.Process(label, from, key)
   }
 }

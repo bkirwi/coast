@@ -31,8 +31,11 @@ class MachineSpec extends Specification with ScalaCheck {
         flow.source(integers).map { _ * 2 }
       }
 
-      val compiled = Machine.compile(graph)
-        .push(integers, "foo" -> 1, "bar" -> 2, "foo" -> 3)
+      val input = Messages.from(integers, Map(
+        "foo" -> Seq(1, 3), "bar" -> Seq(2)
+      ))
+
+      val compiled = Machine.compile(graph).push(input)
 
       Prop.forAll(Sample.complete(compiled)) { output =>
         output(doubled) must_== Map(
