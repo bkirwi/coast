@@ -84,7 +84,9 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
       .map { case (k, (_, v)) => k -> v }
   }
 
-  def flatten[B0](implicit func: B => Traversable[B0]) = stream.flatMap(func andThen { _.toSeq })
+  def flatten[B0](implicit func: B <:< Seq[B0]) = stream.flatMap(func)
+
+  def flattenOption[B0](implicit func: B <:< Option[B0]) = stream.flatMap(func andThen { _.toSeq })
 
   def sum[B0 >: B](
     implicit monoid: Monoid[B0], isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], valueFormat: BinaryFormat[B0]

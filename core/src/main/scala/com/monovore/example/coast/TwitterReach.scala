@@ -1,10 +1,16 @@
 package com.monovore.example.coast
 
-import java.net.URI
-
+/* As usual, we start with the imports.
+ *
+ * We're importing the top-level `coast` package and the nested `flow`
+ * package, which contains most of the classes and methods we'll need.
+ */
 import com.monovore.coast
-import coast.flow
+import com.monovore.coast.flow
 
+/* These don't have anything to do with `coast`, but we'll need them later.
+ */
+import java.net.URI
 import scala.util.Try
 
 /* This streaming job is loosely based on Trident's 'Twitter reach' example
@@ -35,7 +41,7 @@ object TwitterReach extends ExampleMain {
    *
    * First, we'll define a few `Name`s. A `Name` corresponds roughly to a Kafka
    * topic; it groups together the topic name (a `String`) and the types of the
-   * keys and messages.
+   * partition keys and messages.
    *
    * Both our inputs are partitioned by user ID. Every time the user sends a
    * tweet, we get the tweet's text on the `tweets` input stream. Every time a
@@ -66,7 +72,7 @@ object TwitterReach extends ExampleMain {
 
   import coast.wire.ugly._
 
-  /* Now we come to the job logic. We're building up a `Flow` object here; this
+  /* Now we come to the job logic. We're building up a `Graph` object here; this
    * builds up the stream-processing DAG and associates stream names with the
    * actual processing logic. The `for` block here may seem a bit odd, but it
    * makes it possible to track the stream names and types without cluttering
@@ -81,8 +87,8 @@ object TwitterReach extends ExampleMain {
   val graph = for {
 
     /* This next line defines an internal stream. The string in the middle gives
-     * a name to this internal stream -- in the Samza backend, for example, this
-     * is the name of  both the output Kafka topic and the Samza job that
+     * a name to the stream -- in the Samza backend, for example, this
+     * is the name of both the output Kafka topic and the Samza job that
      * produces it. On the left, we bind the output to a variable, so we can use
      * it as an input to other jobs. On the right, we're opening a block: this
      * holds the 'definition' of the stream.
@@ -103,6 +109,10 @@ object TwitterReach extends ExampleMain {
        * table with a changelog stream. In this case, calculating the current
        * value requires keeping state; `coast` will take care of this,
        * serializing it when necessary using the formatters we defined above.
+       *
+       * Streams and pools are `coast`'s two abstractions for streaming data;
+       * all transformations and joins we do below result in one of these two
+       * types.
        */
 
       val followersByUser =
@@ -119,10 +129,11 @@ object TwitterReach extends ExampleMain {
       val tweetedLinks = flow.source(Tweets)
         .flatMap { _.split("\\s+") }
         .filter { _.startsWith("http") }
-        .flatMap { maybeURI => Try(new URI(maybeURI)).toOption.toSeq }
+        .map { maybeURI => Try(new URI(maybeURI)).toOption }
+        .flattenOption
 
-      /* After that, we join the two together to make a new stream and regroup
-       * by key.  Each stage could probably use a little more explanation.
+      /* After that, we join the two together to make a new stream, then regroup
+       * by key. Each of these steps could probably use a little more explanation.
        *
        * Recall that tweetedLinks is a stream, and followersByUser is a pool.
        * When we join the two, it returns the type Stream[UserID, (URI,
@@ -133,7 +144,7 @@ object TwitterReach extends ExampleMain {
        * followers at the time -- which is exactly what we needed.
        *
        * To get the total reach, though, we'll need to get the set of all
-       * followers together on a single node -- but everything's still grouped
+       * followers together on a single node -- but our data is still grouped
        * by user ID. When running on a cluster, we'll have to shuffle data
        * across the network to get the proper grouping before we can accumulate.
        * That's why this job is split in two: this first part writes the data
@@ -149,15 +160,18 @@ object TwitterReach extends ExampleMain {
     }
 
     /* In the second part of the job, we're calculating the final counts and
-     * writing them to the output stream. To write to a named stream and not a
-     * label, we use `coast.sink`.
+     * writing them to the output stream. Since this is our actual output, and
+     * not just an implementation detail, we write it to the named output stream
+     * we defined above. Since this stream may have any number of consumers,
+     * perhaps using other languages or frameworks, `coast` is careful to keep
+     * public outputs like this free of duplicates or metadata.
      */
 
     _ <- flow.sink(Reach) {
 
-      /* This last bit's pretty minimal: we just accumulate all the followers in
-       * one big set.  Every time that set's updated, we calculate the size and
-       * write it to our output stream.
+      /* This last bit's pretty minimal. We use another fold to accumulate all
+       * the followers in one big set. Every time we see a new follower, we
+       * recalculate the size and write it to our output stream.
        */
 
       followersByURI
@@ -174,6 +188,8 @@ object TwitterReach extends ExampleMain {
    * If you have this code checked out, you can run this code with the `dot`
    * argument to print the job in graphviz format; you'll see the two main
    * stages, plus the structure inside each stage that defines the dataflow.
+   * Otherwise -- if you create Kafka topics with the right names and data
+   * formats, this would be ready to run on the cluster.
    */
 
 }
