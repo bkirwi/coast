@@ -1,65 +1,85 @@
 # coast
 
-An experiment in streaming, with a focus on correctness, concision, and
-friendliness.
+In this dark stream-processing landscape, `coast` is a ray of light.
 
-## Caveat Haxxor
+**NOTE:** This is a brand-new project, and many things are still a little rough
+around the edges. If something's particularly confusing or broken, feel free to
+[open an issue][issues].
 
-This project is unreleased, immature, and changing rapidly. If you don't like what you see now, check back in a few weeks.
+## Why `coast`?
 
-## Why Another Streaming Framework?
+- **Simple:** `coast` provides a simple streaming model with strong ordering and
+  exactly-once semantics. This straightforward behaviour extends across multiple
+  machines, state aggregations, and even between independent jobs, making it
+  easier to reason about how your entire system behaves.
 
-Consider this simple stream processing task: we want to write a job that pulls data from an input stream and write it to an output stream. (Let's say the input and output are stored in Kafka.) We'd like to copy the stream exactly: the first message in the input is the first message in the output, and so on.
+- **Easy:** Streams are built up and wired together using a concise, idiomatic
+  Scala API. These dataflow graphs can be as small or as large as you like:
+  there's no pressure to cram all your logic in one big job, or to write a bunch
+  of single-stage jobs and track their relationships by hand.
 
-In the current generation of streaming frameworks, this is surprisingly difficult; in the presence of failures, most implementations will drop, duplicate, or reorder messages. (Getting it right involves careful, manual offset tracking.) When a job this trivial is this tricky to get right, it's hard to build reliable applications on top. Mistakes are common enough that many experts advocate using streaming frameworks for only [approximate, disposable calculations](http://en.wikipedia.org/wiki/Lambda_architecture#Speed_layer), and reproducing all the work in another system; this works, but it's a lot of effort, and it limits the kind of applications you can build.
+- **Kafkaesque:** `coast`'s core abstractions are patterned after Kafka's
+  data model, and it's designed to fit comfortably in the middle of a larger
+  Kafka-based infrastructure. By taking advantage of Kafka's messaging
+  guarantees, `coast` can implement [exactly-once messaging][impossible] without
+  a heavy coordination cost.
 
-`coast` dreams of a better way.
+## 60 Second Intro
 
-## What's Here?
+`coast`'s streams are closely patterned after Kafka's topics: a stream has
+multiple partitions, and each partition has an ordered series of values. A
+stream can have any number of partitions, each of which has a unique key. (These
+keys are multiplexed on to a Kafka topic where necessary, semantic-partitioning
+style.) You can create a stream by pulling data from a topic, but `coast` also
+has a rich API for building derivative streams: applying transformations,
+merging streams together, regrouping, aggregating state, or performing joins.
+These derivative streams behave just the same as streams that come directly from
+Kafka, which makes it easy to build up complex stream transformations from small
+pieces.
 
-This project comprises:
-- A simple, exactly-once streaming model; supporting transforming, splitting, and merging streams while maintainting persistent state. This model is designed to give strong guarantees about ordering and consistency, while allowing an implementation to scale to many machines.
-- An idiomatic Scala API for defining streaming topologies.
-- A small, in-memory backend for `coast`'s streaming model. This captures the nondeterminism that would be present in a distributed system, so testing with this helps you understand how your streaming job will behave on a real cluster.
-- A pretty-printer that exports the DAG of your stream processing job to GraphViz format.
+Once you've defined a stream you like, you can give it a name and publish it
+back to Kafka; `coast` tracks the mapping between stream names and their
+definitions.  The `flow` package defines a rich Scala API for defining streams
+and composing them together to build up an acyclic dataflow graph. You can use
+these graphs in multiple ways: `dot` prints the graph in GraphViz format;
+`machine` is a persistent in-memory implementation that's handy for unit
+testing; and the `samza` backend can compile the graph to multiple [Samza
+jobs][samza] and run it on a cluster.
 
-A backend that compiles the DAG into a set of Samza jobs is also in progress, but not complete. A [fork of the `hello-samza` project](https://github.com/bkirwi/incubator-samza-hello-samza/tree/hello-coast) has some examples.
+If this all sounds promising, you might want to read through the
+[heavily-commented 'Twitter reach' example][twitter-reach], or [this fork of the
+hello-samza project][hello-coast].
+
+[samza]: http://samza.incubator.apache.org/
+[hello-coast]: https://github.com/bkirwi/incubator-samza-hello-samza/tree/hello-coast 
+[twitter-reach]: core/src/main/scala/com/monovore/example/coast/TwitterReach.scala
+[impossible]: http://ben.kirw.in/2014/11/28/kafka-patterns/
 
 ## Mandatory Word Count Example
 
 ```scala
-// declare the names of the input and output streams
-val Sentences = coast.Name[String, String]("sentences")
-val WordCounts = coast.Name[String, Int]("word-counts")
+val Sentences = flow.Name[Source, String]("sentences")
 
-val flow = for {
+val WordCounts = flow.Name[String, Int]("word-counts")
 
-  // split each sentence into words and regroup 
-  countsByWord <- coast.label("counts-by-word") {
-    coast.source(Sentences)
-      .flatMap { sentence => sentence.split("\\s+") }
-      .map { word => word -> 1 }
+val graph = for {
+
+  words <- flow.stream("words") {
+    flow.source(Sentences)
+      .flatMap { _.split("\\s+") }
+      .map { _ -> 1 }
       .groupByKey
   }
-  
-  // add up the counts for each word, and stream out the list of changes
-  _ <- coast.sink(WordCounts) {
-    countsByWord
-      .fold(0) { _ + _ }
-      .stream
+
+  _ <- flow.sink(WordCounts) {
+    words.sum.updates
   }
-  
 } yield ()
 ```
 
-## Future Work
+## Missing Pieces
 
-- The Samza backend is incomplete, and all components need both polish and documentation.
+There's a lot of work do still; if you're interested, have a look at the [open
+issues][issues], or check back in a few weeks.
 
-- It would be nice to support multiple frontends, possibly in other languages. (Java, Clojure, Ruby, etc.) This might require moving a small amount of code to Java.
-
-- The current API only works nicely for small, pure functions. In the future, `coast` should have better support for processing that is asynchronous, nondeterministic, or requires initialization.
-
-- Migrations are a common pain in any distributed context. `coast` has access to a lot of data and metadata, so it should be possible to provide built-in support for this. Good tooling here would be astonishingly useful.
-
-- It should be possible to compile a `coast` flow into other popular streaming frameworks. (Storm is a good target; Spark Streaming is also promising.) This would make it easier to bring `coast`'s strong guarantees to places that have existing infrastructure for these other frameworks.
+[issues]: https://github.com/bkirwi/coast/issues
