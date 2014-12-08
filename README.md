@@ -24,7 +24,7 @@ around the edges. If something's particularly confusing or broken, feel free to
   guarantees, `coast` can implement [exactly-once messaging][impossible] without
   a heavy coordination cost.
 
-## 60 Second Intro
+## Quick Introduction
 
 `coast`'s streams are closely patterned after Kafka's topics: a stream has
 multiple partitions, and each partition has an ordered series of values. A
