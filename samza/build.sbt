@@ -1,4 +1,4 @@
-def samzaDep(name: String) = "org.apache.samza" %% name % "0.8.0-SNAPSHOT"
+def samzaDep(name: String) = "org.apache.samza" %% name % "0.8.0"
 
 resolvers += "Local Maven Repository" at s"file://${Path.userHome.absolutePath}/.m2/repository"
 
