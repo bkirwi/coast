@@ -9,7 +9,7 @@ import model._
  * @param value
  * @tparam A
  */
-case class FlowGraph[+A](bindings: Seq[String -> Sink[_, _]], value: A) extends Graph {
+case class FlowGraph[+A](bindings: Seq[String -> Sink[_, _]], value: A) extends Graph with Graphable[A] {
 
   def map[B](func: A => B): FlowGraph[B] = copy(value = func(value))
 
@@ -25,4 +25,18 @@ case class FlowGraph[+A](bindings: Seq[String -> Sink[_, _]], value: A) extends 
 
     FlowGraph(bindings ++ result.bindings, result.value)
   }
+
+  override def toGraph: FlowGraph[A] = this
+}
+
+object FlowGraph {
+
+  /**
+   * Creates a graph without any name bindings.
+   */
+  def apply[A](a: A): FlowGraph[A] = FlowGraph(Seq.empty, a)
+}
+
+trait Graphable[+A] {
+  def toGraph: FlowGraph[A]
 }
