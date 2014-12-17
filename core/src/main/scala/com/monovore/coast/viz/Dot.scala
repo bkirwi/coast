@@ -1,5 +1,5 @@
 package com.monovore.coast
-package dot
+package viz
 
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -7,14 +7,19 @@ import com.monovore.coast.model._
 
 object Dot {
 
-  sealed trait LabelType
-  case class Public(name: String) extends LabelType { override def toString = "\"public-" + name + "\"" }
-  case class Private(count: Int) extends LabelType { override def toString = "\"internal-" + count + "\"" }
+  private[this] sealed trait LabelType
+  private[this] case class Public(name: String) extends LabelType { override def toString = "\"public-" + name + "\"" }
+  private[this] case class Private(count: Int) extends LabelType { override def toString = "\"internal-" + count + "\"" }
 
-  case class Label(global: LabelType, pretty: String)
+  private[this] case class Label(global: LabelType, pretty: String)
+  private[this] case class Edge(from: Label, to: Label, tag: Option[String] = None)
 
-  case class Edge(from: Label, to: Label, tag: Option[String] = None)
-
+  /**
+   * Write out a graph description in the
+   * [[http://en.wikipedia.org/wiki/DOT_(graph_description_language) DOT graph
+   * description language]]. You'll probably want to hand this off to another
+   * tool for visualization or further processing.
+   */
   def describe(graph: Graph): String = {
 
     val newID: String => Label = {

@@ -4,7 +4,7 @@ import java.io.File
 
 import com.google.common.base.Charsets
 import com.google.common.io.Files
-import com.monovore.coast.dot.Dot
+import com.monovore.coast.viz.Dot
 import com.monovore.coast.model.Graph
 
 /**
