@@ -6,7 +6,7 @@ import java.util.Properties
 
 import com.monovore.coast
 import com.monovore.coast.model.Graph
-import com.monovore.coast.samza.{GraphCompiler, ConfigGenerator}
+import com.monovore.coast.samza.{SafeConfigGenerator, ConfigGenerator}
 import kafka.api.{PartitionFetchInfo, FetchRequest, TopicMetadataRequest, OffsetRequest}
 import kafka.common.{UnknownTopicOrPartitionException, TopicAndPartition}
 import kafka.consumer.{Consumer, ConsumerConfig, ConsumerConnector, SimpleConsumer}

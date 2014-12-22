@@ -13,7 +13,7 @@ import scala.collection.JavaConverters._
 
 object Safe extends (Config => ConfigGenerator) {
 
-  def apply(baseConfig: Config = new MapConfig()): ConfigGenerator = new GraphCompiler(baseConfig)
+  def apply(baseConfig: Config = new MapConfig()): ConfigGenerator = new SafeConfigGenerator(baseConfig)
 
   class SinkFactory[A, B](sinkNode: Sink[A, B]) extends MessageSink.Factory {
 

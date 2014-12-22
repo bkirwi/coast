@@ -2,6 +2,9 @@ package com.monovore.coast.wire
 
 import java.io._
 
+/**
+ * Manages reading and writing data to Java's standard Data{Input,Output} classes.
+ */
 trait DataFormat[A] {
 
   def writeData(output: DataOutput, value: A): Unit

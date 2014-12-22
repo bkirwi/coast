@@ -29,7 +29,7 @@ object ConfigGenerator {
   case class Storage(name: String, keyString: String, valueString: String)
 }
 
-class GraphCompiler(baseConfig: Config = new MapConfig()) extends ConfigGenerator {
+class SafeConfigGenerator(baseConfig: Config = new MapConfig()) extends ConfigGenerator {
 
   import ConfigGenerator._
 
