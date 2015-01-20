@@ -153,6 +153,32 @@ class SamzaIntegrationSpec extends Specification with ScalaCheck {
 
       output must not be empty
     }
+
+    "handle cycles" in {
+
+      val graph = for {
+
+        looped <- flow.cycle[String, Int]("looped") { looped =>
+
+          val merged = flow.merge(
+            "foo" -> flow.source(Foo),
+            "loop" -> looped.filter { _ % 2 == 0 }
+          )
+
+          merged.map { _ + 1 }
+        }
+
+        _ <- flow.sink(Bar) { looped }
+
+      } yield ()
+
+      val input = Messages
+        .add(Foo, Map("test" -> (1 to BigNumber by 2)))
+
+      val output = IntegrationTest.fuzz(graph, input).get(Bar)
+
+      output("test").sorted must_== (2 to (BigNumber+1))
+    }
   }
 
   "a 'simple' samza-backed job" should {
