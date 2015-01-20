@@ -12,8 +12,8 @@ libraryDependencies ++= Seq(
   samzaDep("samza-kv-inmemory"),
   samzaDep("samza-kafka"),
   "org.apache.kafka" %% "kafka" % "0.8.1.1" classifier "test" exclude("javax.jms", "jms") exclude("com.sun.jdmk", "jmxtools") exclude("com.sun.jmx", "jmxri"),
-  "org.specs2" %% "specs2" % "2.4.11" % "it",
-  "org.scalacheck" %% "scalacheck" % "1.11.5" % "it"
+  "org.specs2" %% "specs2" % "2.4.15" % "it",
+  "org.scalacheck" %% "scalacheck" % "1.12.1" % "it"
 )
 
 fork in run := true
