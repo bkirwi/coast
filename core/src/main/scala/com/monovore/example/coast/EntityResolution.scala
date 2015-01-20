@@ -38,39 +38,36 @@ object EntityResolution extends ExampleMain {
 
   val graph = for {
     
-    input <- flow.stream("input") {
-      flow.source(RawProducts)
-        .flatMap { e => scope(e).map { _ -> e }}
-        .groupByKey
-    }
-
     allProducts <- flow.cycle[Category, Product]("all-products-internal") { allProducts =>
+
+      def groupByScope[A](stream: flow.Stream[A, Product]) =
+        stream
+          .flatMap { e => scope(e).map { _ -> e }}
+          .groupByKey
 
 
       val merged = allProducts
         .aggregate(Set.empty[Product]) { (set, next) =>
 
-          if (set contains next) set -> Seq.empty
-          else {
+          set.find(matches(_, next))
+            .map { found =>
 
-            set.find(matches(_, next))
-              .map { found =>
+              val merged = merge(found, next)
 
-                val merged = merge(found, next)
-
-                if (merged == next) (set - found + merged) -> Seq.empty
-                else if (merged == found) set -> Seq.empty
-                else (set - found + merged) -> Seq(merged)
+              (set - found + merged) -> {
+                if (merged == next || merged == found) Seq.empty
+                else Seq(merged)
               }
-              .getOrElse {
-                (set + next) -> Seq.empty[Product]
-              }
-          }
+            }
+            .getOrElse {
+              (set + next) -> Seq.empty[Product]
+            }
         }
-        .flatMap { e => scope(e).map { _ -> e } }
-        .groupByKey
 
-        flow.merge("merged" -> merged, "raw" -> input)
+        flow.merge(
+          "merged" -> groupByScope(merged),
+          "raw" -> groupByScope(flow.source(RawProducts))
+        )
     }
 
     _ <- flow.sink(AllProducts) { allProducts }
