@@ -54,10 +54,8 @@ object EntityResolution extends ExampleMain {
 
               val merged = merge(found, next)
 
-              (set - found + merged) -> {
-                if (merged == next || merged == found) Seq.empty
-                else Seq(merged)
-              }
+              if (merged == next || merged == found) (set - found + merged) -> Seq.empty
+              else (set - found) -> Seq(merged)
             }
             .getOrElse {
               (set + next) -> Seq.empty[Product]

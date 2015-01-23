@@ -43,13 +43,10 @@ class EntityResolutionSpec extends Specification with ScalaCheck {
 
           forall(output(AllProducts)) { case (scope, values) =>
 
-            values.toList.tails.forall {
-              case Nil => true
-              case head :: tail => {
+            val merged = for (a <- values; b <- values; if matches(a, b)) yield merge(a, b)
 
-                tail.forall(!matches(_, head)) ||
-                  values.exists { other => matches(head, other) && merge(head, other) == other }
-              }
+            merged.forall { case m =>
+              values.exists { c => matches(m, c) && merge(m, c) == c }
             }
           }
         }
