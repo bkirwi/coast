@@ -16,7 +16,7 @@ class EntityResolutionSpec extends Specification with ScalaCheck {
 
     val products = for {
       names <- Gen.nonEmptyContainerOf[Set, Name](
-        Gen.choose(1, 20).map { n => Name(s"Product #$n") }
+        Gen.choose(1, 20).map { n => Name(s"Item #$n") }
       )
       minPrice <- Gen.choose(5, 25)
       category <- Gen.nonEmptyContainerOf[Set, Category](
@@ -32,9 +32,24 @@ class EntityResolutionSpec extends Specification with ScalaCheck {
         Shrink.shrink(categories).map { Product(names, price, _) }
     }
 
-    "include all the input data" in {
+    "handle a simple example" in {
 
-      prop { products: Map[SourceID, Seq[Product]] =>
+      val electrons = Category("electronics")
+      val fooBar = Product(Set(Name("Foo"), Name("Bar")), 12, Set(electrons))
+      val fooBaz = Product(Set(Name("Foo"), Name("Baz")), 12, Set(electrons))
+
+      val machine = Machine.compile(graph)
+        .push(Messages.from(RawProducts, Map(7 -> Seq(fooBar, fooBaz))))
+
+      Prop.forAll(Sample.complete(machine)) { output =>
+
+        output(AllProducts)(electrons) must_== Seq(fooBar, merge(fooBar, fooBaz))
+      }
+    }
+
+    "monotonically increase" in {
+
+      propNoShrink { products: Map[SourceID, Seq[Product]] =>
 
         val machine = Machine.compile(graph)
           .push(Messages.from(RawProducts, products))
@@ -43,11 +58,11 @@ class EntityResolutionSpec extends Specification with ScalaCheck {
 
           forall(output(AllProducts)) { case (scope, values) =>
 
-            val merged = for (a <- values; b <- values; if matches(a, b)) yield merge(a, b)
-
-            merged.forall { case m =>
-              values.exists { c => matches(m, c) && merge(m, c) == c }
-            }
+            values.tails
+              .collect { case head :: tail => (head, tail) }
+              .forall { case (head, tail) =>
+                tail.forall { x => !matches(head, x) || merge(head, x) == x }
+              }
           }
         }
       }

@@ -3,6 +3,8 @@ package com.monovore.example.coast
 import com.monovore.coast
 import com.monovore.coast.flow
 
+import scala.annotation.tailrec
+
 object EntityResolution extends ExampleMain {
   
   import coast.wire.ugly._
@@ -36,37 +38,47 @@ object EntityResolution extends ExampleMain {
 
   val AllProducts = flow.Name[Category, Product]("all-products")
 
+  def groupByScope[A](stream: flow.Stream[A, Product]) =
+    stream
+      .flatMap { e => scope(e).map { _ -> e }}
+      .groupByKey
+
   val graph = for {
-    
-    allProducts <- flow.cycle[Category, Product]("all-products-internal") { allProducts =>
 
-      def groupByScope[A](stream: flow.Stream[A, Product]) =
-        stream
-          .flatMap { e => scope(e).map { _ -> e }}
-          .groupByKey
+    allProducts <- flow.cycle[Category, Product]("all-products-merged") { allProducts =>
 
-
-      val merged = allProducts
-        .aggregate(Set.empty[Product]) { (set, next) =>
-
-          set.find(matches(_, next))
-            .map { found =>
-
-              val merged = merge(found, next)
-
-              if (merged == next || merged == found) (set - found + merged) -> Seq.empty
-              else (set - found) -> Seq(merged)
-            }
-            .getOrElse {
-              (set + next) -> Seq.empty[Product]
-            }
+      for {
+        scoped <- flow.stream("scoped-products") {
+          flow.merge(
+            "all" -> groupByScope(flow.source(RawProducts)),
+            "raw" -> groupByScope(allProducts)
+          )
         }
+      } yield {
 
-        flow.merge(
-          "merged" -> groupByScope(merged),
-          "raw" -> groupByScope(flow.source(RawProducts))
-        )
+        scoped
+          .withKeys.aggregate(Set.empty[Product]) { key => (set, next) =>
+
+            @tailrec
+            def doMerge(set: Set[Product], next: Product): (Set[Product], Seq[Product]) = {
+
+              set.find(matches(_, next)) match {
+                case Some(found) => {
+                  val merged = merge(found, next)
+
+                  if (merged == found) set -> Seq.empty
+                  else if (merged == next) doMerge(set - found, next)
+                  else doMerge(set - found, merged)
+                }
+                case None =>  (set + next) -> Seq(next)
+              }
+            }
+
+            doMerge(set, next)
+          }
+      }
     }
+
 
     _ <- flow.sink(AllProducts) { allProducts }
   } yield ()
