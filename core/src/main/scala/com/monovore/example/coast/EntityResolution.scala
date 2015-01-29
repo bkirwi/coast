@@ -20,9 +20,6 @@ object EntityResolution extends ExampleMain {
   def scope(product: Product): Seq[Category] =
     product.categories.toSeq.sorted
 
-  def responsible(category: String, one: Product, other: Product) =
-    (one.categories intersect other.categories).toSeq.sorted.headOption == Some(category)
-
   def matches(one: Product, other: Product): Boolean = {
     (one.names intersect other.names).nonEmpty &&
       (one.categories intersect other.categories).nonEmpty
