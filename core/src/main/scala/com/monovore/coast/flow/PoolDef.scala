@@ -13,7 +13,7 @@ class PoolDef[+G <: AnyGrouping, A, +B](
 
   def updatedPairs[B0 >: B](
     implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], valueFormat: BinaryFormat[B0]
-  ): Stream[A, (B0, B0)] =
+  ): GroupedStream[A, (B0, B0)] =
     updates.aggregate(initial: B0) { (last, current) =>
       current -> Seq(last -> current)
     }
@@ -21,7 +21,7 @@ class PoolDef[+G <: AnyGrouping, A, +B](
   def map[B0](function: B => B0): PoolDef[G, A, B0] =
     updates.map(function).latestOr(function(initial))
 
-  def join[B0 >: B, B1](other: Pool[A, B1])(
+  def join[B0 >: B, B1](other: GroupedPool[A, B1])(
     implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], pairFormat: BinaryFormat[(B0, B1)]
   ): PoolDef[Grouped, A, (B0, B1)] = {
 

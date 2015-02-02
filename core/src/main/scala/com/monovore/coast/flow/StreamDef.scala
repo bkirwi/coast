@@ -30,7 +30,7 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
 
   def aggregate[S, B0](init: S)(func: WithKey[(S, B) => (S, Seq[B0])])(
     implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], stateFormat: BinaryFormat[S]
-  ): Stream[A, B0] = {
+  ): GroupedStream[A, B0] = {
 
     val keyedFunc = context.unwrap(func)
 
@@ -39,7 +39,7 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
 
   def fold[B0](init: B0)(func: WithKey[(B0, B) => B0])(
     implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], stateFormat: BinaryFormat[B0]
-  ): Pool[A, B0] = {
+  ): GroupedPool[A, B0] = {
 
     val transformer = context.map(func) { fn =>
 
@@ -54,7 +54,7 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
 
   def grouped[B0 >: B](size: Int)(
     implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], stateFormat: BinaryFormat[Seq[B0]]
-  ): Stream[A, Seq[B0]] = {
+  ): GroupedStream[A, Seq[B0]] = {
 
     require(size > 0, "Expected a positive group size")
 
@@ -90,13 +90,13 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
 
   def sum[B0 >: B](
     implicit monoid: Monoid[B0], isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], valueFormat: BinaryFormat[B0]
-  ): Pool[A, B0] = {
+  ): GroupedPool[A, B0] = {
     stream.fold(monoid.zero)(monoid.plus)
   }
 
-  def join[B0](pool: Pool[A, B0])(
+  def join[B0](pool: GroupedPool[A, B0])(
     implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], b0Format: BinaryFormat[B0]
-  ): Stream[A, (B, B0)] = {
+  ): GroupedStream[A, (B, B0)] = {
 
     Flow.merge("stream" -> pool.updates.map(Left(_)), "pool" -> isGrouped.stream(this.stream).map(Right(_)))
       .aggregate(pool.initial) { (state: B0, msg: Either[B0, B]) =>

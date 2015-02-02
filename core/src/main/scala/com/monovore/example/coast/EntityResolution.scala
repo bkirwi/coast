@@ -1,8 +1,7 @@
 package com.monovore.example.coast
 
 import com.monovore.coast
-import com.monovore.coast.flow
-import com.monovore.coast.flow.{Flow, Topic}
+import com.monovore.coast.flow.{AnyStream, Flow, Topic}
 
 import scala.annotation.tailrec
 
@@ -36,17 +35,19 @@ object EntityResolution extends ExampleMain {
 
   val AllProducts = Topic[Category, Product]("all-products")
 
-  def groupByScope[A](stream: flow.Stream[A, Product]) =
-    stream
-      .flatMap { e => scope(e).map { _ -> e }}
-      .groupByKey
-
   val graph = for {
 
     allProducts <- Flow.cycle[Category, Product]("all-products-merged") { allProducts =>
 
       for {
+
         scoped <- Flow.stream("scoped-products") {
+
+          def groupByScope[A](stream: AnyStream[A, Product]) =
+            stream
+              .flatMap { e => scope(e).map { _ -> e }}
+              .groupByKey
+
           Flow.merge(
             "all" -> groupByScope(Flow.source(RawProducts)),
             "raw" -> groupByScope(allProducts)
@@ -58,25 +59,24 @@ object EntityResolution extends ExampleMain {
           .aggregate(Set.empty[Product]) { (set, next) =>
 
             @tailrec
-            def doMerge(set: Set[Product], next: Product): (Set[Product], Seq[Product]) = {
+            def mergeAll(set: Set[Product], next: Product): (Set[Product], Option[Product]) = {
 
               set.find(matches(_, next)) match {
                 case Some(found) => {
                   val merged = merge(found, next)
 
-                  if (merged == found) set -> Seq.empty
-                  else if (merged == next) doMerge(set - found, next)
-                  else doMerge(set - found, merged)
+                  if (merged == found) set -> None
+                  else mergeAll(set - found, merged)
                 }
-                case None =>  (set + next) -> Seq(next)
+                case None => (set + next) -> Some(next)
               }
             }
 
-            doMerge(set, next)
+            val (newSet, output) = mergeAll(set, next)
+            newSet -> output.toSeq
           }
       }
     }
-
 
     _ <- Flow.sink(AllProducts) { allProducts }
   } yield ()

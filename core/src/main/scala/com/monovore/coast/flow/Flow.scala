@@ -49,24 +49,24 @@ object Flow {
     new StreamDef[G, A, B](Merge(upstreams.map { case (name, stream) => name -> stream.element}))
   }
 
-  def source[A : BinaryFormat, B : BinaryFormat](topic: Topic[A,B]): Stream[A, B] =
+  def source[A : BinaryFormat, B : BinaryFormat](topic: Topic[A,B]): GroupedStream[A, B] =
     new StreamDef[Grouped, A, B](Source[A, B](topic.name))
 
-  def sink[A : BinaryFormat : Partitioner, B : BinaryFormat](topic: Topic[A, B])(flow: StreamDef[Grouped, A, B]): Flow[Unit] = {
-    Flow(Seq(topic.name -> Sink(flow.element)), ())
+  def sink[A : BinaryFormat : Partitioner, B : BinaryFormat](topic: Topic[A, B])(stream: GroupedStream[A, B]): Flow[Unit] = {
+    Flow(Seq(topic.name -> Sink(stream.element)), ())
   }
 
-  def stream[A : BinaryFormat : Partitioner, B : BinaryFormat](label: String)(stream: FlowLike[StreamDef[AnyGrouping, A, B]]): Flow[Stream[A, B]] =
+  def stream[A : BinaryFormat : Partitioner, B : BinaryFormat](label: String)(stream: FlowLike[AnyStream[A, B]]): Flow[GroupedStream[A, B]] =
     stream.toFlow.flatMap { stream =>
       Flow(Seq(label -> Sink(stream.element)), new StreamDef[Grouped, A, B](Source[A, B](label)))
     }
 
-  def pool[A : BinaryFormat : Partitioner, B : BinaryFormat](label: String)(pool: FlowLike[PoolDef[AnyGrouping, A, B]]): Flow[Pool[A, B]] =
+  def pool[A : BinaryFormat : Partitioner, B : BinaryFormat](label: String)(pool: FlowLike[AnyPool[A, B]]): Flow[GroupedPool[A, B]] =
     pool.toFlow.flatMap { pool =>
       Flow(Seq(label -> Sink(pool.element)), new PoolDef[Grouped, A, B](pool.initial, Source[A, B](label)))
     }
 
-  def cycle[A : BinaryFormat : Partitioner, B : BinaryFormat](label: String)(cycle: Stream[A, B] => FlowLike[StreamDef[AnyGrouping, A, B]]): Flow[Stream[A, B]] = {
+  def cycle[A : BinaryFormat : Partitioner, B : BinaryFormat](label: String)(cycle: GroupedStream[A, B] => FlowLike[AnyStream[A, B]]): Flow[GroupedStream[A, B]] = {
 
     val stream = new StreamDef[Grouped, A, B](Source[A, B](label))
 

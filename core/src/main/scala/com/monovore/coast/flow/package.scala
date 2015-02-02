@@ -5,9 +5,11 @@ import com.monovore.coast.model.{Source, Merge, Sink}
 
 package object flow {
 
-  type Stream[A, +B] = StreamDef[Grouped, A, B]
+  type AnyStream[A, +B] = StreamDef[AnyGrouping, A, B]
+  type GroupedStream[A, +B] = StreamDef[Grouped, A, B]
 
-  type Pool[A, +B] = PoolDef[Grouped, A, B]
+  type AnyPool[A, +B] = PoolDef[AnyGrouping, A, B]
+  type GroupedPool[A, +B] = PoolDef[Grouped, A, B]
 
   case class Topic[A, B](name: String)
 
