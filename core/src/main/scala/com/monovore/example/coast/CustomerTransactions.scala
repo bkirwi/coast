@@ -24,7 +24,7 @@ object CustomerTransactions extends ExampleMain {
 
   val CustomerInfo = flow.Topic[CustomerID, (Customer, Seq[Transaction])]("customer-info")
 
-  override def graph: flow.FlowGraph[Unit] = for {
+  override def graph: flow.Flow[Unit] = for {
 
     transactionsByCustomer <- flow.stream("transactions-by-customer") {
 

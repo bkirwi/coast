@@ -109,10 +109,10 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
 }
 
 class StreamDef[+G <: AnyGrouping, A, +B](element: Node[A, B])
-    extends StreamBuilder[Id, G, A, B](new NoContext[A], element) with Graphable[StreamDef[AnyGrouping, A, B]] {
+    extends StreamBuilder[Id, G, A, B](new NoContext[A], element) with FlowLike[StreamDef[AnyGrouping, A, B]] {
 
   def withKeys: StreamBuilder[From[A]#To, G, A, B] =
     new StreamBuilder[From[A]#To, G, A, B](new FnContext[A], element)
 
-  override def toGraph: FlowGraph[StreamDef[AnyGrouping, A, B]] = FlowGraph(this)
+  override def toFlow: Flow[StreamDef[AnyGrouping, A, B]] = Flow(this)
 }
