@@ -26,8 +26,8 @@ class SamzaIntegrationSpec extends Specification with ScalaCheck {
 
     "pass through data safely" in {
 
-      val graph = flow.sink(Bar) {
-        flow.source(Foo)
+      val graph = Flow.sink(Bar) {
+        Flow.source(Foo)
       }
 
       val inputData = Map(
@@ -45,8 +45,8 @@ class SamzaIntegrationSpec extends Specification with ScalaCheck {
 
     "flatMap nicely" in {
 
-      val graph = flow.sink(Bar) {
-        flow.source(Foo).flatMap { n => Seq.fill(3)(n) }
+      val graph = Flow.sink(Bar) {
+        Flow.source(Foo).flatMap { n => Seq.fill(3)(n) }
       }
 
       val inputData = Map(
@@ -63,8 +63,8 @@ class SamzaIntegrationSpec extends Specification with ScalaCheck {
 
     "accumulate state" in {
 
-      val graph = flow.sink(Bar) {
-        flow.source(Foo).fold(0) { (n, _) => n + 1 }.updates
+      val graph = Flow.sink(Bar) {
+        Flow.source(Foo).fold(0) { (n, _) => n + 1 }.updates
       }
 
       val inputData = Map(
@@ -85,11 +85,11 @@ class SamzaIntegrationSpec extends Specification with ScalaCheck {
 
       val graph = for {
 
-        once <- flow.stream("testing") {
-          flow.source(Foo).fold(1) { (n, _) => n + 1 }.updates
+        once <- Flow.stream("testing") {
+          Flow.source(Foo).fold(1) { (n, _) => n + 1 }.updates
         }
 
-        _ <- flow.sink(Bar) { once.map { _ + 1 } }
+        _ <- Flow.sink(Bar) { once.map { _ + 1 } }
 
       } yield ()
 
@@ -109,10 +109,10 @@ class SamzaIntegrationSpec extends Specification with ScalaCheck {
 
       val Foo2 = Topic[String, Int]("foo-2")
 
-      val graph = flow.sink(Bar) {
-        flow.merge(
-          "foo-1" -> flow.source(Foo),
-          "foo-2" -> flow.source(Foo2)
+      val graph = Flow.sink(Bar) {
+        Flow.merge(
+          "foo-1" -> Flow.source(Foo),
+          "foo-2" -> Flow.source(Foo2)
         )
       }
 
@@ -133,11 +133,11 @@ class SamzaIntegrationSpec extends Specification with ScalaCheck {
 
       val graph = for {
 
-        grouped <- flow.stream("grouped") {
-          flow.source(Foo).groupBy { n => (n % 10).toString }
+        grouped <- Flow.stream("grouped") {
+          Flow.source(Foo).groupBy { n => (n % 10).toString }
         }
 
-        _ <- flow.sink(Bar) { grouped }
+        _ <- Flow.sink(Bar) { grouped }
       } yield ()
 
       val input = Messages
@@ -161,15 +161,15 @@ class SamzaIntegrationSpec extends Specification with ScalaCheck {
 
         looped <- flow.cycle[String, Int]("looped") { looped =>
 
-          val merged = flow.merge(
-            "foo" -> flow.source(Foo),
+          val merged = Flow.merge(
+            "foo" -> Flow.source(Foo),
             "loop" -> looped.filter { _ % 2 == 0 }
           )
 
           merged.map { _ + 1 }
         }
 
-        _ <- flow.sink(Bar) { looped }
+        _ <- Flow.sink(Bar) { looped }
 
       } yield ()
 

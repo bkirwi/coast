@@ -2,7 +2,7 @@ package com.monovore.example.coast
 
 import com.monovore.coast
 import coast.flow
-import com.monovore.coast.flow.Topic
+import com.monovore.coast.flow.{Flow, Topic}
 
 import scala.collection.immutable.SortedSet
 
@@ -39,9 +39,9 @@ object Denormalize extends ExampleMain {
   val graph = for {
 
     // Roll up 'users' under their group id
-    usersByKey <- flow.stream[GroupID, (UserID, Option[String])]("users-pool") {
+    usersByKey <- Flow.stream[GroupID, (UserID, Option[String])]("users-pool") {
 
-      flow.source(Users)
+      Flow.source(Users)
         .latestOr(None)
         .updatedPairs
         .flatMap {
@@ -64,9 +64,9 @@ object Denormalize extends ExampleMain {
     }
 
     // Join, and a trivial transformation
-    _ <- flow.sink(Denormalized) {
+    _ <- Flow.sink(Denormalized) {
 
-      val groups = flow.source(Groups).latestOr(None)
+      val groups = Flow.source(Groups).latestOr(None)
 
       val usersPool = usersByKey
         .fold(Map.empty[UserID, String]) { (state, newInfo) =>

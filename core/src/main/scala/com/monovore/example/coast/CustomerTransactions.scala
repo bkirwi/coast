@@ -2,7 +2,7 @@ package com.monovore.example.coast
 
 import com.monovore.coast
 import coast.flow
-import com.monovore.coast.flow.Topic
+import com.monovore.coast.flow.{Flow, Topic}
 
 /**
  * Based on the discussion in this thread:
@@ -25,11 +25,11 @@ object CustomerTransactions extends ExampleMain {
 
   val CustomerInfo = Topic[CustomerID, (Customer, Seq[Transaction])]("customer-info")
 
-  override def graph: flow.Flow[Unit] = for {
+  override def graph: Flow[Unit] = for {
 
-    transactionsByCustomer <- flow.stream("transactions-by-customer") {
+    transactionsByCustomer <- Flow.stream("transactions-by-customer") {
 
-      (flow.source(Transactions).latestOption join flow.source(CustomerTransactions).latestOption)
+      (Flow.source(Transactions).latestOption join Flow.source(CustomerTransactions).latestOption)
         .updates
         .flatMap { case (latestTransaction, allCustomers) =>
 
@@ -43,11 +43,11 @@ object CustomerTransactions extends ExampleMain {
         .groupByKey
     }
 
-    _ <- flow.sink(CustomerInfo) {
+    _ <- Flow.sink(CustomerInfo) {
 
       val allCustomerTransactions = transactionsByCustomer.fold(Seq.empty[Transaction]) { _ :+ _ }
 
-      val latestCustomerInfo = flow.source(Customers).latestOption
+      val latestCustomerInfo = Flow.source(Customers).latestOption
 
       (latestCustomerInfo join allCustomerTransactions)
         .updates

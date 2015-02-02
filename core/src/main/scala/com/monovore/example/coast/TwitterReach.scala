@@ -6,12 +6,12 @@ package com.monovore.example.coast
  * package, which contains most of the classes and methods we'll need.
  */
 import com.monovore.coast
-import com.monovore.coast.flow
-import com.monovore.coast.flow.Topic
+import com.monovore.coast.flow.{Flow, Topic}
 
 /* These don't have anything to do with `coast`, but we'll need them later.
  */
 import java.net.URI
+
 import scala.util.Try
 
 /* This streaming job is loosely based on Trident's 'Twitter reach' example
@@ -95,7 +95,7 @@ object TwitterReach extends ExampleMain {
      * holds the 'definition' of the stream.
      */
 
-    followersByURI <- flow.stream("followers-by-uri") {
+    followersByURI <- Flow.stream("followers-by-uri") {
 
       /* This little definition has two parts. The first,
        * `coast.source(Followers)`, subscribes us to the `followers` stream we
@@ -117,7 +117,7 @@ object TwitterReach extends ExampleMain {
        */
 
       val followersByUser =
-        flow.source(Followers).fold(Set.empty[FollowerID]) { _ + _ }
+        Flow.source(Followers).fold(Set.empty[FollowerID]) { _ + _ }
 
       /* This defines a stream that extracts URIs from tweets. If a tweet
        * contains multiple URIs, we'll get multiple events in the stream.
@@ -127,7 +127,7 @@ object TwitterReach extends ExampleMain {
        * URI validation code.
        */
 
-      val tweetedLinks = flow.source(Tweets)
+      val tweetedLinks = Flow.source(Tweets)
         .flatMap { _.split("\\s+") }
         .filter { _.startsWith("http") }
         .map { maybeURI => Try(new URI(maybeURI)).toOption }
@@ -168,7 +168,7 @@ object TwitterReach extends ExampleMain {
      * public outputs like this free of duplicates or metadata.
      */
 
-    _ <- flow.sink(Reach) {
+    _ <- Flow.sink(Reach) {
 
       /* This last bit's pretty minimal. We use another fold to accumulate all
        * the followers in one big set. Every time we see a new follower, we

@@ -2,10 +2,8 @@ package com.monovore.coast
 package samza
 
 import com.monovore.coast
-import coast.flow
-import com.monovore.coast.flow.Topic
+import com.monovore.coast.flow.{Flow, Topic}
 
-import org.apache.samza.config.serializers.JsonConfigSerializer
 import org.specs2.ScalaCheck
 import org.specs2.mutable._
 
@@ -20,8 +18,8 @@ class SamzaSpec extends Specification with ScalaCheck {
       val source = Topic[String, Int]("ints")
       val sink = Topic[String, Int]("bigger-ints")
 
-      val sampleFlow = flow.sink(sink) {
-        flow.source(source).fold(0) { _ + _ }.updates
+      val sampleFlow = Flow.sink(sink) {
+        Flow.source(source).fold(0) { _ + _ }.updates
       }
 
       val configs = samza.Safe().configure(sampleFlow)
