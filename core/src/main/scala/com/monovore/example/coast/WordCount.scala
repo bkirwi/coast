@@ -7,9 +7,9 @@ object WordCount extends ExampleMain {
 
   type Source = Long
 
-  val Sentences = flow.Name[Source, String]("sentences")
+  val Sentences = flow.Topic[Source, String]("sentences")
 
-  val WordCounts = flow.Name[String, Int]("word-counts")
+  val WordCounts = flow.Topic[String, Int]("word-counts")
 
   import coast.wire.ugly._
 

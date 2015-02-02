@@ -56,10 +56,10 @@ object TwitterReach extends ExampleMain {
   type UserID = String 
   type FollowerID = String
 
-  val Tweets = flow.Name[UserID, String]("tweets")
-  val Followers = flow.Name[UserID, FollowerID]("followers")
+  val Tweets = flow.Topic[UserID, String]("tweets")
+  val Followers = flow.Topic[UserID, FollowerID]("followers")
 
-  val Reach = flow.Name[URI, Int]("reach")
+  val Reach = flow.Topic[URI, Int]("reach")
 
   /* `coast` uses implicit parameters to decide how to partition and serialize
    * your data. Don't be frightened! It's both safer and less verbose than using

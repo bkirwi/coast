@@ -30,10 +30,10 @@ object Denormalize extends ExampleMain {
 
   // 'Changelog' for users and groups
   // We expect None when the data is missing or deleted, and Some(user) otherwise
-  val Users = flow.Name[UserID, Option[User]]("users")
-  val Groups = flow.Name[GroupID, Option[Group]]("groups")
+  val Users = flow.Topic[UserID, Option[User]]("users")
+  val Groups = flow.Topic[GroupID, Option[Group]]("groups")
   
-  val Denormalized = flow.Name[GroupID, Option[DenormalizedGroup]]("denormalized-groups")
+  val Denormalized = flow.Topic[GroupID, Option[DenormalizedGroup]]("denormalized-groups")
 
   val graph = for {
 

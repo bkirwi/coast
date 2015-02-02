@@ -19,7 +19,7 @@ class CoastKafkaSystemSpec extends Specification with ScalaCheck {
 
     import coast.wire.pretty._
 
-    def stream(name: String) = flow.Name[String, Int](name)
+    def stream(name: String) = flow.Topic[String, Int](name)
 
     "eventually write all the data" in {
 

@@ -18,11 +18,11 @@ package object flow {
     new StreamDef[G, A, B](Merge(upstreams.map { case (name, stream) => name -> stream.element}))
   }
 
-  def source[A : BinaryFormat, B : BinaryFormat](name: Name[A,B]): Stream[A, B] =
-    new StreamDef[Grouped, A, B](Source[A, B](name.name))
+  def source[A : BinaryFormat, B : BinaryFormat](topic: Topic[A,B]): Stream[A, B] =
+    new StreamDef[Grouped, A, B](Source[A, B](topic.name))
 
-  def sink[A : BinaryFormat : Partitioner, B : BinaryFormat](name: Name[A, B])(flow: StreamDef[Grouped, A, B]): FlowGraph[Unit] = {
-    FlowGraph(Seq(name.name -> Sink(flow.element)), ())
+  def sink[A : BinaryFormat : Partitioner, B : BinaryFormat](topic: Topic[A, B])(flow: StreamDef[Grouped, A, B]): FlowGraph[Unit] = {
+    FlowGraph(Seq(topic.name -> Sink(flow.element)), ())
   }
 
   def stream[A : BinaryFormat : Partitioner, B : BinaryFormat](label: String)(stream: Graphable[StreamDef[AnyGrouping, A, B]]): FlowGraph[Stream[A, B]] =
@@ -44,7 +44,7 @@ package object flow {
     }
   }
 
-  case class Name[A, B](name: String)
+  case class Topic[A, B](name: String)
 
   private[coast] type Id[+A] = A
 

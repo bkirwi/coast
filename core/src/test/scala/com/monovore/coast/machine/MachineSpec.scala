@@ -19,13 +19,13 @@ class MachineSpec extends Specification with ScalaCheck {
 
   "a compiled flow" should {
 
-    val integers = flow.Name[String, Int]("integers")
+    val integers = flow.Topic[String, Int]("integers")
 
-    val output = flow.Name[String, Int]("output")
+    val output = flow.Topic[String, Int]("output")
 
     "do a basic deterministic transformation" in {
 
-      val doubled = flow.Name[String, Int]("doubled")
+      val doubled = flow.Topic[String, Int]("doubled")
 
       val graph = flow.stream("doubled") {
         flow.source(integers).map { _ * 2 }
@@ -69,7 +69,7 @@ class MachineSpec extends Specification with ScalaCheck {
 
       "merge" in {
 
-        val integers2 = flow.Name[String, Int]("integers-2")
+        val integers2 = flow.Topic[String, Int]("integers-2")
 
         val graph = flow.sink(output) {
 

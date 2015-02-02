@@ -31,9 +31,9 @@ object EntityResolution extends ExampleMain {
     categories = one.categories ++ other.categories
   )
 
-  val RawProducts = flow.Name[SourceID, Product]("raw-products")
+  val RawProducts = flow.Topic[SourceID, Product]("raw-products")
 
-  val AllProducts = flow.Name[Category, Product]("all-products")
+  val AllProducts = flow.Topic[Category, Product]("all-products")
 
   def groupByScope[A](stream: flow.Stream[A, Product]) =
     stream

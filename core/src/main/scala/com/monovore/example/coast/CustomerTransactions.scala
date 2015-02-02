@@ -18,11 +18,11 @@ object CustomerTransactions extends ExampleMain {
   case class Customer()
   case class Transaction()
 
-  val Customers = flow.Name[CustomerID, Customer]("customers")
-  val CustomerTransactions = flow.Name[TransactionID, CustomerID]("customer-transactions")
-  val Transactions = flow.Name[TransactionID, Transaction]("transactions")
+  val Customers = flow.Topic[CustomerID, Customer]("customers")
+  val CustomerTransactions = flow.Topic[TransactionID, CustomerID]("customer-transactions")
+  val Transactions = flow.Topic[TransactionID, Transaction]("transactions")
 
-  val CustomerInfo = flow.Name[CustomerID, (Customer, Seq[Transaction])]("customer-info")
+  val CustomerInfo = flow.Topic[CustomerID, (Customer, Seq[Transaction])]("customer-info")
 
   override def graph: flow.FlowGraph[Unit] = for {
 

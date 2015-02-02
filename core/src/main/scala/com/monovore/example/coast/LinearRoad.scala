@@ -30,8 +30,8 @@ object LinearRoad extends ExampleMain {
 
   implicit val SummaryMonoid = Monoid(Summary.apply _, Summary.unapply _)
 
-  val PositionReports = flow.Name[VehicleID, (PlaceAndTime, Double)]("position-reports")
-  val TotalTolls = flow.Name[VehicleID, Double]("total-tolls")
+  val PositionReports = flow.Topic[VehicleID, (PlaceAndTime, Double)]("position-reports")
+  val TotalTolls = flow.Topic[VehicleID, Double]("total-tolls")
 
   val graph: Graph = for {
 
