@@ -7,6 +7,7 @@ package com.monovore.example.coast
  */
 import com.monovore.coast
 import com.monovore.coast.flow
+import com.monovore.coast.flow.Topic
 
 /* These don't have anything to do with `coast`, but we'll need them later.
  */
@@ -56,10 +57,10 @@ object TwitterReach extends ExampleMain {
   type UserID = String 
   type FollowerID = String
 
-  val Tweets = flow.Topic[UserID, String]("tweets")
-  val Followers = flow.Topic[UserID, FollowerID]("followers")
+  val Tweets = Topic[UserID, String]("tweets")
+  val Followers = Topic[UserID, FollowerID]("followers")
 
-  val Reach = flow.Topic[URI, Int]("reach")
+  val Reach = Topic[URI, Int]("reach")
 
   /* `coast` uses implicit parameters to decide how to partition and serialize
    * your data. Don't be frightened! It's both safer and less verbose than using

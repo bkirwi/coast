@@ -2,6 +2,7 @@ package com.monovore.example.coast
 
 import com.monovore.coast
 import com.monovore.coast.flow
+import com.monovore.coast.flow.Topic
 
 import scala.annotation.tailrec
 
@@ -31,9 +32,9 @@ object EntityResolution extends ExampleMain {
     categories = one.categories ++ other.categories
   )
 
-  val RawProducts = flow.Topic[SourceID, Product]("raw-products")
+  val RawProducts = Topic[SourceID, Product]("raw-products")
 
-  val AllProducts = flow.Topic[Category, Product]("all-products")
+  val AllProducts = Topic[Category, Product]("all-products")
 
   def groupByScope[A](stream: flow.Stream[A, Product]) =
     stream

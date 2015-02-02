@@ -2,14 +2,15 @@ package com.monovore.example.coast
 
 import com.monovore.coast
 import com.monovore.coast.flow
+import com.monovore.coast.flow.Topic
 
 object WordCount extends ExampleMain {
 
   type Source = Long
 
-  val Sentences = flow.Topic[Source, String]("sentences")
+  val Sentences = Topic[Source, String]("sentences")
 
-  val WordCounts = flow.Topic[String, Int]("word-counts")
+  val WordCounts = Topic[String, Int]("word-counts")
 
   import coast.wire.ugly._
 

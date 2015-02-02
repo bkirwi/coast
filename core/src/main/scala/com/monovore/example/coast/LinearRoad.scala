@@ -2,6 +2,7 @@ package com.monovore.example.coast
 
 import com.monovore.coast
 import com.monovore.coast.flow
+import com.monovore.coast.flow.Topic
 import com.monovore.coast.model.Graph
 import com.twitter.algebird.{Monoid, AveragedValue}
 
@@ -30,8 +31,8 @@ object LinearRoad extends ExampleMain {
 
   implicit val SummaryMonoid = Monoid(Summary.apply _, Summary.unapply _)
 
-  val PositionReports = flow.Topic[VehicleID, (PlaceAndTime, Double)]("position-reports")
-  val TotalTolls = flow.Topic[VehicleID, Double]("total-tolls")
+  val PositionReports = Topic[VehicleID, (PlaceAndTime, Double)]("position-reports")
+  val TotalTolls = Topic[VehicleID, Double]("total-tolls")
 
   val graph: Graph = for {
 

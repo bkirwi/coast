@@ -3,6 +3,7 @@ package machine
 
 import com.monovore.coast
 import coast.flow
+import com.monovore.coast.flow.Topic
 import com.monovore.coast.model.Graph
 
 import com.twitter.algebird.Semigroup
@@ -19,13 +20,13 @@ class MachineSpec extends Specification with ScalaCheck {
 
   "a compiled flow" should {
 
-    val integers = flow.Topic[String, Int]("integers")
+    val integers = Topic[String, Int]("integers")
 
-    val output = flow.Topic[String, Int]("output")
+    val output = Topic[String, Int]("output")
 
     "do a basic deterministic transformation" in {
 
-      val doubled = flow.Topic[String, Int]("doubled")
+      val doubled = Topic[String, Int]("doubled")
 
       val graph = flow.stream("doubled") {
         flow.source(integers).map { _ * 2 }
@@ -69,7 +70,7 @@ class MachineSpec extends Specification with ScalaCheck {
 
       "merge" in {
 
-        val integers2 = flow.Topic[String, Int]("integers-2")
+        val integers2 = Topic[String, Int]("integers-2")
 
         val graph = flow.sink(output) {
 

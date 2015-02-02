@@ -2,6 +2,7 @@ package com.monovore.example.coast
 
 import com.monovore.coast
 import coast.flow
+import com.monovore.coast.flow.Topic
 
 /**
  * Based on the discussion in this thread:
@@ -18,11 +19,11 @@ object CustomerTransactions extends ExampleMain {
   case class Customer()
   case class Transaction()
 
-  val Customers = flow.Topic[CustomerID, Customer]("customers")
-  val CustomerTransactions = flow.Topic[TransactionID, CustomerID]("customer-transactions")
-  val Transactions = flow.Topic[TransactionID, Transaction]("transactions")
+  val Customers = Topic[CustomerID, Customer]("customers")
+  val CustomerTransactions = Topic[TransactionID, CustomerID]("customer-transactions")
+  val Transactions = Topic[TransactionID, Transaction]("transactions")
 
-  val CustomerInfo = flow.Topic[CustomerID, (Customer, Seq[Transaction])]("customer-info")
+  val CustomerInfo = Topic[CustomerID, (Customer, Seq[Transaction])]("customer-info")
 
   override def graph: flow.Flow[Unit] = for {
 

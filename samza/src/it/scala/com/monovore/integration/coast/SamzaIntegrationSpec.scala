@@ -2,6 +2,7 @@ package com.monovore.integration.coast
 
 import com.monovore.coast
 import com.monovore.coast.flow
+import com.monovore.coast.flow.Topic
 import com.monovore.coast.wire.{Partitioner, BinaryFormat}
 import org.scalacheck.{Prop, Gen}
 import org.specs2.ScalaCheck
@@ -19,9 +20,9 @@ class SamzaIntegrationSpec extends Specification with ScalaCheck {
 
     import coast.wire.pretty._
 
-    val Foo = flow.Topic[String, Int]("foo")
+    val Foo = Topic[String, Int]("foo")
 
-    val Bar = flow.Topic[String, Int]("bar")
+    val Bar = Topic[String, Int]("bar")
 
     "pass through data safely" in {
 
@@ -106,7 +107,7 @@ class SamzaIntegrationSpec extends Specification with ScalaCheck {
 
     "do a merge" in {
 
-      val Foo2 = flow.Topic[String, Int]("foo-2")
+      val Foo2 = Topic[String, Int]("foo-2")
 
       val graph = flow.sink(Bar) {
         flow.merge(
@@ -208,7 +209,7 @@ class SamzaIntegrationSpec extends Specification with ScalaCheck {
 
 case class Messages(messages: Map[String, Map[Seq[Byte], (Int => Int, Seq[Seq[Byte]])]] = Map.empty) {
 
-  def add[A : BinaryFormat : Partitioner, B : BinaryFormat](name: flow.Topic[A,B], messages: Map[A, Seq[B]]): Messages = {
+  def add[A : BinaryFormat : Partitioner, B : BinaryFormat](name: Topic[A,B], messages: Map[A, Seq[B]]): Messages = {
 
     val formatted = messages.map { case (k, vs) =>
       val pn: (Int => Int) = implicitly[Partitioner[A]].partition(k, _)
@@ -218,7 +219,7 @@ case class Messages(messages: Map[String, Map[Seq[Byte], (Int => Int, Seq[Seq[By
     Messages(this.messages.updated(name.name, formatted))
   }
 
-  def get[A : BinaryFormat, B : BinaryFormat](name: flow.Topic[A, B]): Map[A, Seq[B]] = {
+  def get[A : BinaryFormat, B : BinaryFormat](name: Topic[A, B]): Map[A, Seq[B]] = {
 
     val data = messages.getOrElse(name.name, Map.empty)
 

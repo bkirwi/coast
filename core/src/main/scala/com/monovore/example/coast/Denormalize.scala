@@ -2,6 +2,7 @@ package com.monovore.example.coast
 
 import com.monovore.coast
 import coast.flow
+import com.monovore.coast.flow.Topic
 
 import scala.collection.immutable.SortedSet
 
@@ -30,10 +31,10 @@ object Denormalize extends ExampleMain {
 
   // 'Changelog' for users and groups
   // We expect None when the data is missing or deleted, and Some(user) otherwise
-  val Users = flow.Topic[UserID, Option[User]]("users")
-  val Groups = flow.Topic[GroupID, Option[Group]]("groups")
+  val Users = Topic[UserID, Option[User]]("users")
+  val Groups = Topic[GroupID, Option[Group]]("groups")
   
-  val Denormalized = flow.Topic[GroupID, Option[DenormalizedGroup]]("denormalized-groups")
+  val Denormalized = Topic[GroupID, Option[DenormalizedGroup]]("denormalized-groups")
 
   val graph = for {
 
