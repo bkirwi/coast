@@ -1,17 +1,8 @@
 package com.monovore.example.coast
 
-/* As usual, we start with the imports.
- *
- * We're importing the top-level `coast` package and the nested `flow`
- * package, which contains most of the classes and methods we'll need.
- */
 import com.monovore.coast
 import com.monovore.coast.flow.{Flow, Topic}
-
-/* These don't have anything to do with `coast`, but we'll need them later.
- */
 import java.net.URI
-
 import scala.util.Try
 
 /* This streaming job is loosely based on Trident's 'Twitter reach' example
@@ -40,8 +31,8 @@ object TwitterReach extends ExampleMain {
    * probably want to pull these out to a common file so all the jobs can access
    * them.
    *
-   * First, we'll define a few `Name`s. A `Name` corresponds roughly to a Kafka
-   * topic; it groups together the topic name (a `String`) and the types of the
+   * First, we'll define a few `Topic`s. A `Topic` corresponds closely to a topic
+   * in Kafka; it groups together the topic name (a `String`) and the types of the
    * partition keys and messages.
    *
    * Both our inputs are partitioned by user ID. Every time the user sends a
@@ -73,8 +64,8 @@ object TwitterReach extends ExampleMain {
 
   import coast.wire.ugly._
 
-  /* Now we come to the job logic. We're building up a `Graph` object here; this
-   * builds up the stream-processing DAG and associates stream names with the
+  /* Now we come to the job logic. We're building up a `Flow` object here; this
+   * defines the stream-processing graph and associates topic names with the
    * actual processing logic. The `for` block here may seem a bit odd, but it
    * makes it possible to track the stream names and types without cluttering
    * the job itself.
@@ -98,26 +89,27 @@ object TwitterReach extends ExampleMain {
     followersByURI <- Flow.stream("followers-by-uri") {
 
       /* This little definition has two parts. The first,
-       * `coast.source(Followers)`, subscribes us to the `followers` stream we
-       * defined above. This gives us a `Stream[UserID, FollowerID]` -- it's an
-       * ongoing stream of events, and the types match up with the types we
-       * defined for `Followers` above.
+       * `Flow.source(Followers)`, subscribes us to the `followers` stream we
+       * defined above. This gives us a `GroupedStream[UserID, FollowerID]` --
+       * it's an ongoing stream of events, and the types match up with the types
+       * we defined for `Followers` above.
        *
-       * The second part has the form `.fold(initial)(update function)`. This
-       * accumulates all the followers for a given user into a single set. The
-       * return type here is `Pool[UserID, Set[FollowerID]]`. A `Pool` is like a
+       * The second part has the form `.fold(initial)(update function)`. Here, it
+       * accumulates all the followers for a given user into a single set: the
+       * return type here is `GroupedPool[UserID, Set[FollowerID]]`. A pool is like a
        * stream with a current value for each key; or, if you prefer, like a
        * table with a changelog stream. In this case, calculating the current
        * value requires keeping state; `coast` will take care of this,
        * serializing it when necessary using the formatters we defined above.
        *
-       * Streams and pools are `coast`'s two abstractions for streaming data;
+       * Streams and pools are `coast`'s two main abstractions for streaming data;
        * all transformations and joins we do below result in one of these two
        * types.
        */
 
       val followersByUser =
-        Flow.source(Followers).fold(Set.empty[FollowerID]) { _ + _ }
+        Flow.source(Followers)
+          .fold(Set.empty[FollowerID]) { _ + _ }
 
       /* This defines a stream that extracts URIs from tweets. If a tweet
        * contains multiple URIs, we'll get multiple events in the stream.
@@ -127,11 +119,12 @@ object TwitterReach extends ExampleMain {
        * URI validation code.
        */
 
-      val tweetedLinks = Flow.source(Tweets)
-        .flatMap { _.split("\\s+") }
-        .filter { _.startsWith("http") }
-        .map { maybeURI => Try(new URI(maybeURI)).toOption }
-        .flattenOption
+      val tweetedLinks =
+        Flow.source(Tweets)
+          .flatMap { _.split("\\s+") }
+          .filter { _.startsWith("http") }
+          .map { maybeURI => Try(new URI(maybeURI)).toOption }
+          .flattenOption
 
       /* After that, we join the two together to make a new stream, then regroup
        * by key. Each of these steps could probably use a little more explanation.
@@ -189,8 +182,8 @@ object TwitterReach extends ExampleMain {
    * If you have this code checked out, you can run this code with the `dot`
    * argument to print the job in graphviz format; you'll see the two main
    * stages, plus the structure inside each stage that defines the dataflow.
-   * Otherwise -- if you create Kafka topics with the right names and data
-   * formats, this would be ready to run on the cluster.
+   * Otherwise, if you create the Kafka topics with the right names,
+   * this code is ready to run on the cluster.
    */
 
 }
