@@ -54,7 +54,7 @@ object EntityResolution extends ExampleMain {
       } yield {
 
         scoped
-          .withKeys.aggregate(Set.empty[Product]) { key => (set, next) =>
+          .aggregate(Set.empty[Product]) { (set, next) =>
 
             @tailrec
             def doMerge(set: Set[Product], next: Product): (Set[Product], Seq[Product]) = {
