@@ -96,9 +96,9 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
 
   def join[B0](pool: Pool[A, B0])(
     implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], b0Format: BinaryFormat[B0]
-  ): Stream[A, B -> B0] = {
+  ): Stream[A, (B, B0)] = {
 
-    merge("stream" -> pool.updates.map(Left(_)), "pool" -> isGrouped.stream(this.stream).map(Right(_)))
+    Flow.merge("stream" -> pool.updates.map(Left(_)), "pool" -> isGrouped.stream(this.stream).map(Right(_)))
       .aggregate(pool.initial) { (state: B0, msg: Either[B0, B]) =>
         msg match {
           case Left(newState) => newState -> Seq.empty

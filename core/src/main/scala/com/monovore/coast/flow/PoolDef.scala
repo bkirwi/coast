@@ -25,7 +25,7 @@ class PoolDef[+G <: AnyGrouping, A, +B](
     implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], pairFormat: BinaryFormat[(B0, B1)]
   ): PoolDef[Grouped, A, (B0, B1)] = {
 
-    val merged = merge(
+    val merged = Flow.merge(
       "left" -> isGrouped.pool(this).updates.map(Left(_)),
       "right" -> other.updates.map(Right(_))
     )

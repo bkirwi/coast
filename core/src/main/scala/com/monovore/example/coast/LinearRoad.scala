@@ -2,7 +2,7 @@ package com.monovore.example.coast
 
 import com.monovore.coast
 import com.monovore.coast.flow
-import com.monovore.coast.flow.Topic
+import com.monovore.coast.flow.{Flow, Topic}
 import com.monovore.coast.model.Graph
 import com.twitter.algebird.{Monoid, AveragedValue}
 
@@ -36,11 +36,11 @@ object LinearRoad extends ExampleMain {
 
   val graph: Graph = for {
 
-    vehicleSpeeds <- flow.stream("reports-by-position") {
-      flow.source(PositionReports).invert
+    vehicleSpeeds <- Flow.stream("reports-by-position") {
+      Flow.source(PositionReports).invert
     }
 
-    tolls <- flow.stream("summaries") {
+    tolls <- Flow.stream("summaries") {
 
       vehicleSpeeds
         .map { case (vehicle, speed) => Summary(Set(vehicle), AveragedValue(speed)) }
@@ -57,7 +57,7 @@ object LinearRoad extends ExampleMain {
         .invert
     }
 
-    _ <- flow.sink(TotalTolls) {
+    _ <- Flow.sink(TotalTolls) {
 
       tolls
         .fold(Map.empty[PlaceAndTime, Double]) { _ + _ }

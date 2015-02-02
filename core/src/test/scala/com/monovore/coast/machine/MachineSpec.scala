@@ -3,7 +3,7 @@ package machine
 
 import com.monovore.coast
 import coast.flow
-import com.monovore.coast.flow.Topic
+import com.monovore.coast.flow.{Flow, Topic}
 import com.monovore.coast.model.Graph
 
 import com.twitter.algebird.Semigroup
@@ -28,8 +28,8 @@ class MachineSpec extends Specification with ScalaCheck {
 
       val doubled = Topic[String, Int]("doubled")
 
-      val graph = flow.stream("doubled") {
-        flow.source(integers).map { _ * 2 }
+      val graph = Flow.stream("doubled") {
+        Flow.source(integers).map { _ * 2 }
       }
 
       val input = Messages.from(integers, Map(
@@ -50,8 +50,8 @@ class MachineSpec extends Specification with ScalaCheck {
 
       "pool" in {
 
-        val graph = flow.sink(output) {
-          flow.source(integers).fold(0) { _ + _ }.updates
+        val graph = Flow.sink(output) {
+          Flow.source(integers).fold(0) { _ + _ }.updates
         }
 
         prop { input: Map[String, Seq[Int]] =>
@@ -72,11 +72,11 @@ class MachineSpec extends Specification with ScalaCheck {
 
         val integers2 = Topic[String, Int]("integers-2")
 
-        val graph = flow.sink(output) {
+        val graph = Flow.sink(output) {
 
-          flow.merge(
-            "ints" -> flow.source(integers),
-            "more" -> flow.source(integers2)
+          Flow.merge(
+            "ints" -> Flow.source(integers),
+            "more" -> Flow.source(integers2)
           )
         }
 
@@ -100,11 +100,11 @@ class MachineSpec extends Specification with ScalaCheck {
 
         val graph = for {
 
-          grouped <- flow.stream("grouped") {
-            flow.source(integers).groupBy { n => (n % 2 == 0).toString}
+          grouped <- Flow.stream("grouped") {
+            Flow.source(integers).groupBy { n => (n % 2 == 0).toString}
           }
 
-          _ <- flow.sink(output) { grouped }
+          _ <- Flow.sink(output) { grouped }
         } yield ()
 
         prop { input: Map[String, Seq[Int]] =>
@@ -127,8 +127,8 @@ class MachineSpec extends Specification with ScalaCheck {
 
       "x.map(identity) === x" in {
 
-        val original = flow.sink(output) { flow.source(integers) }
-        val mapped = flow.sink(output) { flow.source(integers).map(identity) }
+        val original = Flow.sink(output) { Flow.source(integers) }
+        val mapped = Flow.sink(output) { Flow.source(integers).map(identity) }
 
         prop { (pairs: Map[String, Seq[Int]]) =>
 
@@ -142,8 +142,8 @@ class MachineSpec extends Specification with ScalaCheck {
         val f: (Int => Int) = { _ * 2 }
         val g: (Int => Int) = { _ + 6 }
 
-        val original = flow.sink(output) { flow.source(integers).map(f andThen g) }
-        val mapped = flow.sink(output) { flow.source(integers).map(f).map(g) }
+        val original = Flow.sink(output) { Flow.source(integers).map(f andThen g) }
+        val mapped = Flow.sink(output) { Flow.source(integers).map(f).map(g) }
 
         prop { (pairs: Map[String, Seq[Int]]) =>
 
@@ -156,8 +156,8 @@ class MachineSpec extends Specification with ScalaCheck {
         val f: (Int => Seq[Int]) = { x => Seq(x, x) }
         val g: (Int => Seq[Int]) = { x => Seq(x + 6) }
 
-        val nested = flow.sink(output) { flow.source(integers).flatMap(f andThen { _.flatMap(g) }) }
-        val chained = flow.sink(output) { flow.source(integers).flatMap(f).flatMap(g) }
+        val nested = Flow.sink(output) { Flow.source(integers).flatMap(f andThen { _.flatMap(g) }) }
+        val chained = Flow.sink(output) { Flow.source(integers).flatMap(f).flatMap(g) }
 
         prop { (pairs: Map[String, Seq[Int]]) =>
 
@@ -167,8 +167,8 @@ class MachineSpec extends Specification with ScalaCheck {
 
       "stream.flatMap(lift) === stream" in {
 
-        val noop = flow.sink(output) { flow.source(integers) }
-        val mapped = flow.sink(output) { flow.source(integers).flatMap { x => List(x) } }
+        val noop = Flow.sink(output) { Flow.source(integers) }
+        val mapped = Flow.sink(output) { Flow.source(integers).flatMap { x => List(x) } }
 
         prop { (pairs: Map[String, Seq[Int]]) =>
 
@@ -178,10 +178,10 @@ class MachineSpec extends Specification with ScalaCheck {
 
       "pool.map(identity) === pool" in {
 
-        val pool = flow.source(integers).latestOr(0)
+        val pool = Flow.source(integers).latestOr(0)
 
-        val original = flow.sink(output) { pool.updates }
-        val mapped = flow.sink(output) { pool.map(identity).updates }
+        val original = Flow.sink(output) { pool.updates }
+        val mapped = Flow.sink(output) { pool.map(identity).updates }
 
         prop { (pairs: Map[String, Seq[Int]]) =>
 
@@ -195,10 +195,10 @@ class MachineSpec extends Specification with ScalaCheck {
         val f: (Int => Int) = { _ * 2 }
         val g: (Int => Int) = { _ + 6 }
 
-        val pool = flow.source(integers).latestOr(0)
+        val pool = Flow.source(integers).latestOr(0)
 
-        val original = flow.sink(output) { pool.map(f andThen g).updates }
-        val mapped = flow.sink(output) { pool.map(f).map(g).updates }
+        val original = Flow.sink(output) { pool.map(f andThen g).updates }
+        val mapped = Flow.sink(output) { pool.map(f).map(g).updates }
 
         prop { (pairs: Map[String, Seq[Int]]) =>
 

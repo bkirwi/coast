@@ -58,20 +58,20 @@ hello-samza project][hello-coast].
 ## Mandatory Word Count Example
 
 ```scala
-val Sentences = flow.Name[Source, String]("sentences")
+val Sentences = Topic[Source, String]("sentences")
 
-val WordCounts = flow.Name[String, Int]("word-counts")
+val WordCounts = Topic[String, Int]("word-counts")
 
 val graph = for {
 
-  words <- flow.stream("words") {
-    flow.source(Sentences)
+  words <- Flow.stream("words") {
+    Flow.source(Sentences)
       .flatMap { _.split("\\s+") }
       .map { _ -> 1 }
       .groupByKey
   }
 
-  _ <- flow.sink(WordCounts) {
+  _ <- Flow.sink(WordCounts) {
     words.sum.updates
   }
 } yield ()

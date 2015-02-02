@@ -2,7 +2,7 @@ package com.monovore.example.coast
 
 import com.monovore.coast
 import com.monovore.coast.flow
-import com.monovore.coast.flow.Topic
+import com.monovore.coast.flow.{Flow, Topic}
 
 import scala.annotation.tailrec
 
@@ -43,12 +43,12 @@ object EntityResolution extends ExampleMain {
 
   val graph = for {
 
-    allProducts <- flow.cycle[Category, Product]("all-products-merged") { allProducts =>
+    allProducts <- Flow.cycle[Category, Product]("all-products-merged") { allProducts =>
 
       for {
-        scoped <- flow.stream("scoped-products") {
-          flow.merge(
-            "all" -> groupByScope(flow.source(RawProducts)),
+        scoped <- Flow.stream("scoped-products") {
+          Flow.merge(
+            "all" -> groupByScope(Flow.source(RawProducts)),
             "raw" -> groupByScope(allProducts)
           )
         }
@@ -78,6 +78,6 @@ object EntityResolution extends ExampleMain {
     }
 
 
-    _ <- flow.sink(AllProducts) { allProducts }
+    _ <- Flow.sink(AllProducts) { allProducts }
   } yield ()
 }
