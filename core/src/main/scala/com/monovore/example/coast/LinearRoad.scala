@@ -1,7 +1,6 @@
 package com.monovore.example.coast
 
 import com.monovore.coast
-import com.monovore.coast.flow
 import com.monovore.coast.flow.{Flow, Topic}
 import com.monovore.coast.model.Graph
 import com.twitter.algebird.{Monoid, AveragedValue}
