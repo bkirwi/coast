@@ -47,7 +47,7 @@ class EntityResolutionSpec extends Specification with ScalaCheck {
       }
     }
 
-    "monotonically increase" in {
+    "merge all mergeable products" in {
 
       propNoShrink { products: Map[Int, Seq[Product]] =>
 
@@ -63,6 +63,32 @@ class EntityResolutionSpec extends Specification with ScalaCheck {
               .forall { case (head, tail) =>
                 tail.forall { x => !matches(head, x) || merge(head, x) == x }
               }
+          }
+        }
+      }
+    }
+
+    "not throw away any information" in {
+
+      propNoShrink { products: Map[Int, Seq[Product]] =>
+
+        val machine =
+          Machine.compile(graph)
+            .push(Messages.from(RawProducts, products))
+
+        Prop.forAll(Sample.complete(machine)) { output =>
+
+          val inputProducts: Seq[Product] = products.values.flatten.toSeq
+
+          val allProducts = output(AllProducts)
+
+          forall(inputProducts) { product =>
+
+            product.categories forall { category =>
+              allProducts(category) exists { other =>
+                matches(product, other) && merge(product, other) == other
+              }
+            }
           }
         }
       }
