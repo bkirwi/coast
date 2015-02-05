@@ -82,7 +82,7 @@ object TwitterReach extends ExampleMain {
      * a name to the stream -- in the Samza backend, for example, this
      * is the name of both the output Kafka topic and the Samza job that
      * produces it. On the left, we bind the output to a variable, so we can use
-     * it as an input to other jobs. On the right, we're opening a block: this
+     * it as an input to other stages. On the right, we're opening a block: this
      * holds the 'definition' of the stream.
      */
 
@@ -130,8 +130,8 @@ object TwitterReach extends ExampleMain {
        * by key. Each of these steps could probably use a little more explanation.
        *
        * Recall that tweetedLinks is a stream, and followersByUser is a pool.
-       * When we join the two, it returns the type Stream[UserID, (URI,
-       * Set[FollowerID)]. It's handy to think of the 'stream-pool join' as a
+       * When we join the two, it returns the type `GroupedStream[UserID, (URI,
+       * Set[FollowerID])]`. It's handy to think of the 'stream-pool join' as a
        * 'lookup' operation: every time there's a new event, we look up the
        * current state for the matching key and pair the event and state
        * together. In our case, we have both the link and all of the user's
