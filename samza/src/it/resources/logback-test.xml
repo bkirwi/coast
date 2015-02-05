@@ -14,11 +14,11 @@
 
     <!--<logger name="com.monovore.integration.coast" level="TRACE"/>-->
 
-    <logger name="org.apache.samza" level="INFO"/>
+    <!--<logger name="org.apache.samza" level="INFO"/>-->
 
-    <logger name="com.monovore.coast.samza" level="DEBUG"/>
+    <!--<logger name="com.monovore.coast.samza" level="DEBUG"/>-->
 
-    <root level="WARN">
+    <root level="ERROR">
         <appender-ref ref="STDOUT" />
     </root>
 </configuration>
