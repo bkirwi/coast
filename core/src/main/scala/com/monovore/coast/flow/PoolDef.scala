@@ -14,7 +14,7 @@ class PoolDef[+G <: AnyGrouping, A, +B](
   def updatedPairs[B0 >: B](
     implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], valueFormat: BinaryFormat[B0]
   ): GroupedStream[A, (B0, B0)] =
-    updates.aggregate(initial: B0) { (last, current) =>
+    updates.transform(initial: B0) { (last, current) =>
       current -> Seq(last -> current)
     }
 

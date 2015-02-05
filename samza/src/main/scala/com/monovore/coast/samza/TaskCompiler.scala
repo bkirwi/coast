@@ -52,7 +52,7 @@ private[samza] class TaskCompiler(context: TaskCompiler.Context) {
     compile(trans.upstream, transformed, prefix)
   }
 
-  def compileAggregate[S, A, B, B0](trans: Aggregate[S, A, B0, B], sink: MessageSink[A, B], prefix: List[String]) = {
+  def compileStateTrans[S, A, B, B0](trans: StatefulTransform[S, A, B0, B], sink: MessageSink[A, B], prefix: List[String]) = {
 
     val transformed = new MessageSink[A, B0] with Logging {
 
@@ -124,7 +124,7 @@ private[samza] class TaskCompiler(context: TaskCompiler.Context) {
     ent match {
       case source @ Source(_) => compileSource(source, sink, prefix)
       case merge @ Merge(_) => compileMerge(merge, sink, prefix)
-      case trans @ Aggregate(_, _, _) => compileAggregate(trans, sink, prefix)
+      case trans @ StatefulTransform(_, _, _) => compileStateTrans(trans, sink, prefix)
       case pure @ PureTransform(_, _) => compilePure(pure, sink, prefix)
       case group @ GroupBy(_, _) => compileGroupBy(group, sink, prefix)
     }

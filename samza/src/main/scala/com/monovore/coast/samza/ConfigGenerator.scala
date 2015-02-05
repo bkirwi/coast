@@ -43,7 +43,7 @@ class SafeConfigGenerator(baseConfig: Config = new MapConfig()) extends ConfigGe
     case Merge(ups) => {
       ups.flatMap { case (branch, up) => storageFor(up, branch :: path)}
     }
-    case agg @ Aggregate(up, _, _) => {
+    case agg @ StatefulTransform(up, _, _) => {
       val upstreamed = storageFor(up, "aggregated" :: path)
       upstreamed :+ Storage(
         name = formatPath(path),

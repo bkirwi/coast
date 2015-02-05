@@ -13,10 +13,7 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
   def stream: StreamDef[G, A, B] = new StreamDef(element)
 
   def flatMap[B0](func: WithKey[B => Seq[B0]]): StreamDef[G, A, B0] = new StreamDef(
-    PureTransform[A, B, B0](self.element, {
-      context.unwrap(func) andThen { unkeyed =>
-        (b: B) => unkeyed(b) }
-    })
+    PureTransform[A, B, B0](self.element, context.unwrap(func))
   )
 
   def filter(func: WithKey[B => Boolean]): StreamDef[G, A, B] = flatMap {
@@ -26,15 +23,13 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
   }
 
   def map[B0](func: WithKey[B => B0]): StreamDef[G, A, B0] =
-    flatMap(context.map(func) { func => func andThen { b => Seq(b)} })
+    flatMap(context.map(func) { func => func andThen { b => Seq(b) } })
 
-  def aggregate[S, B0](init: S)(func: WithKey[(S, B) => (S, Seq[B0])])(
+  def transform[S, B0](init: S)(func: WithKey[(S, B) => (S, Seq[B0])])(
     implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], stateFormat: BinaryFormat[S]
   ): GroupedStream[A, B0] = {
 
-    val keyedFunc = context.unwrap(func)
-
-    new StreamDef(Aggregate[S, A, B, B0](self.element, init, keyedFunc))
+    new StreamDef(StatefulTransform[S, A, B, B0](self.element, init, context.unwrap(func)))
   }
 
   def fold[B0](init: B0)(func: WithKey[(B0, B) => B0])(
@@ -43,9 +38,9 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
 
     val transformer = context.map(func) { fn =>
 
-      (s: B0, b: B) => {
-        val b0 = fn(s, b)
-        b0 -> Seq(b0)
+      (state: B0, next: B) => {
+        val newState = fn(state, next)
+        newState -> Seq(newState)
       }
     }
 
@@ -58,7 +53,7 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
 
     require(size > 0, "Expected a positive group size")
 
-    stream.aggregate(Vector.empty[B0]: Seq[B0]) { (buffer, next) =>
+    stream.transform(Vector.empty[B0]: Seq[B0]) { (buffer, next) =>
 
       if (buffer.size >= size) Vector.empty[B0] -> Seq(buffer)
       else (buffer :+ (next: B0)) -> Seq.empty[Seq[B0]]
@@ -98,8 +93,8 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
     implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], b0Format: BinaryFormat[B0]
   ): GroupedStream[A, (B, B0)] = {
 
-    Flow.merge("stream" -> pool.updates.map(Left(_)), "pool" -> isGrouped.stream(this.stream).map(Right(_)))
-      .aggregate(pool.initial) { (state: B0, msg: Either[B0, B]) =>
+    Flow.merge("stream" -> isGrouped.stream(this.stream).map(Right(_)), "pool" -> pool.updates.map(Left(_)))
+      .transform(pool.initial) { (state: B0, msg: Either[B0, B]) =>
         msg match {
           case Left(newState) => newState -> Seq.empty
           case Right(msg) => state -> Seq(msg -> state)

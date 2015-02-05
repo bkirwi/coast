@@ -6,17 +6,19 @@ import com.monovore.coast.flow.{AnyStream, Flow, Topic}
 import scala.annotation.tailrec
 
 object EntityResolution extends ExampleMain {
-  
+
   import coast.wire.ugly._
 
   type SourceID = Int
+
   case class Name(name: String)
+
   case class Category(categoryName: String)
 
   implicit val categoryOrdering: Ordering[Category] = Ordering.by { _.categoryName }
 
   case class Product(names: Set[Name], minPrice: Int, categories: Set[Category])
-  
+
   def scope(product: Product): Seq[Category] =
     product.categories.toSeq.sorted
 
@@ -35,6 +37,11 @@ object EntityResolution extends ExampleMain {
 
   val AllProducts = Topic[Category, Product]("all-products")
 
+  def groupByScope[A](stream: AnyStream[A, Product]) =
+    stream
+      .flatMap { e => scope(e).map { _ -> e } }
+      .groupByKey
+
   val graph = for {
 
     allProducts <- Flow.cycle[Category, Product]("all-products-merged") { allProducts =>
@@ -42,11 +49,6 @@ object EntityResolution extends ExampleMain {
       for {
 
         scoped <- Flow.stream("scoped-products") {
-
-          def groupByScope[A](stream: AnyStream[A, Product]) =
-            stream
-              .flatMap { e => scope(e).map { _ -> e }}
-              .groupByKey
 
           Flow.merge(
             "all" -> groupByScope(Flow.source(RawProducts)),
@@ -56,7 +58,7 @@ object EntityResolution extends ExampleMain {
       } yield {
 
         scoped
-          .aggregate(Set.empty[Product]) { (set, next) =>
+          .transform(Set.empty[Product]) { (set, next) =>
 
             @tailrec
             def mergeAll(set: Set[Product], next: Product): (Set[Product], Option[Product]) = {
@@ -73,6 +75,7 @@ object EntityResolution extends ExampleMain {
             }
 
             val (newSet, output) = mergeAll(set, next)
+
             newSet -> output.toSeq
           }
       }

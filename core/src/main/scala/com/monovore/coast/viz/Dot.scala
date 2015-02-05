@@ -36,7 +36,7 @@ object Dot {
         val id = newID("transform")
         sources(id, upstream) ++ Seq(Edge(id, downstream))
       }
-      case Aggregate(upstream, _, _) => {
+      case StatefulTransform(upstream, _, _) => {
         val id = newID("aggregate")
         sources(id, upstream) ++ Seq(Edge(id, downstream))
       }

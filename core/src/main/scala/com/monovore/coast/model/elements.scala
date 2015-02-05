@@ -12,7 +12,7 @@ case class Source[A, B](
   val valueFormat: BinaryFormat[B]
 ) extends Node[A, B]
 
-case class Aggregate[S, A, B0, +B](
+case class StatefulTransform[S, A, B0, +B](
   upstream: Node[A, B0],
   init: S,
   transformer: A => (S, B0) => (S, Seq[B])
@@ -48,7 +48,7 @@ object Transform {
     Some((t.upstream, t.init, t.transformer))
 
   def apply[S : BinaryFormat, A: BinaryFormat, B0, B](e: Node[A, B0], i: S, t: A => (S, B0) => (S, Seq[B])): Transform[S, A, B0, B] =
-    Aggregate(e, i, t)
+    StatefulTransform(e, i, t)
 }
 
 case class Merge[A, +B](upstreams: Seq[String -> Node[A, B]]) extends Node[A, B]
