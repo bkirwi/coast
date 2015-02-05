@@ -93,5 +93,32 @@ class EntityResolutionSpec extends Specification with ScalaCheck {
         }
       }
     }
+
+    "match the results of a simple swoosh run" in {
+
+      propNoShrink { products: Map[Int, Seq[Product]] =>
+
+        val machine =
+          Machine.compile(graph)
+          .push(Messages.from(RawProducts, products))
+
+        Prop.forAll(Sample.complete(machine)) { output =>
+
+          val swooshed = products.values.flatten
+            .foldLeft(Set.empty[Product]) { (set, next) =>
+              mergeAll(set, next)._1
+            }
+
+          val allProducts = output(AllProducts)
+
+          forall(swooshed) { product =>
+
+            product.categories forall { category =>
+              allProducts(category).contains(product)
+            }
+          }
+        }
+      }
+    }
   }
 }
