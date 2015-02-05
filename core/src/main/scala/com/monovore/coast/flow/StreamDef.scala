@@ -25,6 +25,11 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
   def map[B0](func: WithKey[B => B0]): StreamDef[G, A, B0] =
     flatMap(context.map(func) { func => func andThen { b => Seq(b) } })
 
+  def collect[B0](func: WithKey[PartialFunction[B,  B0]]): StreamDef[G, A, B0] =
+    flatMap(context.map(func) { func =>
+      { b => if (func.isDefinedAt(b)) Seq(func(b)) else Seq.empty }
+    })
+
   def transform[S, B0](init: S)(func: WithKey[(S, B) => (S, Seq[B0])])(
     implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], stateFormat: BinaryFormat[S]
   ): GroupedStream[A, B0] = {

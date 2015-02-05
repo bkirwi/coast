@@ -49,7 +49,7 @@ class EntityResolutionSpec extends Specification with ScalaCheck {
 
     "monotonically increase" in {
 
-      propNoShrink { products: Map[SourceID, Seq[Product]] =>
+      propNoShrink { products: Map[Int, Seq[Product]] =>
 
         val machine = Machine.compile(graph)
           .push(Messages.from(RawProducts, products))
