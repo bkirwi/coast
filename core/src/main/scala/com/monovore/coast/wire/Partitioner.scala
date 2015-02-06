@@ -7,7 +7,7 @@ import scala.annotation.implicitNotFound
 import scala.language.existentials
 
 /**
- * Hashes the value A to a partition in the range [0, numPartitions]. This is
+ * Hashes the value A to a partition in the range [0, numPartitions). This is
  * analogous to Kafka's partitioner class, but meant to be used as a typeclass.
  * This makes it easier to configure partitioning strategies per-topic, instead
  * of per-producer-instance.

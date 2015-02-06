@@ -40,7 +40,7 @@ pieces.
 Once you've defined a stream you like, you can give it a name and publish it
 back to Kafka; `coast` tracks the mapping between stream names and their
 definitions.  The `flow` package defines a rich Scala API for defining streams
-and composing them together to build up an acyclic dataflow graph. You can use
+and composing them together to build up a dataflow graph. You can use
 these graphs in multiple ways: `dot` prints the graph in GraphViz format;
 `machine` is a persistent in-memory implementation that's handy for unit
 testing; and the `samza` backend can compile the graph to multiple [Samza
