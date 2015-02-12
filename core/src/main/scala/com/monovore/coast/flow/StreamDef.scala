@@ -3,7 +3,7 @@ package flow
 
 import com.monovore.coast.model._
 import com.monovore.coast.wire.BinaryFormat
-import com.twitter.algebird.Monoid
+import com.twitter.algebird.{Monoid, MonoidAggregator}
 
 class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
   private[coast] val context: Context[A, WithKey],
@@ -49,7 +49,19 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
       }
     }
 
-    new PoolDef(init, Transform(self.element, init, context.unwrap(transformer)))
+    this.transform(init)(transformer).latestOr(init)
+  }
+
+  def aggregate[S, B0](aggregator: MonoidAggregator[B, S, B0])(
+    implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], stateFormat: BinaryFormat[S]
+  ): GroupedPool[A, B0] = {
+
+    implicit val stateMonoid = aggregator.monoid
+
+    this.stream
+      .map(aggregator.prepare)
+      .sum
+      .map(aggregator.present)
   }
 
   def grouped[B0 >: B](size: Int)(
