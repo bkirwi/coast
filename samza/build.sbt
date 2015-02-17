@@ -9,7 +9,7 @@ libraryDependencies ++= Seq(
   samzaDep("samza-kv"),
   "ch.qos.logback" % "logback-classic" % "1.1.2",
   // TODO: integration tests only
-  samzaDep("samza-kv-inmemory"),
+  samzaDep("samza-kv-inmemory") exclude ("com.google.guava", "guava"),
   samzaDep("samza-kafka"),
   "org.apache.kafka" %% "kafka" % "0.8.1.1" classifier "test" exclude("javax.jms", "jms") exclude("com.sun.jdmk", "jmxtools") exclude("com.sun.jmx", "jmxri"),
   "org.specs2" %% "specs2" % "2.4.15" % "it",
