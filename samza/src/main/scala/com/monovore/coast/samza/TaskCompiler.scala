@@ -16,9 +16,9 @@ private[samza] class TaskCompiler(context: TaskCompiler.Context) {
 
   import MessageSink.{Bytes, ByteSink}
 
-  def compileSource[A, B](source: Source[A, B], sink: MessageSink[A, B], prefix: List[String]) = {
+  def compileSource[A, B](source: Source[A, B], sink: MessageSink[A, B], prefix: Path) = {
 
-    val store = context.getSource(formatPath(prefix))
+    val store = context.getSource(prefix.toString)
 
     store.downstream -> new MessageSink[Bytes, Bytes] with Logging {
 
@@ -38,7 +38,7 @@ private[samza] class TaskCompiler(context: TaskCompiler.Context) {
     }
   }
 
-  def compilePure[A, B, B0](trans: PureTransform[A, B0, B], sink: MessageSink[A, B], prefix: List[String]) = {
+  def compilePure[A, B, B0](trans: PureTransform[A, B0, B], sink: MessageSink[A, B], prefix: Path) = {
 
     val transformed = new MessageSink[A, B0] {
 
@@ -52,11 +52,11 @@ private[samza] class TaskCompiler(context: TaskCompiler.Context) {
     compile(trans.upstream, transformed, prefix)
   }
 
-  def compileStateTrans[S, A, B, B0](trans: StatefulTransform[S, A, B0, B], sink: MessageSink[A, B], prefix: List[String]) = {
+  def compileStateTrans[S, A, B, B0](trans: StatefulTransform[S, A, B0, B], sink: MessageSink[A, B], prefix: Path) = {
 
     val transformed = new MessageSink[A, B0] with Logging {
 
-      val store = context.getStore[Int, A, S](samza.formatPath(prefix), trans.init)
+      val store = context.getStore[Int, A, S](prefix.toString, trans.init)
 
       override def execute(stream: String, partition: Int, offset: Long, key: A, value: B0): Long = {
 
@@ -73,10 +73,10 @@ private[samza] class TaskCompiler(context: TaskCompiler.Context) {
       }
     }
 
-    compile(trans.upstream, transformed, "aggregated" :: prefix)
+    compile(trans.upstream, transformed, prefix.next)
   }
 
-  def compileGroupBy[A, B, A0](gb: GroupBy[A, B, A0], sink: MessageSink[A, B], prefix: List[String]) = {
+  def compileGroupBy[A, B, A0](gb: GroupBy[A, B, A0], sink: MessageSink[A, B], prefix: Path) = {
 
     val task = new MessageSink[A0, B] {
 
@@ -89,7 +89,7 @@ private[samza] class TaskCompiler(context: TaskCompiler.Context) {
     compile(gb.upstream, task, prefix)
   }
 
-  def compileMerge[A, B](merge: Merge[A, B], sink: MessageSink[A, B], prefix: List[String]) = {
+  def compileMerge[A, B](merge: Merge[A, B], sink: MessageSink[A, B], prefix: Path) = {
 
     var maxOffset: Long = 0L
 
@@ -103,7 +103,7 @@ private[samza] class TaskCompiler(context: TaskCompiler.Context) {
     }
 
     val (offsets, upstreamSinks) = merge.upstreams
-      .map { case (name, up) => compile(up, downstreamSink, name :: prefix) }
+      .map { case (name, up) => compile(up, downstreamSink, prefix / name) }
       .unzip
 
     maxOffset = offsets.max
@@ -119,7 +119,7 @@ private[samza] class TaskCompiler(context: TaskCompiler.Context) {
     }
   }
 
-  def compile[A, B](ent: Node[A, B], sink: MessageSink[A, B], prefix: List[String]): Long -> ByteSink = {
+  def compile[A, B](ent: Node[A, B], sink: MessageSink[A, B], prefix: Path): Long -> ByteSink = {
 
     ent match {
       case source @ Source(_) => compileSource(source, sink, prefix)
@@ -147,7 +147,7 @@ private[samza] class TaskCompiler(context: TaskCompiler.Context) {
       }
     }
 
-    val (_, compiledNode) = compile(sink.element, formatted, name :: Nil)
+    val (_, compiledNode) = compile(sink.element, formatted, Path(name))
 
     compiledNode
   }

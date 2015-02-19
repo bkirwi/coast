@@ -27,7 +27,6 @@ object Safe extends (Config => ConfigGenerator) {
         .filter { _.nonEmpty }
         .toSet
 
-      // Left(size) if the stream is regrouped, Right(offset) if it isn't
       val (numPartitions, offsetThreshold) = {
 
         val systemFactory = config.getNewInstance[SystemFactory](s"systems.$CoastSystem.samza.factory")

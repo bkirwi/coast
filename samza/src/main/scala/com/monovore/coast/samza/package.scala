@@ -15,10 +15,5 @@ package object samza {
 
   val CoastSystem = "coast-system"
 
-  private[samza] def formatPath(path: List[String]): String = {
-    if (path.isEmpty) "."
-    else path.reverse.mkString(".")
-  }
-
   def config(pairs: (String -> String)*): Config = new MapConfig(pairs.toMap.asJava)
 }

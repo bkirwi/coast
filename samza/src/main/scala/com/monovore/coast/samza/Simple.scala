@@ -16,16 +16,16 @@ object Simple extends (Config => ConfigGenerator) {
 
     import com.monovore.coast.samza.ConfigGenerator._
 
-    def storageFor[A, B](element: Node[A, B], path: List[String]): Seq[Storage] = element match {
+    def storageFor[A, B](element: Node[A, B], path: Path): Seq[Storage] = element match {
       case Source(_) => Seq()
       case PureTransform(up, _) => storageFor(up, path)
       case Merge(ups) => {
-        ups.flatMap { case (branch, up) => storageFor(up, branch :: path)}
+        ups.flatMap { case (branch, up) => storageFor(up, path / branch)}
       }
       case agg @ StatefulTransform(up, _, _) => {
-        val upstreamed = storageFor(up, "aggregated" :: path)
+        val upstreamed = storageFor(up, path.next)
         upstreamed :+ Storage(
-          name = formatPath(path),
+          name = path,
           keyString = SerializationUtil.toBase64(agg.keyFormat),
           valueString = SerializationUtil.toBase64(agg.stateFormat)
         )
@@ -41,7 +41,7 @@ object Simple extends (Config => ConfigGenerator) {
 
         val inputs = sourcesFor(sink.element).map { i => s"$CoastSystem.$i" }
 
-        val storage = storageFor(sink.element, List(name))
+        val storage = storageFor(sink.element, Path(name))
 
         val factory: MessageSink.Factory = new Simple.SinkFactory(sink)
 

@@ -26,27 +26,27 @@ object ConfigGenerator {
     case GroupBy(up, _) => sourcesFor(up)
   }
 
-  case class Storage(name: String, keyString: String, valueString: String)
+  case class Storage(name: Path, keyString: String, valueString: String)
 }
 
 class SafeConfigGenerator(baseConfig: Config = new MapConfig()) extends ConfigGenerator {
 
   import ConfigGenerator._
 
-  private[this] def storageFor[A, B](element: Node[A, B], path: List[String]): Seq[Storage] = element match {
+  private[this] def storageFor[A, B](element: Node[A, B], path: Path): Seq[Storage] = element match {
     case Source(_) => Seq(Storage( // SAFE
-      name = formatPath(path),
+      name = path,
       keyString = SerializationUtil.toBase64(wire.pretty.UnitFormat),
       valueString = SerializationUtil.toBase64(wire.pretty.UnitFormat)
     ))
     case PureTransform(up, _) => storageFor(up, path)
     case Merge(ups) => {
-      ups.flatMap { case (branch, up) => storageFor(up, branch :: path)}
+      ups.flatMap { case (branch, up) => storageFor(up, path / branch)}
     }
     case agg @ StatefulTransform(up, _, _) => {
-      val upstreamed = storageFor(up, "aggregated" :: path)
+      val upstreamed = storageFor(up, path.next)
       upstreamed :+ Storage(
-        name = formatPath(path),
+        name = path,
         keyString = SerializationUtil.toBase64(agg.keyFormat),
         valueString = SerializationUtil.toBase64(agg.stateFormat)
       )
@@ -69,11 +69,11 @@ class SafeConfigGenerator(baseConfig: Config = new MapConfig()) extends ConfigGe
       val inputs = (sourcesFor(sink.element) + s"coast.merge.$name")
         .map { i => s"$CoastSystem.$i" }
 
-      val storage = storageFor(sink.element, List(name))
+      val storage = storageFor(sink.element, Path(name))
 
       // SAFE ???
       val streamDelays = storage
-        .map { case Storage(s, _, _) => s -> (s.count { _ == '.'} + 1) }
+        .map { case Storage(s, _, _) => s -> (s.branches.size + 1) }
 
       val factory: MessageSink.Factory = new Safe.SinkFactory(sink)
 
