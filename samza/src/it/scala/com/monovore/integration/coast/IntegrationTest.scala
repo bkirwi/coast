@@ -107,6 +107,9 @@ object IntegrationTest {
         val baseConfig = coast.samza.config(
           // toy-problem config
           "task.commit.ms" -> "300",
+
+          "task.checkpoint.factory" -> "org.apache.samza.checkpoint.kafka.KafkaCheckpointManagerFactory",
+          "task.checkpoint.system" -> "coast-system",
           "task.checkpoint.replication.factor" -> "1",
           // overridden in safe config generator
           "systems.coast-system.samza.factory" -> "org.apache.samza.system.kafka.KafkaSystemFactory",

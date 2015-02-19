@@ -146,7 +146,7 @@ class CoastKafkaSystemFactory extends SystemFactory with Logging {
 
     require(producerConfig.messageSendMaxRetries == 0, "messages can be duplicated or reordered with retries")
 
-    require(producerConfig.requestRequiredAcks > 0, "not requiring acks makes failures invisible")
+    require(producerConfig.requestRequiredAcks != 0, "not requiring acks makes failures invisible")
 
     val producer = new KafkaProducer[Array[Byte], Array[Byte]](producerConfig)
 
@@ -157,7 +157,7 @@ class CoastKafkaSystemFactory extends SystemFactory with Logging {
         .toMap
         .withDefaultValue(0)
 
-    info(s"Configuring coast kafka system with delays: $delays")
+    info(s"Configuring coast kafka producer with delays: $delays")
 
     new CoastKafkaSystem.Producer(producer, delayForStream = delays)
   }

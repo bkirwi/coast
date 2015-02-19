@@ -3,7 +3,7 @@ package samza
 
 import com.monovore.coast.model._
 
-import org.apache.samza.config.{MapConfig, Config}
+import org.apache.samza.config.{TaskConfig, JobConfig, MapConfig, Config}
 import collection.JavaConverters._
 
 trait ConfigGenerator {
@@ -95,11 +95,11 @@ class SafeConfigGenerator(baseConfig: Config = new MapConfig()) extends ConfigGe
       val configMap = Map(
 
         // Job
-        "job.name" -> name,
+        JobConfig.JOB_NAME -> name,
 
         // Task
-        "task.class" -> "com.monovore.coast.samza.CoastTask",
-        "task.inputs" -> inputs.mkString(","),
+        TaskConfig.TASK_CLASS -> "com.monovore.coast.samza.CoastTask",
+        TaskConfig.INPUT_STREAMS -> inputs.mkString(","),
 
         // TODO: checkpoints should be configurable
         "task.checkpoint.factory" -> "org.apache.samza.checkpoint.kafka.KafkaCheckpointManagerFactory",
@@ -107,7 +107,7 @@ class SafeConfigGenerator(baseConfig: Config = new MapConfig()) extends ConfigGe
 
         // Kafka system
         s"systems.$CoastSystem.samza.offset.default" -> "oldest",
-        s"systems.$CoastSystem.producer.producer.type" -> "sync",           // SAFE
+        s"systems.$CoastSystem.producer.producer.type" -> "sync",
         s"systems.$CoastSystem.producer.message.send.max.retries" -> "0",
         s"systems.$CoastSystem.producer.request.required.acks" -> "1",
         s"systems.$CoastSystem.samza.factory" -> "com.monovore.coast.samza.CoastKafkaSystemFactory",
@@ -116,7 +116,7 @@ class SafeConfigGenerator(baseConfig: Config = new MapConfig()) extends ConfigGe
         // Coast-specific
         TaskKey -> SerializationUtil.toBase64(factory),
         TaskName -> name,
-        RegroupedStreams -> regrouped.mkString(",")   // SAFE ???
+        RegroupedStreams -> regrouped.mkString(",")
       )
 
       val storageMap = storage

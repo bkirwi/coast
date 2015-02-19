@@ -4,7 +4,7 @@ package samza
 import com.monovore.coast.model._
 import com.monovore.coast.samza.MessageSink.ByteSink
 import org.apache.samza.Partition
-import org.apache.samza.config.{Config, MapConfig}
+import org.apache.samza.config.{TaskConfig, JobConfig, Config, MapConfig}
 import org.apache.samza.system.SystemFactory
 import org.apache.samza.task.TaskContext
 
@@ -48,15 +48,11 @@ object Simple extends (Config => ConfigGenerator) {
         val configMap = Map(
 
           // Job
-          "job.name" -> name,
+          JobConfig.JOB_NAME -> name,
 
           // Task
-          "task.class" -> "com.monovore.coast.samza.CoastTask",
-          "task.inputs" -> inputs.mkString(","),
-
-          // TODO: checkpoints should be configurable
-          "task.checkpoint.factory" -> "org.apache.samza.checkpoint.kafka.KafkaCheckpointManagerFactory",
-          "task.checkpoint.system" -> "coast-system",
+          TaskConfig.TASK_CLASS -> "com.monovore.coast.samza.CoastTask",
+          TaskConfig.INPUT_STREAMS -> inputs.mkString(","),
 
           // Kafka system
           s"systems.$CoastSystem.samza.offset.default" -> "oldest",
