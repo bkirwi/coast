@@ -26,7 +26,22 @@ object ConfigGenerator {
     case GroupBy(up, _) => sourcesFor(up)
   }
 
-  case class Storage(name: Path, keyString: String, valueString: String)
+  case class Storage(name: Path, keyString: String, valueString: String) {
+
+    def serdeConfig: Map[String, String] = {
+
+      val keyName = s"coast-key-$name"
+      val msgName = s"coast-msg-$name"
+
+      Map(
+        s"stores.$name.key.serde" -> keyName,
+        s"stores.$name.msg.serde" -> msgName,
+        s"serializers.registry.$keyName.class" -> "com.monovore.coast.samza.CoastSerdeFactory",
+        s"serializers.registry.$keyName.serialized.base64" -> keyString,
+        s"serializers.registry.$msgName.class" -> "com.monovore.coast.samza.CoastSerdeFactory",
+        s"serializers.registry.$msgName.serialized.base64" -> valueString)
+    }
+  }
 }
 
 class SafeConfigGenerator(baseConfig: Config = new MapConfig()) extends ConfigGenerator {
@@ -105,22 +120,13 @@ class SafeConfigGenerator(baseConfig: Config = new MapConfig()) extends ConfigGe
       )
 
       val storageMap = storage
-        .map { case Storage(name, keyFormat, msgFormat) =>
+        .map { case storage @ Storage(name, keyFormat, msgFormat) =>
 
-          val keyName = s"coast-key-$name"
-          val msgName = s"coast-msg-$name"
-
-          Map(
+          storage.serdeConfig ++ Map(
+            s"stores.$name.coast.simple" -> "false",
             s"stores.$name.factory" -> "com.monovore.coast.samza.CoastStoreFactory",
             s"stores.$name.subfactory" -> "org.apache.samza.storage.kv.inmemory.InMemoryKeyValueStorageEngineFactory",
-            s"stores.$name.key.serde" -> keyName,
-            s"stores.$name.msg.serde" -> msgName,
-            s"stores.$name.changelog" -> s"$CoastSystem.coast.changelog.$name",
-            s"stores.$name.coast.simple" -> "false",
-            s"serializers.registry.$keyName.class" -> "com.monovore.coast.samza.CoastSerdeFactory",
-            s"serializers.registry.$keyName.serialized.base64" -> keyFormat,
-            s"serializers.registry.$msgName.class" -> "com.monovore.coast.samza.CoastSerdeFactory",
-            s"serializers.registry.$msgName.serialized.base64" -> msgFormat
+            s"stores.$name.changelog" -> s"$CoastSystem.coast.changelog.$name"
           )
         }
         .flatten.toMap
