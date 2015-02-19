@@ -1,15 +1,16 @@
 package com.monovore.integration.coast
 
 import java.nio.ByteBuffer
-import java.util
 import java.util.Properties
 
 import com.monovore.coast
+import com.monovore.coast.flow.Topic
 import com.monovore.coast.model.Graph
-import com.monovore.coast.samza.{SafeConfigGenerator, ConfigGenerator}
-import kafka.api.{PartitionFetchInfo, FetchRequest, TopicMetadataRequest, OffsetRequest}
-import kafka.common.{UnknownTopicOrPartitionException, TopicAndPartition}
-import kafka.consumer.{Consumer, ConsumerConfig, ConsumerConnector, SimpleConsumer}
+import com.monovore.coast.samza.ConfigGenerator
+import com.monovore.coast.wire.{Partitioner, BinaryFormat}
+import kafka.api.{FetchRequest, OffsetRequest, PartitionFetchInfo, TopicMetadataRequest}
+import kafka.common.TopicAndPartition
+import kafka.consumer.{ConsumerConfig, SimpleConsumer}
 import kafka.producer.{KeyedMessage, Producer, ProducerConfig}
 import kafka.server.{KafkaConfig, KafkaServer}
 import kafka.utils.{TestUtils, TestZKUtils}
@@ -240,3 +241,27 @@ object IntegrationTest {
     }
   }
 }
+
+case class Messages(messages: Map[String, Map[Seq[Byte], (Int => Int, Seq[Seq[Byte]])]] = Map.empty) {
+
+  def add[A : BinaryFormat : Partitioner, B : BinaryFormat](name: Topic[A,B], messages: Map[A, Seq[B]]): Messages = {
+
+    val formatted = messages.map { case (k, vs) =>
+      val pn: (Int => Int) = implicitly[Partitioner[A]].partition(k, _)
+      BinaryFormat.write(k).toSeq -> (pn, vs.map { v => BinaryFormat.write(v).toSeq })
+    }
+
+    Messages(this.messages.updated(name.name, formatted))
+  }
+
+  def get[A : BinaryFormat, B : BinaryFormat](name: Topic[A, B]): Map[A, Seq[B]] = {
+
+    val data = messages.getOrElse(name.name, Map.empty)
+
+    data.map { case (k, (_, vs) ) =>
+      BinaryFormat.read[A](k.toArray) -> vs.map { v => BinaryFormat.read[B](v.toArray) }
+    }.withDefaultValue(Seq.empty[B])
+  }
+}
+
+object Messages extends Messages(Map.empty)

@@ -180,53 +180,5 @@ class SamzaIntegrationSpec extends Specification with ScalaCheck {
       output("test").sorted must_== (2 to (BigNumber+1))
     }
   }
-
-  "a 'simple' samza-backed job" should {
-
-    "count words" in {
-
-      import com.monovore.example.coast.WordCount._
-      import coast.wire.ugly._
-
-      val words = Gen.oneOf("testing", "scandal", "riviera", "salad", "Thursday")
-      val sentences = Gen.listOf(words).map { _.mkString(" ") }
-      val sentenceList = Seq.fill(100)(sentences.sample).flatten.toSeq
-
-      val input = Messages
-        .add(Sentences, Map(0L -> sentenceList))
-
-      val output = IntegrationTest.fuzz(graph, input, simple = true).get(WordCounts)
-
-      val testingCount = sentenceList
-        .flatMap { _.split(" ") }
-        .count { _ == "testing" }
-
-      output("testing") must_== (1 to testingCount)
-    }
-  }
 }
-
-case class Messages(messages: Map[String, Map[Seq[Byte], (Int => Int, Seq[Seq[Byte]])]] = Map.empty) {
-
-  def add[A : BinaryFormat : Partitioner, B : BinaryFormat](name: Topic[A,B], messages: Map[A, Seq[B]]): Messages = {
-
-    val formatted = messages.map { case (k, vs) =>
-      val pn: (Int => Int) = implicitly[Partitioner[A]].partition(k, _)
-      BinaryFormat.write(k).toSeq -> (pn, vs.map { v => BinaryFormat.write(v).toSeq })
-    }
-
-    Messages(this.messages.updated(name.name, formatted))
-  }
-
-  def get[A : BinaryFormat, B : BinaryFormat](name: Topic[A, B]): Map[A, Seq[B]] = {
-
-    val data = messages.getOrElse(name.name, Map.empty)
-
-    data.map { case (k, (_, vs) ) =>
-      BinaryFormat.read[A](k.toArray) -> vs.map { v => BinaryFormat.read[B](v.toArray) }
-    }.withDefaultValue(Seq.empty[B])
-  }
-}
-
-object Messages extends Messages(Map.empty)
 
