@@ -90,7 +90,7 @@ class SafeConfigGenerator(baseConfig: Config = new MapConfig()) extends ConfigGe
       val streamDelays = storage
         .map { case Storage(s, _, _) => s -> (s.branches.size + 1) }
 
-      val factory: MessageSink.Factory = new SafeBackend.SinkFactory(sink)
+      val factory: CoastTask.Factory = new SafeBackend.SinkFactory(sink)
 
       val configMap = Map(
 

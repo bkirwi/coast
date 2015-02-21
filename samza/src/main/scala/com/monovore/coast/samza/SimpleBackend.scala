@@ -45,7 +45,7 @@ object SimpleBackend extends SamzaBackend {
 
         val storage = storageFor(sink.element, Path(name))
 
-        val factory: MessageSink.Factory = new SimpleBackend.SinkFactory(sink)
+        val factory: CoastTask.Factory = new SimpleBackend.SinkFactory(sink)
 
         val configMap = Map(
 
@@ -83,9 +83,9 @@ object SimpleBackend extends SamzaBackend {
     }
   }
 
-  class SinkFactory[A, B](sink: Sink[A, B]) extends MessageSink.Factory {
+  class SinkFactory[A, B](sink: Sink[A, B]) extends CoastTask.Factory {
 
-    override def make(config: Config, context: TaskContext, messageSink: ByteSink): ByteSink = {
+    override def make(config: Config, context: TaskContext, receiver: CoastTask.Receiver): CoastTask.Receiver = {
 
       val outputStream = config.get(samza.TaskName)
 
@@ -136,7 +136,7 @@ object SimpleBackend extends SamzaBackend {
 
       val finalSink: Send[A, B] = { (key, value) =>
 
-        messageSink.execute(
+        receiver.send(
           outputStream,
           sink.keyPartitioner.partition(key, numPartitions),
           -1,
@@ -149,10 +149,10 @@ object SimpleBackend extends SamzaBackend {
         compileElement(sink.element, Path(outputStream), finalSink)
           .withDefaultValue { (_: Array[Byte], _: Array[Byte]) => () }
 
-      new MessageSink[Array[Byte], Array[Byte]] {
-        override def execute(stream: String, partition: Int, offset: Long, key: Array[Byte], value: Array[Byte]): Long = {
+      new CoastTask.Receiver {
+
+        override def send(stream: String, partition: Int, offset: Long, key: Array[Byte], value: Array[Byte]) {
           compiled.apply(stream).apply(key, value)
-          -1L
         }
       }
     }

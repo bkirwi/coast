@@ -14,8 +14,4 @@ object MessageSink {
   type Bytes = Array[Byte]
 
   type ByteSink = MessageSink[Bytes, Bytes]
-
-  trait Factory extends Serializable {
-    def make(config: Config, context: TaskContext, sink: ByteSink): ByteSink
-  }
 }

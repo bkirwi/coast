@@ -15,9 +15,9 @@ object SafeBackend extends SamzaBackend {
 
   def apply(baseConfig: Config = new MapConfig()): ConfigGenerator = new SafeConfigGenerator(baseConfig)
 
-  class SinkFactory[A, B](sinkNode: Sink[A, B]) extends MessageSink.Factory {
+  class SinkFactory[A, B](sinkNode: Sink[A, B]) extends CoastTask.Factory {
 
-    override def make(config: Config, context: TaskContext, whatSink: ByteSink) = {
+    override def make(config: Config, context: TaskContext, whatSink: CoastTask.Receiver): CoastTask.Receiver = {
 
       val streamName = config.get(samza.TaskName)
 
@@ -49,7 +49,7 @@ object SafeBackend extends SamzaBackend {
             }
 
           if (offset >= offsetThreshold) {
-            whatSink.execute(streamName, partition, offset, key, payload)
+            whatSink.send(streamName, partition, offset, key, payload)
           }
 
           offset + 1
@@ -65,9 +65,9 @@ object SafeBackend extends SamzaBackend {
 
       val mergeStream = s"coast.merge.$streamName"
 
-      new MessageSink.ByteSink {
+      new CoastTask.Receiver {
 
-        override def execute(stream: String, partition: Int, offset: Long, key: Bytes, value: Bytes): Long = {
+        override def send(stream: String, partition: Int, offset: Long, key: Array[Byte], value: Array[Byte]) {
 
           if (stream == mergeStream) {
 
@@ -83,7 +83,7 @@ object SafeBackend extends SamzaBackend {
               if (regroupedStreams(stream)) value
               else BinaryFormat.write(FullMessage(stream, 0, offset, value))
 
-            whatSink.execute(
+            whatSink.send(
               mergeStream,
               partitionIndex,
               -1,
