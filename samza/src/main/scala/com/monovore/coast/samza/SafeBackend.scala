@@ -19,7 +19,7 @@ object SafeBackend extends SamzaBackend {
 
     override def make(config: Config, context: TaskContext, whatSink: ByteSink) = {
 
-      val taskName = config.get(samza.TaskName)
+      val streamName = config.get(samza.TaskName)
 
       val partitionIndex = context.getTaskName.getTaskName.split("\\W+").last.toInt // ICK!
 
@@ -29,16 +29,11 @@ object SafeBackend extends SamzaBackend {
 
       val (numPartitions, offsetThreshold) = {
 
-        val systemFactory = config.getNewInstance[SystemFactory](s"systems.$CoastSystem.samza.factory")
-        val admin = systemFactory.getAdmin(CoastSystem, config)
-        val meta = admin.getSystemStreamMetadata(Set(taskName).asJava).asScala
-          .getOrElse(taskName, sys.error(s"Couldn't find metadata on output stream $taskName"))
+        val partitions = SamzaBackend.getPartitions(config, CoastSystem, streamName)
 
-        val partitionMeta = meta.getSystemStreamPartitionMetadata.asScala
-
-        partitionMeta.size -> {
-          if (regroupedStreams(taskName)) 0L
-          else partitionMeta(new Partition(partitionIndex)).getUpcomingOffset.toLong
+        partitions.size -> {
+          if (regroupedStreams(streamName)) 0L
+          else partitions(partitionIndex)
         }
       }
 
@@ -47,30 +42,28 @@ object SafeBackend extends SamzaBackend {
         override def execute(stream: String, partition: Int, offset: Long, key: Bytes, value: Bytes): Long = {
 
           val payload =
-            if (regroupedStreams(taskName)) {
-              BinaryFormat.write(FullMessage(taskName, partitionIndex, offset, value))
+            if (regroupedStreams(streamName)) {
+              BinaryFormat.write(FullMessage(streamName, partitionIndex, offset, value))
             } else {
               value
             }
 
           if (offset >= offsetThreshold) {
-            whatSink.execute(taskName, partition, offset, key, payload)
+            whatSink.execute(streamName, partition, offset, key, payload)
           }
 
           offset + 1
         }
       }
 
-      val name = config.get(samza.TaskName)
-
       val compiler = new TaskCompiler(new TaskCompiler.Context {
         override def getStore[P, A, B](path: String, default: B): CoastState[Int, A, B] =
           context.getStore(path).asInstanceOf[CoastStorageEngine[A, B]].withDefault(default)
       })
 
-      val compiled = compiler.compileSink(sinkNode, finalSink, name, numPartitions)
+      val compiled = compiler.compileSink(sinkNode, finalSink, streamName, numPartitions)
 
-      val mergeStream = s"coast.merge.$taskName"
+      val mergeStream = s"coast.merge.$streamName"
 
       new MessageSink.ByteSink {
 

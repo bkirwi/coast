@@ -68,7 +68,6 @@ object SimpleBackend extends SamzaBackend {
           .map { case storage @ Storage(name, keyFormat, msgFormat) =>
 
             storage.serdeConfig ++ Map(
-              s"stores.$name.coast.simple" -> "true",
               s"stores.$name.factory" -> "org.apache.samza.storage.kv.inmemory.InMemoryKeyValueStorageEngineFactory",
               s"stores.$name.changelog" -> s"$CoastSystem.coast-cl.$name"
             )
@@ -90,7 +89,7 @@ object SimpleBackend extends SamzaBackend {
 
       val outputStream = config.get(samza.TaskName)
 
-      val numPartitions = SamzaBackend.getPartitions(config, CoastSystem, outputStream)
+      val numPartitions = SamzaBackend.getPartitions(config, CoastSystem, outputStream).size
 
       type Send[A, B] = (A, B) => Unit
 

@@ -7,7 +7,6 @@ import org.apache.samza.util.Logging
 private[samza] object TaskCompiler {
 
   trait Context {
-    def getSource(path: String): CoastState[Int, Unit, Unit] = getStore(path, unit)
     def getStore[P, A, B](path: String, default: B): CoastState[Int, A, B]
   }
 }
@@ -18,7 +17,7 @@ private[samza] class TaskCompiler(context: TaskCompiler.Context) {
 
   def compileSource[A, B](source: Source[A, B], sink: MessageSink[A, B], prefix: Path) = {
 
-    val store = context.getSource(prefix.toString)
+    val store = context.getStore[Int, Unit, Unit](prefix.toString, unit)
 
     store.downstream -> new MessageSink[Bytes, Bytes] with Logging {
 

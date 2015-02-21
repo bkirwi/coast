@@ -125,28 +125,13 @@ class CoastStoreFactory[A, B] extends StorageEngineFactory[A, B] {
     val backingFactory = containerContext.config
       .getNewInstance[BaseKeyValueStorageEngineFactory[_, _]](s"stores.$storeName.subfactory")
 
-    val isSimple = containerContext.config.getBoolean(s"stores.$storeName.coast.simple")
-
     val underlying =
       backingFactory.getKVStore(storeName, storeDir, registry, changeLogSystemStreamPartition, containerContext)
 
     val serialized = new SerializedKeyValueStore[A, B](underlying, keySerde, msgSerde)
 
-    // ICK: avoid framing when running in 'simple' mode
-    // looking forward to nuking all of this...
-    val keyFormat =
-      if (!isSimple) DataFormat.wireFormat[(Int, Array[Byte])]
-      else new BinaryFormat[(Int, Array[Byte])] {
-        override def write(value: (Int, Array[Byte])): Array[Byte] = value._2
-        override def read(bytes: Array[Byte]): (Int, Array[Byte]) = (0, bytes)
-      }
-
-    val valueFormat =
-      if (!isSimple) DataFormat.wireFormat[(Long, Long, Array[Byte])]
-      else new BinaryFormat[(Long, Long, Array[Byte])] {
-        override def write(value: (Long, Long, Array[Byte])): Array[Byte] = value._3
-        override def read(bytes: Array[Byte]): (Long, Long, Array[Byte]) = (0L, 0L, bytes)
-      }
+    val keyFormat = DataFormat.wireFormat[(Int, Array[Byte])]
+    val valueFormat = DataFormat.wireFormat[(Long, Long, Array[Byte])]
 
     new CoastStorageEngine[A, B](serialized, keySerde, msgSerde, collector, changeLogSystemStreamPartition, keyFormat, valueFormat)
   }
