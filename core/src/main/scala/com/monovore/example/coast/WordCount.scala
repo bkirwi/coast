@@ -11,7 +11,7 @@ object WordCount extends ExampleMain {
 
   val WordCounts = Topic[String, Int]("word-counts")
 
-  import coast.wire.ugly._
+  import coast.wire.pretty._
 
   val graph = for {
 

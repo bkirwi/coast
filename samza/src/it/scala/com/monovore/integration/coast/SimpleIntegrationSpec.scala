@@ -14,7 +14,7 @@ class SimpleIntegrationSpec extends Specification with ScalaCheck {
     "count words" in {
 
       import com.monovore.example.coast.WordCount._
-      import coast.wire.ugly._
+      import coast.wire.pretty._
 
       val words = Gen.oneOf("testing", "scandal", "riviera", "salad", "Thursday")
       val sentences = Gen.listOf(words).map { _.mkString(" ") }

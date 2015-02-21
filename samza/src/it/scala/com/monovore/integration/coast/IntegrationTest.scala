@@ -6,7 +6,7 @@ import java.util.Properties
 import com.monovore.coast
 import com.monovore.coast.flow.Topic
 import com.monovore.coast.model.Graph
-import com.monovore.coast.samza.ConfigGenerator
+import coast.samza.{SimpleBackend, SafeBackend, ConfigGenerator}
 import com.monovore.coast.wire.{Partitioner, BinaryFormat}
 import kafka.api.{FetchRequest, OffsetRequest, PartitionFetchInfo, TopicMetadataRequest}
 import kafka.common.TopicAndPartition
@@ -118,11 +118,9 @@ object IntegrationTest {
           "systems.coast-system.producer.metadata.broker.list" -> config.getProperty("metadata.broker.list")
         )
 
-        val configGen: ConfigGenerator =
-          if (simple) coast.samza.Simple(baseConfig)
-          else coast.samza.Safe(baseConfig)
+        val backend = if (simple) SimpleBackend else SafeBackend
 
-        val configs = configGen.configure(graph)
+        val configs = backend(baseConfig).configure(graph)
 
         // FLAIL!
 

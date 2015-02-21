@@ -22,7 +22,7 @@ class SamzaSpec extends Specification with ScalaCheck {
         Flow.source(source).fold(0) { _ + _ }.updates
       }
 
-      val configs = samza.Safe().configure(sampleFlow)
+      val configs = samza.SafeBackend().configure(sampleFlow)
 
       configs must haveSize(1)
 

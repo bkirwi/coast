@@ -11,7 +11,7 @@ import org.apache.samza.task.TaskContext
 
 import scala.collection.JavaConverters._
 
-object Safe extends (Config => ConfigGenerator) {
+object SafeBackend extends SamzaBackend {
 
   def apply(baseConfig: Config = new MapConfig()): ConfigGenerator = new SafeConfigGenerator(baseConfig)
 
