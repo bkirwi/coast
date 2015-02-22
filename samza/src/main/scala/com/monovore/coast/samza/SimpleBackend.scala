@@ -2,12 +2,9 @@ package com.monovore.coast
 package samza
 
 import com.monovore.coast.model._
-import com.monovore.coast.samza.MessageSink.ByteSink
 import com.twitter.algebird.Monoid
-import org.apache.samza.Partition
-import org.apache.samza.config.{TaskConfig, JobConfig, Config, MapConfig}
+import org.apache.samza.config.{Config, JobConfig, MapConfig, TaskConfig}
 import org.apache.samza.storage.kv.KeyValueStorageEngine
-import org.apache.samza.system.SystemFactory
 import org.apache.samza.task.TaskContext
 
 import scala.collection.JavaConverters._
@@ -97,13 +94,13 @@ object SimpleBackend extends SamzaBackend {
         { (a, b) => left(a, b); right(a, b) }
       }
 
-      def compileElement[A, B](elem: Node[A, B], path: Path, send: Send[A, B]): Map[String, Send[Array[Byte], Array[Byte]]] = elem match {
+      def compileNode[A, B](node: Node[A, B], path: Path, send: Send[A, B]): Map[String, Send[Array[Byte], Array[Byte]]] = node match {
         case src: Source[A, B] => Map(src.source -> { (key, value) =>
           send(src.keyFormat.read(key), src.valueFormat.read(value))
         })
         case pure: PureTransform[A, b0, B] => {
 
-          compileElement(pure.upstream, path, { (key: A, value: b0) =>
+          compileNode(pure.upstream, path, { (key: A, value: b0) =>
             pure.function(key)(value).foreach { newValue => send(key, newValue) }
           })
         }
@@ -111,7 +108,7 @@ object SimpleBackend extends SamzaBackend {
 
           val state = context.getStore(path.toString).asInstanceOf[KeyValueStorageEngine[A, s0]]
 
-          compileElement(stateful.upstream, path.next, { (key: A, value: b0) =>
+          compileNode(stateful.upstream, path.next, { (key: A, value: b0) =>
 
             val currentState = Option(state.get(key)).getOrElse(stateful.init)
 
@@ -124,12 +121,12 @@ object SimpleBackend extends SamzaBackend {
         }
         case group: GroupBy[A, B, a0] => {
 
-          compileElement(group.upstream, path, { (key: a0, value: B) =>
+          compileNode(group.upstream, path, { (key: a0, value: B) =>
             send(group.groupBy(key)(value), value)
           })
         }
         case merge: Merge[A, B] => {
-          val compiled = merge.upstreams.map { case (branch, node) => compileElement(node, path / branch, send) }
+          val compiled = merge.upstreams.map { case (branch, node) => compileNode(node, path / branch, send) }
           Monoid.sum(compiled)
         }
       }
@@ -146,7 +143,7 @@ object SimpleBackend extends SamzaBackend {
       }
 
       val compiled =
-        compileElement(sink.element, Path(outputStream), finalSink)
+        compileNode(sink.element, Path(outputStream), finalSink)
           .withDefaultValue { (_: Array[Byte], _: Array[Byte]) => () }
 
       new CoastTask.Receiver {

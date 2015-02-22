@@ -13,15 +13,15 @@ private[samza] object TaskCompiler {
 
 private[samza] class TaskCompiler(context: TaskCompiler.Context) {
 
-  import MessageSink.{Bytes, ByteSink}
+  import MessageSink.ByteSink
 
   def compileSource[A, B](source: Source[A, B], sink: MessageSink[A, B], prefix: Path) = {
 
     val store = context.getStore[Int, Unit, Unit](prefix.toString, unit)
 
-    store.downstream -> new MessageSink[Bytes, Bytes] with Logging {
+    store.downstream -> new MessageSink[Array[Byte], Array[Byte]] with Logging {
 
-      override def execute(stream: String, partition: Int, offset: Long, key: Bytes, value: Bytes): Long = {
+      override def execute(stream: String, partition: Int, offset: Long, key: Array[Byte], value: Array[Byte]): Long = {
 
         if (stream == source.source) {
           
@@ -107,9 +107,9 @@ private[samza] class TaskCompiler(context: TaskCompiler.Context) {
 
     maxOffset = offsets.max
 
-    offsets.max -> new MessageSink[Bytes, Bytes] {
+    offsets.max -> new MessageSink[Array[Byte], Array[Byte]] {
 
-      override def execute(stream: String, partition: Int, offset: Long, key: Bytes, value: Bytes): Long = {
+      override def execute(stream: String, partition: Int, offset: Long, key: Array[Byte], value: Array[Byte]): Long = {
 
         upstreamSinks.foreach { s => s.execute(stream, partition, offset, key, value) }
 

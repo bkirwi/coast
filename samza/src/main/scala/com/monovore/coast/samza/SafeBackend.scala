@@ -2,14 +2,9 @@ package com.monovore.coast.samza
 
 import com.monovore.coast.model.Sink
 import com.monovore.coast.samza
-import com.monovore.coast.samza.MessageSink._
 import com.monovore.coast.wire.BinaryFormat
-import org.apache.samza.Partition
-import org.apache.samza.config.{MapConfig, Config}
-import org.apache.samza.system.SystemFactory
+import org.apache.samza.config.{Config, MapConfig}
 import org.apache.samza.task.TaskContext
-
-import scala.collection.JavaConverters._
 
 object SafeBackend extends SamzaBackend {
 
@@ -39,7 +34,7 @@ object SafeBackend extends SamzaBackend {
 
       val finalSink = new MessageSink.ByteSink {
 
-        override def execute(stream: String, partition: Int, offset: Long, key: Bytes, value: Bytes): Long = {
+        override def execute(stream: String, partition: Int, offset: Long, key: Array[Byte], value: Array[Byte]): Long = {
 
           val payload =
             if (regroupedStreams(streamName)) {
@@ -95,4 +90,14 @@ object SafeBackend extends SamzaBackend {
       }
     }
   }
+}
+
+trait MessageSink[-K, -V] extends Serializable {
+
+  def execute(stream: String, partition: Int, offset: Long, key: K, value: V): Long
+}
+
+object MessageSink {
+
+  type ByteSink = MessageSink[Array[Byte], Array[Byte]]
 }

@@ -4,14 +4,13 @@ package samza
 import java.io.File
 import java.util
 
-import com.google.common.primitives.Longs
-import com.monovore.coast.wire.{DataFormat, BinaryFormat}
+import com.monovore.coast.wire.{BinaryFormat, DataFormat}
 import org.apache.samza.container.SamzaContainerContext
 import org.apache.samza.metrics.MetricsRegistry
 import org.apache.samza.serializers.Serde
-import org.apache.samza.storage.kv.{KeyValueStore, SerializedKeyValueStore, BaseKeyValueStorageEngineFactory, KeyValueStorageEngine}
-import org.apache.samza.storage.{StorageEngineFactory, StorageEngine}
-import org.apache.samza.system.{OutgoingMessageEnvelope, SystemStreamPartition, IncomingMessageEnvelope}
+import org.apache.samza.storage.kv.{BaseKeyValueStorageEngineFactory, KeyValueStore, SerializedKeyValueStore}
+import org.apache.samza.storage.{StorageEngine, StorageEngineFactory}
+import org.apache.samza.system.{IncomingMessageEnvelope, OutgoingMessageEnvelope, SystemStreamPartition}
 import org.apache.samza.task.MessageCollector
 import org.apache.samza.util.Logging
 
