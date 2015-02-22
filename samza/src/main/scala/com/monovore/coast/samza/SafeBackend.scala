@@ -22,15 +22,11 @@ object SafeBackend extends SamzaBackend {
         .filter { _.nonEmpty }
         .toSet
 
-      val (numPartitions, offsetThreshold) = {
+      val partitions = SamzaBackend.getPartitions(config, CoastSystem, streamName)
 
-        val partitions = SamzaBackend.getPartitions(config, CoastSystem, streamName)
-
-        partitions.size -> {
-          if (regroupedStreams(streamName)) 0L
-          else partitions(partitionIndex)
-        }
-      }
+      val offsetThreshold =
+        if (regroupedStreams(streamName)) 0L
+        else partitions(partitionIndex)
 
       val finalSink = new MessageSink.ByteSink {
 
@@ -39,9 +35,8 @@ object SafeBackend extends SamzaBackend {
           val payload =
             if (regroupedStreams(streamName)) {
               BinaryFormat.write(FullMessage(streamName, partitionIndex, offset, value))
-            } else {
-              value
             }
+            else value
 
           if (offset >= offsetThreshold) {
             whatSink.send(streamName, partition, offset, key, payload)
@@ -56,7 +51,7 @@ object SafeBackend extends SamzaBackend {
           context.getStore(path).asInstanceOf[CoastStorageEngine[A, B]].withDefault(default)
       })
 
-      val compiled = compiler.compileSink(sinkNode, finalSink, streamName, numPartitions)
+      val compiled = compiler.compileSink(sinkNode, finalSink, streamName, partitions.size)
 
       val mergeStream = s"coast.merge.$streamName"
 
