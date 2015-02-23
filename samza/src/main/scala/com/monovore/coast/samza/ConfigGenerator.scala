@@ -125,6 +125,7 @@ class SafeConfigGenerator(baseConfig: Config = new MapConfig()) extends ConfigGe
           storage.serdeConfig ++ Map(
             s"stores.$name.factory" -> "com.monovore.coast.samza.CoastStoreFactory",
             s"stores.$name.subfactory" -> "org.apache.samza.storage.kv.inmemory.InMemoryKeyValueStorageEngineFactory",
+            s"stores.$name.changelog.replication.factor" -> "1",
             s"stores.$name.changelog" -> s"$CoastSystem.coast.changelog.$name"
           )
         }

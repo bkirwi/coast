@@ -4,11 +4,11 @@ import java.nio.ByteBuffer
 import java.util.Properties
 
 import com.monovore.coast
+import coast.samza.{SafeBackend, SimpleBackend}
 import com.monovore.coast.flow.Topic
 import com.monovore.coast.model.Graph
-import coast.samza.{SimpleBackend, SafeBackend, ConfigGenerator}
-import com.monovore.coast.wire.{Partitioner, BinaryFormat}
-import kafka.api.{FetchRequest, OffsetRequest, PartitionFetchInfo, TopicMetadataRequest}
+import com.monovore.coast.wire.{BinaryFormat, Partitioner}
+import kafka.api.{FetchRequest, PartitionFetchInfo, TopicMetadataRequest}
 import kafka.common.TopicAndPartition
 import kafka.consumer.{ConsumerConfig, SimpleConsumer}
 import kafka.producer.{KeyedMessage, Producer, ProducerConfig}
@@ -115,7 +115,8 @@ object IntegrationTest {
           "systems.coast-system.samza.factory" -> "org.apache.samza.system.kafka.KafkaSystemFactory",
           // point things at local kafka / zookeeper2
           "systems.coast-system.consumer.zookeeper.connect" -> config.getProperty("zookeeper.connect"),
-          "systems.coast-system.producer.metadata.broker.list" -> config.getProperty("metadata.broker.list")
+          "systems.coast-system.producer.metadata.broker.list" -> config.getProperty("metadata.broker.list"),
+          "systems.coast-system.producer.bootstrap.servers" -> config.getProperty("metadata.broker.list")
         )
 
         val backend = if (simple) SimpleBackend else SafeBackend
@@ -147,7 +148,9 @@ object IntegrationTest {
             job.waitForFinish(2000) match {
               case ApplicationStatus.SuccessfulFinish => ()
               case ApplicationStatus.UnsuccessfulFinish => ()
-              case _ => sys.error("Taking a very long time!")
+              case _ => {
+                Console.err.println("WHOA:  Taking a very long time!")
+              }
             }
           }
         }
@@ -207,14 +210,15 @@ object IntegrationTest {
 
               val tp = TopicAndPartition(topic.topic, partition.partitionId)
 
-              val offset = consumer.earliestOrLatestOffset(tp, OffsetRequest.LatestTime, 153)
+              val correlationID = Random.nextInt()
+              val minBytes = 0
 
               val response = consumer.fetch(new FetchRequest(
-                correlationId = Random.nextInt(),
-                clientId = ConsumerConfig.DefaultClientId,
-                maxWait = ConsumerConfig.MaxFetchWaitMs,
-                minBytes = 0,
-                requestInfo = Map(
+                correlationID,
+                ConsumerConfig.DefaultClientId,
+                ConsumerConfig.MaxFetchWaitMs,
+                minBytes,
+                Map(
                   tp -> PartitionFetchInfo(0L, Int.MaxValue)
                 )
               ))

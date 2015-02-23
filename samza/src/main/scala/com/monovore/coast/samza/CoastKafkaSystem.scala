@@ -1,13 +1,20 @@
 package com.monovore.coast.samza
 
-import kafka.producer.{KeyedMessage, Producer => KafkaProducer}
-import org.apache.samza.config.Config
+import java.util.Properties
+import java.util.regex.Pattern
+
+import _root_.kafka.producer.{Producer => KafkaProducer, ProducerConfig, KeyedMessage}
+import _root_.kafka.utils.ZKStringSerializer
+import org.I0Itec.zkclient.ZkClient
+import org.apache.samza.SamzaException
+import org.apache.samza.config.{KafkaConfig, Config}
 import org.apache.samza.metrics.MetricsRegistry
 import org.apache.samza.system._
-import org.apache.samza.system.kafka.KafkaSystemFactory
-import org.apache.samza.util.{KafkaUtil, Logging}
+import kafka.{KafkaSystemAdmin, ChangelogInfo, KafkaSystemFactory}
+import org.apache.samza.util.{Util, KafkaUtil, Logging}
 
 import scala.collection.mutable.ArrayBuffer
+import collection.JavaConverters._
 
 object CoastKafkaSystem {
 
@@ -131,22 +138,64 @@ class CoastKafkaSystemFactory extends SystemFactory with Logging {
   override def getConsumer(systemName: String, config: Config, registry: MetricsRegistry): SystemConsumer =
     kafkaFactory.getConsumer(systemName, config, registry)
 
-  override def getAdmin(systemName: String, config: Config): SystemAdmin =
-    kafkaFactory.getAdmin(systemName, config)
+  override def getAdmin(systemName: String, config: Config): SystemAdmin = {
+
+    // Similar to KafkaSystemFactory.getAdmin, but with
+
+    import KafkaConfig.Config2Kafka
+
+    val clientId = KafkaUtil.getClientId("samza-admin", config)
+
+    val producerConfig = config.getKafkaSystemProducerConfig(systemName, clientId)
+    val consumerConfig = config.getKafkaSystemConsumerConfig(systemName, clientId)
+
+    val MatchStore = "stores\\.(.+)\\.changelog".r
+    val MatchTopic = s"$systemName\\.(.+)".r
+
+    val topicMetaInformation =
+      config.regexSubset(KafkaConfig.CHANGELOG_STREAM_NAMES_REGEX).asScala
+        .collect { case (MatchStore(storeName), MatchTopic(topicName)) =>
+
+          topicName -> ChangelogInfo(
+              replicationFactor = config.getChangelogStreamReplicationFactor(storeName).getOrElse("2").toInt,
+              kafkaProps = config.getChangelogKafkaProperties(storeName)
+          )
+        }
+        .toMap
+
+    new KafkaSystemAdmin(
+      systemName,
+      producerConfig.bootsrapServers,
+      consumerConfig.socketTimeoutMs,
+      consumerConfig.socketReceiveBufferBytes,
+      clientId,
+      () => new ZkClient(consumerConfig.zkConnect, 6000, 6000, ZKStringSerializer),
+      topicMetaInformation)
+  }
 
   override def getProducer(systemName: String, config: Config, registry: MetricsRegistry): SystemProducer = {
 
     import org.apache.samza.config.KafkaConfig._
 
-    val clientId = KafkaUtil.getClientId("samza-producer", config)
+    val producerConfig = {
 
-    val producerConfig = config.getKafkaSystemProducerConfig(systemName, clientId)
+      val clientId = KafkaUtil.getClientId("samza-producer", config)
 
-    require(producerConfig.producerType == "sync", "coast's kafka producer does its own message buffering")
+      val subConf = config.subset("systems.%s.producer." format systemName, true)
 
-    require(producerConfig.messageSendMaxRetries == 0, "messages can be duplicated or reordered with retries")
+      config.getKafkaSystemProducerConfig(systemName, clientId)
 
-    require(producerConfig.requestRequiredAcks != 0, "not requiring acks makes failures invisible")
+      val props = new Properties()
+
+      props.putAll(subConf)
+      props.setProperty("client.id", clientId)
+
+      //    require(producerConfig.producerType == "sync", "coast's kafka producer does its own message buffering")
+      //    require(producerConfig.messageSendMaxRetries == 0, "messages can be duplicated or reordered with retries")
+      //    require(producerConfig.requestRequiredAcks != 0, "not requiring acks makes failures invisible")
+
+      new ProducerConfig(props)
+    }
 
     val producer = new KafkaProducer[Array[Byte], Array[Byte]](producerConfig)
 

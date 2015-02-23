@@ -65,6 +65,7 @@ object SimpleBackend extends SamzaBackend {
           .map { case storage @ Storage(name, keyFormat, msgFormat) =>
 
             storage.serdeConfig ++ Map(
+              s"stores.$name.changelog.replication.factor" -> "1",
               s"stores.$name.factory" -> "org.apache.samza.storage.kv.inmemory.InMemoryKeyValueStorageEngineFactory",
               s"stores.$name.changelog" -> s"$CoastSystem.coast-cl.$name"
             )

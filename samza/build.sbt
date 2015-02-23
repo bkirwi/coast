@@ -1,4 +1,4 @@
-def samzaDep(name: String) = "org.apache.samza" %% name % "0.8.0"
+def samzaDep(name: String) = "org.apache.samza" %% name % "0.9.0-SNAPSHOT"
 
 resolvers += "Local Maven Repository" at s"file://${Path.userHome.absolutePath}/.m2/repository"
 
@@ -11,7 +11,8 @@ libraryDependencies ++= Seq(
   // TODO: integration tests only
   samzaDep("samza-kv-inmemory") exclude ("com.google.guava", "guava"),
   samzaDep("samza-kafka"),
-  "org.apache.kafka" %% "kafka" % "0.8.1.1" classifier "test" exclude("javax.jms", "jms") exclude("com.sun.jdmk", "jmxtools") exclude("com.sun.jmx", "jmxri"),
+  "org.apache.kafka" %% "kafka" % "0.8.2.0" classifier "test"
+    exclude("javax.jms", "jms") exclude("com.sun.jdmk", "jmxtools") exclude("com.sun.jmx", "jmxri"),
   "org.specs2" %% "specs2" % "2.4.15" % "it",
   "org.scalacheck" %% "scalacheck" % "1.12.1" % "it"
 )

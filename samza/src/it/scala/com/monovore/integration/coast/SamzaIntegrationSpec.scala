@@ -2,8 +2,6 @@ package com.monovore.integration.coast
 
 import com.monovore.coast
 import com.monovore.coast.flow.{Flow, Topic}
-import com.monovore.coast.wire.{Partitioner, BinaryFormat}
-import org.scalacheck.{Prop, Gen}
 import org.specs2.ScalaCheck
 import org.specs2.mutable._
 
