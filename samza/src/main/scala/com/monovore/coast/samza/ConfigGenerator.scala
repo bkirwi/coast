@@ -36,20 +36,21 @@ object ConfigGenerator {
     )
   }
 
-  case class Storage(name: Path, keyString: String, valueString: String) {
+  case class Storage(path: Path, keyString: String, valueString: String) {
 
     def serdeConfig: Map[String, String] = {
 
-      val keyName = s"coast-key-$name"
-      val msgName = s"coast-msg-$name"
+      val keyName = s"coast-key-$path"
+      val msgName = s"coast-msg-$path"
 
       Map(
-        s"stores.$name.key.serde" -> keyName,
-        s"stores.$name.msg.serde" -> msgName,
+        s"stores.$path.key.serde" -> keyName,
+        s"stores.$path.msg.serde" -> msgName,
         s"serializers.registry.$keyName.class" -> "com.monovore.coast.samza.CoastSerdeFactory",
         s"serializers.registry.$keyName.serialized.base64" -> keyString,
         s"serializers.registry.$msgName.class" -> "com.monovore.coast.samza.CoastSerdeFactory",
-        s"serializers.registry.$msgName.serialized.base64" -> valueString)
+        s"serializers.registry.$msgName.serialized.base64" -> valueString
+      )
     }
   }
 }
@@ -60,7 +61,7 @@ class SafeConfigGenerator(baseConfig: Config = new MapConfig()) extends ConfigGe
 
   private[this] def storageFor[A, B](element: Node[A, B], path: Path): Seq[Storage] = element match {
     case Source(_) => Seq(Storage( // SAFE
-      name = path,
+      path = path,
       keyString = SerializationUtil.toBase64(wire.pretty.UnitFormat),
       valueString = SerializationUtil.toBase64(wire.pretty.UnitFormat)
     ))
@@ -71,7 +72,7 @@ class SafeConfigGenerator(baseConfig: Config = new MapConfig()) extends ConfigGe
     case agg @ StatefulTransform(up, _, _) => {
       val upstreamed = storageFor(up, path.next)
       upstreamed :+ Storage(
-        name = path,
+        path = path,
         keyString = SerializationUtil.toBase64(agg.keyFormat),
         valueString = SerializationUtil.toBase64(agg.stateFormat)
       )

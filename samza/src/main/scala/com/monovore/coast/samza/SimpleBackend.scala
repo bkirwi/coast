@@ -24,7 +24,7 @@ object SimpleBackend extends SamzaBackend {
       case agg @ StatefulTransform(up, _, _) => {
         val upstreamed = storageFor(up, path.next)
         upstreamed :+ Storage(
-          name = path,
+          path = path,
           keyString = SerializationUtil.toBase64(agg.keyFormat),
           valueString = SerializationUtil.toBase64(agg.stateFormat)
         )
