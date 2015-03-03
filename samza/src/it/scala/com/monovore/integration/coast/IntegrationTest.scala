@@ -116,7 +116,9 @@ object IntegrationTest {
           // point things at local kafka / zookeeper2
           "systems.coast-system.consumer.zookeeper.connect" -> config.getProperty("zookeeper.connect"),
           "systems.coast-system.producer.metadata.broker.list" -> config.getProperty("metadata.broker.list"),
-          "systems.coast-system.producer.bootstrap.servers" -> config.getProperty("metadata.broker.list")
+          "systems.coast-system.producer.bootstrap.servers" -> config.getProperty("metadata.broker.list"),
+          // config template for storage
+          "coast.default.stores.changelog.replication.factor" -> "1"
         )
 
         val backend = if (simple) SimpleBackend else SafeBackend
