@@ -95,10 +95,6 @@ object SimpleBackend extends SamzaBackend {
 
       type Send[A, B] = (A, B) => Unit
 
-      implicit def sendMonoid[A, B]: Monoid[Send[A, B]] = Monoid.from((_: A, _: B) => ()) { (left, right) =>
-        { (a, b) => left(a, b); right(a, b) }
-      }
-
       def compileNode[A, B](node: Node[A, B], path: Path, send: Send[A, B]): Map[String, Send[Array[Byte], Array[Byte]]] = node match {
         case src: Source[A, B] => Map(src.source -> { (key, value) =>
           send(src.keyFormat.read(key), src.valueFormat.read(value))
