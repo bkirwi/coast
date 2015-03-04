@@ -1,5 +1,6 @@
 package com.monovore.integration.coast
 
+import java.lang.Thread.UncaughtExceptionHandler
 import java.nio.ByteBuffer
 import java.util.Properties
 
@@ -17,10 +18,14 @@ import kafka.utils.{TestUtils, TestZKUtils}
 import kafka.zk.EmbeddedZookeeper
 import org.apache.samza.job.ApplicationStatus
 import org.apache.samza.job.local.ThreadJobFactory
+import org.slf4j.LoggerFactory
+import org.specs2.execute.{SkipException, Skipped}
 
 import scala.util.Random
 
 object IntegrationTest {
+
+  val logger = LoggerFactory.getLogger("coast.IntegrationTest")
 
   def withKafkaCluster[A](withProps: java.util.Properties => A): A = {
 
@@ -68,6 +73,12 @@ object IntegrationTest {
   }
 
   def fuzz(graph: Graph, input: Messages, simple: Boolean = false): Messages = {
+
+    Thread.setDefaultUncaughtExceptionHandler(new UncaughtExceptionHandler {
+      override def uncaughtException(thread: Thread, throwable: Throwable): Unit = {
+        logger.error(thread.getName, throwable)
+      }
+    })
 
     val factory = new ThreadJobFactory
 
@@ -150,8 +161,8 @@ object IntegrationTest {
             job.waitForFinish(2000) match {
               case ApplicationStatus.SuccessfulFinish => ()
               case ApplicationStatus.UnsuccessfulFinish => ()
-              case _ => {
-                Console.err.println("WHOA:  Taking a very long time!")
+              case status => {
+                throw new SkipException(Skipped(s"TOO SLOW: $status"))
               }
             }
           }
