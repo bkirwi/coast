@@ -29,16 +29,21 @@ object SafeBackend extends SamzaBackend {
         if (regroupedStreams(streamName)) 0L
         else partitions(partitionIndex)
 
-      val finalSink = (partition: Int, offset: Long, key: Array[Byte], value: Array[Byte]) => {
+      val finalSink = (offset: Long, key: A, value: B) => {
+
+        val keyBytes = sinkNode.keyFormat.write(key)
+        val valueBytes = sinkNode.valueFormat.write(value)
+
+        val newPartition = sinkNode.keyPartitioner.partition(key, partitions.size)
 
         val payload =
           if (regroupedStreams(streamName)) {
-            BinaryFormat.write(FullMessage(streamName, partitionIndex, offset, value))
+            BinaryFormat.write(FullMessage(streamName, partitionIndex, offset, valueBytes))
           }
-          else value
+          else valueBytes
 
         if (offset >= offsetThreshold) {
-          whatSink.send(streamName, partition, offset, key, payload)
+          whatSink.send(streamName, newPartition, offset, keyBytes, payload)
         }
 
         offset + 1
@@ -49,7 +54,7 @@ object SafeBackend extends SamzaBackend {
           context.getStore(path).asInstanceOf[CoastStorageEngine[A, B]].withDefault(default)
       })
 
-      val compiled = compiler.compileSink(sinkNode, finalSink, streamName, partitions.size)
+      val compiled = compiler.compile(sinkNode.element, finalSink, Path(streamName))
 
       val mergeStream = s"coast.merge.$streamName"
 
@@ -61,7 +66,7 @@ object SafeBackend extends SamzaBackend {
 
             val fullMessage = BinaryFormat.read[FullMessage](value)
 
-            compiled(fullMessage.stream)(partition, fullMessage.offset, key, fullMessage.value)
+            compiled(fullMessage.stream, partition)(fullMessage.offset, key, fullMessage.value)
 
           } else {
 
@@ -92,9 +97,9 @@ private[samza] object TaskCompiler {
   }
 
   type Offset = Long
-  type MessageSink[-A, -B] = (Int, Offset, A, B) => Offset
+  type MessageSink[-A, -B] = (Offset, A, B) => Offset
   type ByteSink = MessageSink[Array[Byte], Array[Byte]]
-  type Dispatch = String => ByteSink
+  type Dispatch = (String, Int) => ByteSink
 
 }
 
@@ -106,7 +111,7 @@ private[samza] class TaskCompiler(context: TaskCompiler.Context) {
 
     val store = context.getStore[Int, Unit, Unit](prefix.toString, unit)
 
-    (stream: String) => (partition: Int, offset: Long, key: Array[Byte], value: Array[Byte]) => {
+    (stream: String, partition: Int) => (offset: Long, key: Array[Byte], value: Array[Byte]) => {
 
       if (stream == source.source) {
 
@@ -115,7 +120,7 @@ private[samza] class TaskCompiler(context: TaskCompiler.Context) {
           val a = source.keyFormat.read(key)
           val b = source.valueFormat.read(value)
 
-          sink(0, downstreamOffset, a, b) -> unit
+          sink(downstreamOffset, a, b) -> unit
         }
       } else offset
     }
@@ -123,10 +128,10 @@ private[samza] class TaskCompiler(context: TaskCompiler.Context) {
 
   def compilePure[A, B, B0](trans: PureTransform[A, B0, B], sink: MessageSink[A, B], prefix: Path) = {
 
-    val transformed = (partition: Int, offset: Long, key: A, value: B0) => {
+    val transformed = (offset: Long, key: A, value: B0) => {
       val update = trans.function(key)
       val output = update(value)
-      output.foldLeft(offset)(sink(partition, _, key, _))
+      output.foldLeft(offset)(sink(_, key, _))
     }
 
     compile(trans.upstream, transformed, prefix)
@@ -136,15 +141,15 @@ private[samza] class TaskCompiler(context: TaskCompiler.Context) {
 
     val store = context.getStore[Int, A, S](prefix.toString, trans.init)
 
-    val transformed = (partition: Int, offset: Long, key: A, value: B0) => {
+    val transformed = (offset: Long, key: A, value: B0) => {
 
-      store.update(partition, key, offset) { (downstreamOffset, state) =>
+      store.update(0, key, offset) { (downstreamOffset, state) =>
 
         val update = trans.transformer(key)
 
         val (newState, output) = update(state, value)
 
-        val newDownstreamOffset = output.foldLeft(downstreamOffset)(sink(partition, _, key, _))
+        val newDownstreamOffset = output.foldLeft(downstreamOffset)(sink(_, key, _))
 
         newDownstreamOffset -> newState
       }
@@ -155,9 +160,9 @@ private[samza] class TaskCompiler(context: TaskCompiler.Context) {
 
   def compileGroupBy[A, B, A0](gb: GroupBy[A, B, A0], sink: MessageSink[A, B], prefix: Path) = {
 
-    val task = (partition: Int, offset: Long, key: A0, value: B) => {
+    val task = (offset: Long, key: A0, value: B) => {
       val newKey = gb.groupBy(key)(value)
-      sink(partition, offset, newKey, value)
+      sink(offset, newKey, value)
     }
 
     compile(gb.upstream, task, prefix)
@@ -167,17 +172,17 @@ private[samza] class TaskCompiler(context: TaskCompiler.Context) {
 
     var maxOffset: Long = 0L
 
-    val downstreamSink = (partition: Int, offset: Long, key: A, value: B) => {
-      maxOffset = sink(partition, math.max(maxOffset, offset), key, value)
+    val downstreamSink = (offset: Long, key: A, value: B) => {
+      maxOffset = sink(math.max(maxOffset, offset), key, value)
       maxOffset
     }
 
     val upstreamSinks = merge.upstreams
       .map { case (name, up) => compile(up, downstreamSink, prefix / name) }
 
-    (stream: String) => (partition: Int, offset: Long, key: Array[Byte], value: Array[Byte]) => {
+    (stream: String, partition: Int) => (offset: Long, key: Array[Byte], value: Array[Byte]) => {
 
-      upstreamSinks.foreach { s => s(stream)(partition, offset, key, value) }
+      upstreamSinks.foreach { s => s(stream, partition)(offset, key, value) }
 
       offset
     }
@@ -192,23 +197,6 @@ private[samza] class TaskCompiler(context: TaskCompiler.Context) {
       case pure @ PureTransform(_, _) => compilePure(pure, sink, prefix)
       case group @ GroupBy(_, _) => compileGroupBy(group, sink, prefix)
     }
-  }
-
-  def compileSink[A, B](sink: Sink[A, B], messageSink: ByteSink, name: String, partitions: Int): Dispatch = {
-
-    val formatted = (partition: Int, offset: Long, key: A, value: B) => {
-
-      val keyBytes = sink.keyFormat.write(key)
-      val valueBytes = sink.valueFormat.write(value)
-
-      val newPartition = sink.keyPartitioner.partition(key, partitions)
-
-      messageSink(newPartition, offset, keyBytes, valueBytes)
-    }
-
-    val compiledNode = compile(sink.element, formatted, Path(name))
-
-    compiledNode
   }
 }
 
