@@ -18,7 +18,7 @@
 
     <!--<logger name="com.monovore.coast.samza" level="DEBUG"/>-->
 
-    <root level="ERROR">
+    <root level="OFF">
         <appender-ref ref="STDOUT" />
     </root>
 </configuration>
