@@ -19,7 +19,7 @@ private[samza] class TaskCompiler(context: TaskCompiler.Context) {
 
     val store = context.getStore[Int, Unit, Unit](prefix.toString, unit)
 
-    store.downstream -> new MessageSink[Array[Byte], Array[Byte]] with Logging {
+    new MessageSink[Array[Byte], Array[Byte]] with Logging {
 
       override def execute(stream: String, partition: Int, offset: Long, key: Array[Byte], value: Array[Byte]): Long = {
 
@@ -95,19 +95,15 @@ private[samza] class TaskCompiler(context: TaskCompiler.Context) {
     val downstreamSink = new MessageSink[A, B] with Logging {
 
       override def execute(stream: String, partition: Int, offset: Long, key: A, value: B): Long = {
-        maxOffset = math.max(maxOffset, offset)
-        maxOffset = sink.execute(stream, partition, maxOffset, key, value)
+        maxOffset = sink.execute(stream, partition, math.max(maxOffset, offset), key, value)
         maxOffset
       }
     }
 
-    val (offsets, upstreamSinks) = merge.upstreams
+    val upstreamSinks = merge.upstreams
       .map { case (name, up) => compile(up, downstreamSink, prefix / name) }
-      .unzip
 
-    maxOffset = offsets.max
-
-    offsets.max -> new MessageSink[Array[Byte], Array[Byte]] {
+    new MessageSink[Array[Byte], Array[Byte]] {
 
       override def execute(stream: String, partition: Int, offset: Long, key: Array[Byte], value: Array[Byte]): Long = {
 
@@ -118,7 +114,7 @@ private[samza] class TaskCompiler(context: TaskCompiler.Context) {
     }
   }
 
-  def compile[A, B](ent: Node[A, B], sink: MessageSink[A, B], prefix: Path): Long -> ByteSink = {
+  def compile[A, B](ent: Node[A, B], sink: MessageSink[A, B], prefix: Path): ByteSink = {
 
     ent match {
       case source @ Source(_) => compileSource(source, sink, prefix)
@@ -146,7 +142,7 @@ private[samza] class TaskCompiler(context: TaskCompiler.Context) {
       }
     }
 
-    val (_, compiledNode) = compile(sink.element, formatted, Path(name))
+    val compiledNode = compile(sink.element, formatted, Path(name))
 
     compiledNode
   }
