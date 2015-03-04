@@ -7,6 +7,8 @@ import com.monovore.coast.flow.{Flow, Topic}
 import org.specs2.ScalaCheck
 import org.specs2.mutable._
 
+import collection.JavaConverters._
+
 class SamzaSpec extends Specification with ScalaCheck {
 
   "the samza package" should {
@@ -23,6 +25,11 @@ class SamzaSpec extends Specification with ScalaCheck {
       }
 
       val configs = samza.SafeBackend().configure(sampleFlow)
+
+      for ((name, config) <- configs) {
+        println(name)
+        println(SamzaConfig.format(config))
+      }
 
       configs must haveSize(1)
 

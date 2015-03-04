@@ -13,8 +13,6 @@ package object samza {
 
   val CoastSystem = "coast-system"
 
-  def config(pairs: (String -> String)*): Config = new MapConfig(pairs.toMap.asJava)
-
   private[samza] implicit def function1Monoid[A, B: Monoid]: Monoid[A => B] =
     Monoid.from((_: A) => Monoid.zero[B]) { (left, right) =>
       { a => Monoid.plus(left(a), right(a)) }

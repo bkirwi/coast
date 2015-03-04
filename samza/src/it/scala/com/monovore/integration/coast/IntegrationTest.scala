@@ -5,7 +5,7 @@ import java.nio.ByteBuffer
 import java.util.Properties
 
 import com.monovore.coast
-import coast.samza.{SafeBackend, SimpleBackend}
+import coast.samza.{SamzaConfig, SafeBackend, SimpleBackend}
 import com.monovore.coast.flow.Topic
 import com.monovore.coast.model.Graph
 import com.monovore.coast.wire.{BinaryFormat, Partitioner}
@@ -115,14 +115,14 @@ object IntegrationTest {
           producer.send(value.map { value => new KeyedMessage(name, key.toArray, partitionId, value.toArray)}: _*)
         }
 
-        val baseConfig = coast.samza.config(
+        val baseConfig = SamzaConfig.from(
           // toy-problem config
-          "task.commit.ms" -> "300",
+          "task.window.ms" -> "30",
 
+          // overridden in safe config generator
           "task.checkpoint.factory" -> "org.apache.samza.checkpoint.kafka.KafkaCheckpointManagerFactory",
           "task.checkpoint.system" -> "coast-system",
           "task.checkpoint.replication.factor" -> "1",
-          // overridden in safe config generator
           "systems.coast-system.samza.factory" -> "org.apache.samza.system.kafka.KafkaSystemFactory",
           // point things at local kafka / zookeeper2
           "systems.coast-system.consumer.zookeeper.connect" -> config.getProperty("zookeeper.connect"),
@@ -140,7 +140,7 @@ object IntegrationTest {
 
         val sleeps =
           if (simple) Seq(8000)
-          else (0 until 4).map { _ => Random.nextInt(800) + 600} ++ Seq(8000)
+          else (0 until 3).map { _ => Random.nextInt(1500) + 1500} ++ Seq(18000)
 
         for (sleepTime <- sleeps) {
 

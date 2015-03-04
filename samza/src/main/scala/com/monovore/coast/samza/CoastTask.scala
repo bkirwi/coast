@@ -6,13 +6,15 @@ import org.apache.samza.system._
 import org.apache.samza.task._
 import org.apache.samza.util.Logging
 
-class CoastTask extends StreamTask with InitableTask with Logging {
+class CoastTask extends StreamTask with InitableTask with WindowableTask with Logging {
 
   var collector: MessageCollector = _
 
   var receiver: CoastTask.Receiver = _
 
   override def init(config: Config, context: TaskContext): Unit = {
+
+    info("Initializing CoastTask...")
 
     val factory = SerializationUtil.fromBase64[CoastTask.Factory](config.get(samza.TaskKey))
 
@@ -27,6 +29,8 @@ class CoastTask extends StreamTask with InitableTask with Logging {
     }
 
     receiver = factory.make(config, context, finalReceiver)
+
+    info("Initialization complete.")
   }
 
   override def process(
@@ -47,12 +51,23 @@ class CoastTask extends StreamTask with InitableTask with Logging {
 
     this.collector = null
   }
+
+  override def window(collector: MessageCollector, coordinator: TaskCoordinator): Unit = {
+
+    this.collector = collector
+
+    receiver.window()
+
+    this.collector = null
+  }
 }
 
 object CoastTask {
 
   trait Receiver {
     def send(stream: String, partition: Int, offset: Long, key: Array[Byte], value: Array[Byte])
+
+    def window() {}
   }
 
   trait Factory extends Serializable {

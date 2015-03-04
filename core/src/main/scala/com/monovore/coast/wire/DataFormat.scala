@@ -5,7 +5,7 @@ import java.io._
 /**
  * Manages reading and writing data to Java's standard Data{Input,Output} classes.
  */
-trait DataFormat[A] {
+trait DataFormat[A] extends Serializable {
 
   def writeData(output: DataOutput, value: A): Unit
 

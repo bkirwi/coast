@@ -15,22 +15,7 @@ object SimpleBackend extends SamzaBackend {
 
     import com.monovore.coast.samza.ConfigGenerator._
 
-    def storageFor[A, B](element: Node[A, B], path: Path): Seq[Storage] = element match {
-      case Source(_) => Seq()
-      case PureTransform(up, _) => storageFor(up, path)
-      case Merge(ups) => {
-        ups.flatMap { case (branch, up) => storageFor(up, path / branch)}
-      }
-      case agg @ StatefulTransform(up, _, _) => {
-        val upstreamed = storageFor(up, path.next)
-        upstreamed :+ Storage(
-          path = path,
-          keyString = SerializationUtil.toBase64(agg.keyFormat),
-          valueString = SerializationUtil.toBase64(agg.stateFormat)
-        )
-      }
-      case GroupBy(up, _) => storageFor(up, path)
-    }
+    val base = SamzaConfig.Base(baseConfig)
 
     override def configure(graph: Graph): Map[String, Config] = {
 
@@ -62,22 +47,16 @@ object SimpleBackend extends SamzaBackend {
         )
 
         val storageMap = storage
-          .map { case storage @ Storage(name, keyFormat, msgFormat) =>
+          .flatMap { case (path, storage) =>
 
-            storage.serdeConfig ++ Map(
+            base.storageConfig(storage) ++ Map(
               s"stores.$name.factory" -> "org.apache.samza.storage.kv.inmemory.InMemoryKeyValueStorageEngineFactory"
             )
           }
-          .flatten.toMap
-
-        val defaults = storage
-          .map { storage =>
-            ConfigGenerator.defaultsForStore(storage.path.toString, baseConfig)
-          }
-          .flatten.toMap
+          .toMap
 
         name -> new MapConfig(
-          (defaults ++ baseConfigMap ++ configMap ++ storageMap).asJava
+          (baseConfigMap ++ configMap ++ storageMap).asJava
         )
       }
 
