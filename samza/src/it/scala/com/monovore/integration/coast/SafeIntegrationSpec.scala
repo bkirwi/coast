@@ -21,7 +21,16 @@ class SafeIntegrationSpec extends Specification with ScalaCheck {
 
     val Bar = Topic[String, Int]("bar")
 
-    "pass through data safely" in {
+    // table of contents
+    passthrough
+    flatMap
+    transforms
+    composition
+    merging
+    grouping
+    cycles
+
+    def passthrough = "pass through data safely" in {
 
       val graph = Flow.sink(Bar) {
         Flow.source(Foo)
@@ -40,7 +49,7 @@ class SafeIntegrationSpec extends Specification with ScalaCheck {
       output("second") must_== inputData("second")
     }
 
-    "flatMap nicely" in {
+    def flatMap = "flatMap nicely" in {
 
       val graph = Flow.sink(Bar) {
         Flow.source(Foo).flatMap { n => Seq.fill(3)(n) }
@@ -58,7 +67,7 @@ class SafeIntegrationSpec extends Specification with ScalaCheck {
       output("bar") must_== inputData("bar").flatMap { n => Seq.fill(3)(n) }
     }
 
-    "accumulate state" in {
+    def transforms = "accumulate state" in {
 
       val graph = Flow.sink(Bar) {
         Flow.source(Foo).fold(0) { (n, _) => n + 1 }.updates
@@ -77,9 +86,7 @@ class SafeIntegrationSpec extends Specification with ScalaCheck {
       output("two") must_== inputData("two")
     }
 
-    "compose well across multiple Samza jobs" in {
-
-      val BigNumber = 2000
+    def composition = "compose well across multiple Samza jobs" in {
 
       val graph = for {
 
@@ -103,7 +110,7 @@ class SafeIntegrationSpec extends Specification with ScalaCheck {
       output("bar").filter { _ % 100 == 0 } must_== inputData("bar").map { _ + 2 }.filter { _ % 100 == 0 }
     }
 
-    "do a merge" in {
+    def merging = "do a merge" in {
 
       val Foo2 = Topic[String, Int]("foo-2")
 
@@ -124,7 +131,7 @@ class SafeIntegrationSpec extends Specification with ScalaCheck {
       output("test").filter { _ % 2 == 0 } must_== (2 to BigNumber by 2)
     }
 
-    "regroup" in {
+    def grouping = "regroup" in {
 
       val graph = for {
 
@@ -136,21 +143,23 @@ class SafeIntegrationSpec extends Specification with ScalaCheck {
       } yield ()
 
       val input = Messages
-        .add(Foo, Map("test" -> (1 to BigNumber)))
+        .add(Foo, Map(
+          "first" -> (0 until BigNumber by 3),
+          "second" -> (1 until BigNumber by 3),
+          "third" -> (2 until BigNumber by 3)
+        ))
 
       val output = IntegrationTest.fuzz(graph, input).get(Bar)
 
-      for {
-        i <- 0 until 10
-        n <- output(i.toString)
-      } {
-        (n % 10) must_== i
+      forall(output) { case (key, values) =>
+        val remainder = key.toInt
+        values.sorted must_== (remainder until BigNumber by 10)
       }
 
       output must not be empty
     }
 
-    "handle cycles" in {
+    def cycles = "handle cycles" in {
 
       val graph = for {
 
