@@ -26,11 +26,6 @@ class SamzaSpec extends Specification with ScalaCheck {
 
       val configs = samza.SafeBackend().configure(sampleFlow)
 
-      for ((name, config) <- configs) {
-        println(name)
-        println(SamzaConfig.format(config))
-      }
-
       configs must haveSize(1)
 
       configs must beDefinedAt("bigger-ints")
