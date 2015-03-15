@@ -20,9 +20,9 @@ class CoastTask extends StreamTask with InitableTask with WindowableTask with Lo
 
     val finalReceiver = new CoastTask.Receiver {
 
-      override def send(stream: String, partition: Int, offset: Long, key: Array[Byte], value: Array[Byte]) {
+      override def send(stream: SystemStream, partition: Int, offset: Long, key: Array[Byte], value: Array[Byte]) {
 
-        val out = new OutgoingMessageEnvelope(new SystemStream(CoastSystem, stream), partition, key, value)
+        val out = new OutgoingMessageEnvelope(stream, partition, key, value)
 
         collector.send(out)
       }
@@ -39,7 +39,7 @@ class CoastTask extends StreamTask with InitableTask with WindowableTask with Lo
     coordinator: TaskCoordinator
   ): Unit = {
 
-    val stream = envelope.getSystemStreamPartition.getSystemStream.getStream
+    val stream = envelope.getSystemStreamPartition.getSystemStream
     val partition = envelope.getSystemStreamPartition.getPartition.getPartitionId
     val offset = envelope.getOffset.toLong
     val key = envelope.getKey.asInstanceOf[Array[Byte]]
@@ -65,7 +65,7 @@ class CoastTask extends StreamTask with InitableTask with WindowableTask with Lo
 object CoastTask {
 
   trait Receiver {
-    def send(stream: String, partition: Int, offset: Long, key: Array[Byte], value: Array[Byte])
+    def send(systemStream: SystemStream, partition: Int, offset: Long, key: Array[Byte], value: Array[Byte])
 
     def window() {}
   }

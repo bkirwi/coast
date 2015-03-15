@@ -199,7 +199,7 @@ class CoastKafkaSystemFactory extends SystemFactory with Logging {
 
     val producer = new KafkaProducer[Array[Byte], Array[Byte]](producerConfig)
 
-    val KeyRegex = s"systems\\.$CoastSystem\\.streams.(.+)\\.delay".r
+    val KeyRegex = s"systems\\.$systemName\\.streams.(.+)\\.delay".r
 
     val delays =
       config.asScala

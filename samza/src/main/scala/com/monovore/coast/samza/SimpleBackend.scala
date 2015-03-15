@@ -5,6 +5,7 @@ import com.monovore.coast.model._
 import com.twitter.algebird.Monoid
 import org.apache.samza.config.{Config, JobConfig, MapConfig, TaskConfig}
 import org.apache.samza.storage.kv.KeyValueStorageEngine
+import org.apache.samza.system.SystemStream
 import org.apache.samza.task.TaskContext
 
 import scala.collection.JavaConverters._
@@ -23,11 +24,11 @@ object SimpleBackend extends SamzaBackend {
 
       val configs = graph.bindings.map { case (name -> sink) =>
 
-        val inputs = sourcesFor(sink.element).map { i => s"$CoastSystem.$i" }
+        val inputs = sourcesFor(sink.element).map { i => s"${base.system}.$i" }
 
         val storage = storageFor(sink.element, Path(name))
 
-        val factory: CoastTask.Factory = new SimpleBackend.SinkFactory(sink)
+        val factory: CoastTask.Factory = new SimpleBackend.SinkFactory(base.system, sink)
 
         val configMap = Map(
 
@@ -39,7 +40,7 @@ object SimpleBackend extends SamzaBackend {
           TaskConfig.INPUT_STREAMS -> inputs.mkString(","),
 
           // Kafka system
-          s"systems.$CoastSystem.samza.offset.default" -> "oldest",
+          s"systems.${base.system}.samza.offset.default" -> "oldest",
 
           // Coast-specific
           TaskKey -> SerializationUtil.toBase64(factory),
@@ -64,13 +65,13 @@ object SimpleBackend extends SamzaBackend {
     }
   }
 
-  class SinkFactory[A, B](sink: Sink[A, B]) extends CoastTask.Factory {
+  class SinkFactory[A, B](system: String, sink: Sink[A, B]) extends CoastTask.Factory {
 
     override def make(config: Config, context: TaskContext, receiver: CoastTask.Receiver): CoastTask.Receiver = {
 
       val outputStream = config.get(samza.TaskName)
 
-      val numPartitions = SamzaBackend.getPartitions(config, CoastSystem, outputStream).size
+      val numPartitions = SamzaBackend.getPartitions(config, system, outputStream).size
 
       type Send[A, B] = (A, B) => Unit
 
@@ -114,7 +115,7 @@ object SimpleBackend extends SamzaBackend {
       val finalSink: Send[A, B] = { (key, value) =>
 
         receiver.send(
-          outputStream,
+          new SystemStream(system, outputStream),
           sink.keyPartitioner.partition(key, numPartitions),
           -1,
           sink.keyFormat.write(key),
@@ -128,8 +129,8 @@ object SimpleBackend extends SamzaBackend {
 
       new CoastTask.Receiver {
 
-        override def send(stream: String, partition: Int, offset: Long, key: Array[Byte], value: Array[Byte]) {
-          compiled.apply(stream).apply(key, value)
+        override def send(systemStream: SystemStream, partition: Int, offset: Long, key: Array[Byte], value: Array[Byte]) {
+          compiled.apply(systemStream.getStream).apply(key, value)
         }
       }
     }

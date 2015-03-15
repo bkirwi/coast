@@ -119,15 +119,17 @@ object IntegrationTest {
           // toy-problem config
           "task.window.ms" -> "30",
 
+          "coast.system.name" -> "toy-kafka",
+
           // overridden in safe config generator
           "task.checkpoint.factory" -> "org.apache.samza.checkpoint.kafka.KafkaCheckpointManagerFactory",
-          "task.checkpoint.system" -> "coast-system",
+          "task.checkpoint.system" -> "toy-kafka",
           "task.checkpoint.replication.factor" -> "1",
-          "systems.coast-system.samza.factory" -> "org.apache.samza.system.kafka.KafkaSystemFactory",
+          "systems.toy-kafka.samza.factory" -> "org.apache.samza.system.kafka.KafkaSystemFactory",
           // point things at local kafka / zookeeper2
-          "systems.coast-system.consumer.zookeeper.connect" -> config.getProperty("zookeeper.connect"),
-          "systems.coast-system.producer.metadata.broker.list" -> config.getProperty("metadata.broker.list"),
-          "systems.coast-system.producer.bootstrap.servers" -> config.getProperty("metadata.broker.list"),
+          "systems.toy-kafka.consumer.zookeeper.connect" -> config.getProperty("zookeeper.connect"),
+          "systems.toy-kafka.producer.metadata.broker.list" -> config.getProperty("metadata.broker.list"),
+          "systems.toy-kafka.producer.bootstrap.servers" -> config.getProperty("metadata.broker.list"),
           // config template for storage
           "coast.default.stores.changelog.replication.factor" -> "1"
         )

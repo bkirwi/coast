@@ -11,8 +11,6 @@ package object samza {
   val TaskName = "coast.task.name"
   val RegroupedStreams = "coast.streams.regrouped"
 
-  val CoastSystem = "coast-system"
-
   private[samza] implicit def function1Monoid[A, B: Monoid]: Monoid[A => B] =
     Monoid.from((_: A) => Monoid.zero[B]) { (left, right) =>
       { a => Monoid.plus(left(a), right(a)) }

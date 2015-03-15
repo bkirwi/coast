@@ -7,7 +7,7 @@ import safe._
 import com.google.common.base.Charsets
 import org.apache.samza.Partition
 import org.apache.samza.storage.kv.inmemory.InMemoryKeyValueStorageEngineFactory
-import org.apache.samza.system.SystemStreamPartition
+import org.apache.samza.system.{SystemStream, SystemStreamPartition}
 import org.apache.samza.util.Logging
 import org.apache.samza.config.{TaskConfig, JobConfig, Config, MapConfig}
 import org.apache.samza.storage.kv.KeyValueStore
@@ -20,7 +20,12 @@ object SafeBackend extends SamzaBackend {
 
   def apply(baseConfig: Config = new MapConfig()): ConfigGenerator = new SafeConfigGenerator(baseConfig)
 
-  class SinkFactory[A, B](mergeStream: String, checkpointStream: String, sinkNode: Sink[A, B]) extends CoastTask.Factory with Logging {
+  class SinkFactory[A, B](
+    system: String,
+    mergeStream: String,
+    checkpointStream: String,
+    sinkNode: Sink[A, B]
+  ) extends CoastTask.Factory with Logging {
 
     override def make(config: Config, context: TaskContext, whatSink: CoastTask.Receiver): CoastTask.Receiver = {
 
@@ -34,7 +39,7 @@ object SafeBackend extends SamzaBackend {
         .filter { _.nonEmpty }
         .toSet
 
-      val partitions = SamzaBackend.getPartitions(config, CoastSystem, streamName)
+      val partitions = SamzaBackend.getPartitions(config, system, streamName)
 
       val offsetThreshold =
         if (regroupedStreams(streamName)) 0L
@@ -55,10 +60,10 @@ object SafeBackend extends SamzaBackend {
             val qualifier = partitionIndex.toString.getBytes(Charsets.UTF_8)
             val payload = Messages.InternalMessage.binaryFormat.write(qualifier, offset, valueBytes)
             val newPartition = sinkNode.keyPartitioner.partition(key, partitions.size)
-            whatSink.send(streamName, newPartition, -1, keyBytes, payload)
+            whatSink.send(new SystemStream(system, streamName), newPartition, -1, keyBytes, payload)
           }
           else {
-            whatSink.send(streamName, partitionIndex, offset, keyBytes, valueBytes)
+            whatSink.send(new SystemStream(system, streamName), partitionIndex, offset, keyBytes, valueBytes)
           }
         }
 
@@ -81,10 +86,10 @@ object SafeBackend extends SamzaBackend {
 
       checkpoint.inputStreams
         .foreach { case ((name, p), state) =>
-          context.setStartingOffset(new SystemStreamPartition(CoastSystem, name, new Partition(p)), state.offset.toString)
+          context.setStartingOffset(new SystemStreamPartition(system, name, new Partition(p)), state.offset.toString)
         }
 
-      context.setStartingOffset(new SystemStreamPartition(CoastSystem, mergeStream, new Partition(partitionIndex)), checkpoint.mergeOffset.toString)
+      context.setStartingOffset(new SystemStreamPartition(system, mergeStream, new Partition(partitionIndex)), checkpoint.mergeOffset.toString)
 
       var mergeTip = checkpoint.mergeOffset
 
@@ -92,7 +97,9 @@ object SafeBackend extends SamzaBackend {
 
         import Checkpoint._
 
-        override def send(stream: String, partition: Int, offset: Long, key: Array[Byte], value: Array[Byte]) {
+        override def send(systemStream: SystemStream, partition: Int, offset: Long, key: Array[Byte], value: Array[Byte]) {
+
+          val stream = systemStream.getStream
 
           if (stream == mergeStream) {
             mergeTip = math.max(mergeTip, offset + 1)
@@ -107,7 +114,7 @@ object SafeBackend extends SamzaBackend {
 
                 val mergeMessage = Messages.MergeInfo.binaryFormat.write(stream, partition, offset)
 
-                whatSink.send(mergeStream, partitionIndex, checkpoint.mergeOffset, Array.empty, mergeMessage)
+                whatSink.send(new SystemStream(system, mergeStream), partitionIndex, checkpoint.mergeOffset, Array.empty, mergeMessage)
               }
 
               val (qualifier, qualifierOffset, message) =
@@ -196,7 +203,7 @@ class SafeConfigGenerator(baseConfig: Config = new MapConfig()) extends ConfigGe
 
       def className[A](implicit tag: ClassTag[A]): String = tag.runtimeClass.getName
 
-      val factory: CoastTask.Factory = new SafeBackend.SinkFactory(mergeStream, checkpointStream, sink)
+      val factory: CoastTask.Factory = new SafeBackend.SinkFactory(base.system, mergeStream, checkpointStream, sink)
 
       val configMap = Map(
 
@@ -205,23 +212,23 @@ class SafeConfigGenerator(baseConfig: Config = new MapConfig()) extends ConfigGe
 
         // Task
         TaskConfig.TASK_CLASS -> className[CoastTask],
-        TaskConfig.INPUT_STREAMS -> (inputs + mergeStream).map { i => s"$CoastSystem.$i" }.mkString(","),
+        TaskConfig.INPUT_STREAMS -> (inputs + mergeStream).map { i => s"${base.system}.$i" }.mkString(","),
         TaskConfig.MESSAGE_CHOOSER_CLASS_NAME -> className[MergingChooserFactory],
 
         // No-op checkpoints!
         "task.checkpoint.factory" -> className[NoopCheckpointManagerFactory],
 
         // Kafka system
-        s"systems.$CoastSystem.samza.offset.default" -> "oldest",
-        s"systems.$CoastSystem.producer.producer.type" -> "sync",
-        s"systems.$CoastSystem.producer.message.send.max.retries" -> "0",
-        s"systems.$CoastSystem.producer.request.required.acks" -> "1",
-        s"systems.$CoastSystem.samza.factory" -> className[CoastKafkaSystemFactory],
+        s"systems.${base.system}.samza.offset.default" -> "oldest",
+        s"systems.${base.system}.producer.producer.type" -> "sync",
+        s"systems.${base.system}.producer.message.send.max.retries" -> "0",
+        s"systems.${base.system}.producer.request.required.acks" -> "1",
+        s"systems.${base.system}.samza.factory" -> className[CoastKafkaSystemFactory],
 
         // Merge info
-        s"systems.$CoastSystem.streams.$mergeStream.merge" -> inputs.map { i => s"$CoastSystem.$i" }.mkString(","),
-        s"systems.$CoastSystem.streams.$mergeStream.samza.bootstrap" -> "true",
-        s"systems.$CoastSystem.streams.$mergeStream.samza.priority" -> "0",
+        s"systems.${base.system}.streams.$mergeStream.merge" -> inputs.map { i => s"${base.system}.$i" }.mkString(","),
+        s"systems.${base.system}.streams.$mergeStream.samza.bootstrap" -> "true",
+        s"systems.${base.system}.streams.$mergeStream.samza.priority" -> "0",
 
         // Coast-specific
         TaskKey -> SerializationUtil.toBase64(factory),

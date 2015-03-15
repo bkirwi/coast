@@ -19,7 +19,7 @@ object SamzaConfig {
 
   case class Base(base: Config) {
 
-    val system = base.get("coast.system.name", "coast-system")
+    val system = base.get("coast.system.name", "kafka")
 
     val mergePrefix = base.get("coast.prefix.merge", "coast.mg")
 
