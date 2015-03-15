@@ -1,7 +1,7 @@
 package com.monovore.coast.samza.safe
 
 import com.monovore.coast.flow.{Flow, Topic}
-import com.monovore.coast.samza.{CoastState, Path}
+import com.monovore.coast.samza.Path
 import com.monovore.coast.wire.BinaryFormat
 import org.specs2.ScalaCheck
 import org.specs2.mutable._

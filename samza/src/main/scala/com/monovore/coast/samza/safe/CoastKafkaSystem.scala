@@ -1,20 +1,18 @@
-package com.monovore.coast.samza
+package com.monovore.coast.samza.safe
 
 import java.util.Properties
-import java.util.regex.Pattern
 
-import _root_.kafka.producer.{Producer => KafkaProducer, ProducerConfig, KeyedMessage}
-import _root_.kafka.utils.ZKStringSerializer
+import kafka.producer.{KeyedMessage, Producer => KafkaProducer, ProducerConfig}
+import kafka.utils.ZKStringSerializer
 import org.I0Itec.zkclient.ZkClient
-import org.apache.samza.SamzaException
-import org.apache.samza.config.{KafkaConfig, Config}
+import org.apache.samza.config.{Config, KafkaConfig}
 import org.apache.samza.metrics.MetricsRegistry
 import org.apache.samza.system._
-import kafka.{KafkaSystemAdmin, ChangelogInfo, KafkaSystemFactory}
-import org.apache.samza.util.{Util, KafkaUtil, Logging}
+import kafka.{ChangelogInfo, KafkaSystemAdmin, KafkaSystemFactory}
+import org.apache.samza.util.{KafkaUtil, Logging}
 
-import scala.collection.mutable.ArrayBuffer
 import collection.JavaConverters._
+import scala.collection.mutable.ArrayBuffer
 
 object CoastKafkaSystem {
 

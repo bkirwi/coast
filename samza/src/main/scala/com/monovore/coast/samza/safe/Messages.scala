@@ -1,17 +1,15 @@
-package com.monovore.coast
-package samza
+package com.monovore.coast.samza.safe
 
 import com.monovore.coast.wire.DataFormat
 
 object Messages {
 
-//  case class MergeInfo(name: String, partition: Int, offset: Long)
-
   type StreamName = String
   type Partition = Int
   type Offset = Long
-  
   type Qualifier = Array[Byte]
+
+  // TODO: Case classes?
 
   type MergeInfo = (StreamName, Partition, Offset)
 

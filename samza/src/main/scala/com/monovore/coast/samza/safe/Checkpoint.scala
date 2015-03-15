@@ -1,14 +1,8 @@
-package com.monovore.coast.samza
-
-import java.io.{DataOutput, DataInput}
-
-import com.monovore.coast.samza.CoastTask.Receiver
-import com.monovore.coast.wire.{BinaryFormat, DataFormat}
-import org.apache.samza.system.{SystemStream, SystemStreamPartition}
+package com.monovore.coast.samza.safe
 
 import Checkpoint._
-
-import collection.mutable
+import com.monovore.coast.samza.Path
+import com.monovore.coast.wire.BinaryFormat
 
 case class Checkpoint(
   inputStreams: Map[(String, Int), InputState],
@@ -24,6 +18,7 @@ object Checkpoint {
     val default = InputState(0L, Map.empty)
   }
 
+  // FIXME: real serialization format for this. (JSON?)
   val format: BinaryFormat[Checkpoint] = com.monovore.coast.wire.javaSerialization[Checkpoint]
 
   val keyFormat: BinaryFormat[Unit] = new BinaryFormat[Unit] {

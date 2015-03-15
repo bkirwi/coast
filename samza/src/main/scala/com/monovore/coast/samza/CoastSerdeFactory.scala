@@ -16,13 +16,9 @@ class CoastSerdeFactory[A] extends SerdeFactory[A] {
   override def getSerde(name: String, config: Config): Serde[A] = {
 
     val format = SerializationUtil.fromBase64[BinaryFormat[A]](
-      config.get(ConfigSerdeFactory.keyForSerde(name, "serialized", "base64"))
+      config.get(s"serializers.registry.$name.serialized.base64")
     )
 
     new CoastSerde[A](format)
   }
-}
-
-object ConfigSerdeFactory {
-  def keyForSerde(keys: String*): String = s"serializers.registry.${keys.mkString(".")}"
 }

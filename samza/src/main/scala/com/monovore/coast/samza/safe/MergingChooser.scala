@@ -1,10 +1,10 @@
-package com.monovore.coast.samza
+package com.monovore.coast.samza.safe
 
 import org.apache.samza.Partition
 import org.apache.samza.config.Config
 import org.apache.samza.metrics.MetricsRegistry
-import org.apache.samza.system.{SystemStream, SystemStreamPartition, IncomingMessageEnvelope}
-import org.apache.samza.system.chooser.{MessageChooserFactory, MessageChooser}
+import org.apache.samza.system.chooser.{MessageChooser, MessageChooserFactory}
+import org.apache.samza.system.{IncomingMessageEnvelope, SystemStream, SystemStreamPartition}
 import org.apache.samza.util.Logging
 
 import collection.mutable

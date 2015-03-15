@@ -2,11 +2,8 @@ package com.monovore.coast
 package samza
 
 import com.monovore.coast.model._
-import com.twitter.algebird.Monoid
-
-import org.apache.samza.config.{TaskConfig, JobConfig, MapConfig, Config}
+import org.apache.samza.config.Config
 import wire.BinaryFormat
-import collection.JavaConverters._
 
 import scala.language.existentials
 

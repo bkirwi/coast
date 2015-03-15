@@ -1,5 +1,4 @@
-package com.monovore.coast
-package samza
+package com.monovore.coast.samza.safe
 
 import java.io.File
 import java.util
