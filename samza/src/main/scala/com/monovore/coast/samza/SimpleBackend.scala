@@ -5,6 +5,7 @@ import com.monovore.coast.model._
 import com.twitter.algebird.Monoid
 import org.apache.samza.config.{Config, JobConfig, MapConfig, TaskConfig}
 import org.apache.samza.storage.kv.KeyValueStorageEngine
+import org.apache.samza.storage.kv.inmemory.InMemoryKeyValueStorageEngineFactory
 import org.apache.samza.system.SystemStream
 import org.apache.samza.task.TaskContext
 
@@ -15,6 +16,7 @@ object SimpleBackend extends SamzaBackend {
   def apply(baseConfig: Config): ConfigGenerator = new ConfigGenerator {
 
     import com.monovore.coast.samza.ConfigGenerator._
+    import SamzaConfig.className
 
     val base = SamzaConfig.Base(baseConfig)
 
@@ -36,7 +38,7 @@ object SimpleBackend extends SamzaBackend {
           JobConfig.JOB_NAME -> name,
 
           // Task
-          TaskConfig.TASK_CLASS -> "com.monovore.coast.samza.CoastTask",
+          TaskConfig.TASK_CLASS -> className[CoastTask],
           TaskConfig.INPUT_STREAMS -> inputs.mkString(","),
 
           // Kafka system
@@ -51,7 +53,7 @@ object SimpleBackend extends SamzaBackend {
           .flatMap { case (path, storage) =>
 
             base.storageConfig(storage) ++ Map(
-              s"stores.$name.factory" -> "org.apache.samza.storage.kv.inmemory.InMemoryKeyValueStorageEngineFactory"
+              s"stores.$name.factory" -> className[InMemoryKeyValueStorageEngineFactory[_, _]]
             )
           }
           .toMap

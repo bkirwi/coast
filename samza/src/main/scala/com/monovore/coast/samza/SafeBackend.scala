@@ -1,20 +1,18 @@
 package com.monovore.coast
 package samza
 
-import model._
-import safe._
-
 import com.google.common.base.Charsets
+import model._
 import org.apache.samza.Partition
+import org.apache.samza.config.{Config, JobConfig, MapConfig, TaskConfig}
+import org.apache.samza.storage.kv.KeyValueStore
 import org.apache.samza.storage.kv.inmemory.InMemoryKeyValueStorageEngineFactory
 import org.apache.samza.system.{SystemStream, SystemStreamPartition}
-import org.apache.samza.util.Logging
-import org.apache.samza.config.{TaskConfig, JobConfig, Config, MapConfig}
-import org.apache.samza.storage.kv.KeyValueStore
 import org.apache.samza.task.TaskContext
+import org.apache.samza.util.Logging
+import safe._
 
 import collection.JavaConverters._
-import reflect.ClassTag
 
 object SafeBackend extends SamzaBackend {
 
@@ -77,8 +75,7 @@ object SafeBackend extends SamzaBackend {
 
       val compiled = compiler.compile(sinkNode.element, finalSink, streamName)
 
-      val checkpointKey = s"$streamName.checkpoint"
-      val checkpointStore = context.getStore(checkpointKey).asInstanceOf[KeyValueStore[Unit, Checkpoint]]
+      val checkpointStore = context.getStore(checkpointStream).asInstanceOf[KeyValueStore[Unit, Checkpoint]]
 
       var checkpoint: Checkpoint = Option(checkpointStore.get(unit)).getOrElse(Checkpoint(Map.empty, 0L, Map.empty))
 
@@ -169,6 +166,7 @@ object SafeBackend extends SamzaBackend {
 class SafeConfigGenerator(baseConfig: Config = new MapConfig()) extends ConfigGenerator {
 
   import ConfigGenerator._
+  import SamzaConfig.className
   
   val base = SamzaConfig.Base(baseConfig)
 
@@ -184,26 +182,23 @@ class SafeConfigGenerator(baseConfig: Config = new MapConfig()) extends ConfigGe
 
     val configs = graph.bindings.map { case (name -> sink) =>
 
-      val mergeStream = s"${base.mergePrefix}.$name"
-      val checkpoint = s"$name.checkpoint"
-      val checkpointStream = s"${base.checkpointPrefix}.$name"
+      val mergeStream = base.merge(name)
+      val checkpoint = base.checkpoint(name)
 
       val inputs = sourcesFor(sink.element)
 
       val statePaths = storageFor(sink.element, Path(name))
 
       val changelogDelays = statePaths
-        .map { case (path, storage) => base.changelogStream(storage.name) -> (path.branches.size + 2) }
+        .map { case (path, storage) => base.changelog(storage.name) -> (path.branches.size + 2) }
 
       val delays = changelogDelays ++ Map(
         mergeStream -> 0,
         name -> 1,
-        checkpointStream -> ((1 +: changelogDelays.values.toSeq).max + 1)
+        checkpoint -> ((1 +: changelogDelays.values.toSeq).max + 1)
       )
 
-      def className[A](implicit tag: ClassTag[A]): String = tag.runtimeClass.getName
-
-      val factory: CoastTask.Factory = new SafeBackend.SinkFactory(base.system, mergeStream, checkpointStream, sink)
+      val factory: CoastTask.Factory = new SafeBackend.SinkFactory(base.system, mergeStream, checkpoint, sink)
 
       val configMap = Map(
 
@@ -241,7 +236,7 @@ class SafeConfigGenerator(baseConfig: Config = new MapConfig()) extends ConfigGe
         .flatMap { case (path, storage) =>
 
           base.storageConfig(storage) ++ Map(
-            s"stores.${storage.name}.changelog" -> s"${base.system}.${base.changelogStream(storage.name)}",
+            s"stores.${storage.name}.changelog" -> s"${base.system}.${base.changelog(storage.name)}",
             s"stores.${storage.name}.factory" -> className[CoastStoreFactory[_, _]],
             s"stores.${storage.name}.subfactory" -> className[InMemoryKeyValueStorageEngineFactory[_, _]]
           )
@@ -256,7 +251,7 @@ class SafeConfigGenerator(baseConfig: Config = new MapConfig()) extends ConfigGe
       val checkpointConf = {
 
         base.storageConfig(Storage(checkpoint, Checkpoint.keyFormat, Checkpoint.format)) ++ Map(
-          s"stores.$checkpoint.changelog" -> s"${base.system}.$checkpointStream",
+          s"stores.$checkpoint.changelog" -> s"${base.system}.$checkpoint",
           s"stores.$checkpoint.factory" -> "org.apache.samza.storage.kv.inmemory.InMemoryKeyValueStorageEngineFactory"
         )
       }

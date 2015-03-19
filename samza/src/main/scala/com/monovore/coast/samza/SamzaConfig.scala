@@ -4,6 +4,7 @@ import com.monovore.coast.samza.ConfigGenerator.Storage
 import org.apache.samza.config.{Config, MapConfig}
 
 import collection.JavaConverters._
+import reflect.ClassTag
 
 object SamzaConfig {
 
@@ -17,18 +18,29 @@ object SamzaConfig {
       .mkString("\n")
   }
 
+  /**
+   * Samza often wants to be configured with specific class names; this helps
+   * to ensure that those names match actual classes.
+   */
+  def className[A](implicit tag: ClassTag[A]): String = tag.runtimeClass.getName
+
   case class Base(base: Config) {
 
     val system = base.get("coast.system.name", "kafka")
 
-    val mergePrefix = base.get("coast.prefix.merge", "coast.mg")
+    def merge(name: String) = {
+      val prefix = base.get("coast.prefix.merge", "coast.mg")
+      s"$prefix.$name"
+    }
 
-    val changelogPrefix = base.get("coast.prefix.changelog", "coast.cl")
+    def checkpoint(name: String) = {
+      val prefix = base.get("coast.prefix.checkpoint", "coast.cp")
+      s"$prefix.$name"
+    }
 
-    val checkpointPrefix = base.get("coast.prefix.checkpoint", "coast.cp")
-
-    def changelogStream(storage: String) = {
-      s"$changelogPrefix.$storage"
+    def changelog(name: String) = {
+      val changelogPrefix = base.get("coast.prefix.changelog", "coast.cl")
+      s"$changelogPrefix.$name"
     }
 
     def storageConfig(storage: Storage) = {
@@ -44,9 +56,9 @@ object SamzaConfig {
       defaults ++ Map(
         s"stores.$name.key.serde" -> keyName,
         s"stores.$name.msg.serde" -> msgName,
-        s"serializers.registry.$keyName.class" -> "com.monovore.coast.samza.CoastSerdeFactory",
+        s"serializers.registry.$keyName.class" -> className[CoastSerdeFactory[_]],
         s"serializers.registry.$keyName.serialized.base64" -> SerializationUtil.toBase64(keyString),
-        s"serializers.registry.$msgName.class" -> "com.monovore.coast.samza.CoastSerdeFactory",
+        s"serializers.registry.$msgName.class" -> className[CoastSerdeFactory[_]],
         s"serializers.registry.$msgName.serialized.base64" -> SerializationUtil.toBase64(valueString)
       )
     }
