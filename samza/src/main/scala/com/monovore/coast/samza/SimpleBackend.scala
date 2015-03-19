@@ -45,8 +45,8 @@ object SimpleBackend extends SamzaBackend {
           s"systems.${base.system}.samza.offset.default" -> "oldest",
 
           // Coast-specific
-          TaskKey -> SerializationUtil.toBase64(factory),
-          TaskName -> name
+          SamzaConfig.TaskKey -> SerializationUtil.toBase64(factory),
+          SamzaConfig.TaskName -> name
         )
 
         val storageMap = storage
@@ -66,7 +66,7 @@ object SimpleBackend extends SamzaBackend {
 
     override def make(config: Config, context: TaskContext, receiver: CoastTask.Receiver): CoastTask.Receiver = {
 
-      val outputStream = config.get(samza.TaskName)
+      val outputStream = config.get(SamzaConfig.TaskName)
 
       val numPartitions = SamzaBackend.getPartitions(config, system, outputStream).size
 

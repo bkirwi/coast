@@ -8,6 +8,10 @@ import reflect.ClassTag
 
 object SamzaConfig {
 
+  val TaskKey = "coast.task.serialized.base64"
+  val TaskName = "coast.task.name"
+  val RegroupedStreams = "coast.streams.regrouped"
+
   def from(pairs: (String, String)*) = new MapConfig(pairs.toMap.asJava)
 
   def format(config: Config): String = {

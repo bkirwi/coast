@@ -16,7 +16,7 @@ class CoastTask extends StreamTask with InitableTask with WindowableTask with Lo
 
     info("Initializing CoastTask...")
 
-    val factory = SerializationUtil.fromBase64[CoastTask.Factory](config.get(samza.TaskKey))
+    val factory = SerializationUtil.fromBase64[CoastTask.Factory](config.get(SamzaConfig.TaskKey))
 
     val finalReceiver = new CoastTask.Receiver {
 

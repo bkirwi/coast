@@ -7,10 +7,6 @@ import scala.collection.JavaConverters._
 
 package object samza {
 
-  val TaskKey = "coast.task.serialized.base64"
-  val TaskName = "coast.task.name"
-  val RegroupedStreams = "coast.streams.regrouped"
-
   private[samza] implicit def function1Monoid[A, B: Monoid]: Monoid[A => B] =
     Monoid.from((_: A) => Monoid.zero[B]) { (left, right) =>
       { a => Monoid.plus(left(a), right(a)) }

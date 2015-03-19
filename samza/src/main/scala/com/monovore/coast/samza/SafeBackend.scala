@@ -27,13 +27,13 @@ object SafeBackend extends SamzaBackend {
 
     override def make(config: Config, context: TaskContext, whatSink: CoastTask.Receiver): CoastTask.Receiver = {
 
-      val streamName = config.get(samza.TaskName)
+      val streamName = config.get(SamzaConfig.TaskName)
 
       val partitionIndex = context.getTaskName.getTaskName.split("\\W+").last.toInt // ICK!
 
       info(s"Initializing safe coast backend for task [$streamName/$partitionIndex]")
 
-      val regroupedStreams = config.get(RegroupedStreams).split(",")
+      val regroupedStreams = config.get(SamzaConfig.RegroupedStreams).split(",")
         .filter { _.nonEmpty }
         .toSet
 
@@ -226,9 +226,9 @@ class SafeConfigGenerator(baseConfig: Config = new MapConfig()) extends ConfigGe
         s"systems.${base.system}.streams.$mergeStream.samza.priority" -> "0",
 
         // Coast-specific
-        TaskKey -> SerializationUtil.toBase64(factory),
-        TaskName -> name,
-        RegroupedStreams -> regrouped.mkString(",")
+        SamzaConfig.TaskKey -> SerializationUtil.toBase64(factory),
+        SamzaConfig.TaskName -> name,
+        SamzaConfig.RegroupedStreams -> regrouped.mkString(",")
       )
 
 
