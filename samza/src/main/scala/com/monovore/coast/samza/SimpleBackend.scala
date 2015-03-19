@@ -50,12 +50,7 @@ object SimpleBackend extends SamzaBackend {
         )
 
         val storageMap = storage
-          .flatMap { case (path, storage) =>
-
-            base.storageConfig(storage) ++ Map(
-              s"stores.$name.factory" -> className[InMemoryKeyValueStorageEngineFactory[_, _]]
-            )
-          }
+          .flatMap { case (path, storage) => base.storageConfig(storage) }
           .toMap
 
         name -> new MapConfig(

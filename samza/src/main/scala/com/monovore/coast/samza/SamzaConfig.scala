@@ -50,10 +50,12 @@ object SamzaConfig {
       val defaults = base.subset("coast.default.stores.").asScala.toMap
         .map { case (key, value) => s"stores.$name.$key" -> value }
 
-      val keyName = s"$name.key"
-      val msgName = s"$name.msg"
+      val preconfigured = base.subset(s"stores.$name", false).asScala.toMap
 
-      defaults ++ Map(
+      val keyName = s"coast.key.$name"
+      val msgName = s"coast.msg.$name"
+
+      defaults ++ preconfigured ++ Map(
         s"stores.$name.key.serde" -> keyName,
         s"stores.$name.msg.serde" -> msgName,
         s"serializers.registry.$keyName.class" -> className[CoastSerdeFactory[_]],

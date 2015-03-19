@@ -18,6 +18,7 @@ import kafka.utils.{TestUtils, TestZKUtils}
 import kafka.zk.EmbeddedZookeeper
 import org.apache.samza.job.ApplicationStatus
 import org.apache.samza.job.local.ThreadJobFactory
+import org.apache.samza.storage.kv.inmemory.InMemoryKeyValueStorageEngineFactory
 import org.slf4j.LoggerFactory
 import org.specs2.execute.{SkipException, Skipped}
 
@@ -131,7 +132,8 @@ object IntegrationTest {
           "systems.toy-kafka.producer.metadata.broker.list" -> config.getProperty("metadata.broker.list"),
           "systems.toy-kafka.producer.bootstrap.servers" -> config.getProperty("metadata.broker.list"),
           // config template for storage
-          "coast.default.stores.changelog.replication.factor" -> "1"
+          "coast.default.stores.changelog.replication.factor" -> "1",
+          "coast.default.stores.factory" -> SamzaConfig.className[InMemoryKeyValueStorageEngineFactory[_,_]]
         )
 
         val backend = if (simple) SimpleBackend else SafeBackend

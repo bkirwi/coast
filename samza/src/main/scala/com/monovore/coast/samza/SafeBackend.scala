@@ -3,7 +3,7 @@ package samza
 
 import com.google.common.base.Charsets
 import model._
-import org.apache.samza.Partition
+import org.apache.samza.{SamzaException, Partition}
 import org.apache.samza.config.{Config, JobConfig, MapConfig, TaskConfig}
 import org.apache.samza.storage.kv.KeyValueStore
 import org.apache.samza.storage.kv.inmemory.InMemoryKeyValueStorageEngineFactory
@@ -235,10 +235,16 @@ class SafeConfigGenerator(baseConfig: Config = new MapConfig()) extends ConfigGe
       val storageMap = statePaths
         .flatMap { case (path, storage) =>
 
-          base.storageConfig(storage) ++ Map(
+          val baseConfig = base.storageConfig(storage)
+
+          val factoryKey = s"stores.${storage.name}.factory"
+
+          baseConfig ++ Map(
             s"stores.${storage.name}.changelog" -> s"${base.system}.${base.changelog(storage.name)}",
-            s"stores.${storage.name}.factory" -> className[CoastStoreFactory[_, _]],
-            s"stores.${storage.name}.subfactory" -> className[InMemoryKeyValueStorageEngineFactory[_, _]]
+            factoryKey -> className[CoastStoreFactory[_, _]],
+            s"stores.${storage.name}.subfactory" -> {
+              baseConfig.getOrElse(factoryKey, throw new SamzaException(s"Missing storage factory for ${storage.name}."))
+            }
           )
         }
         .toMap
@@ -251,8 +257,7 @@ class SafeConfigGenerator(baseConfig: Config = new MapConfig()) extends ConfigGe
       val checkpointConf = {
 
         base.storageConfig(Storage(checkpoint, Checkpoint.keyFormat, Checkpoint.format)) ++ Map(
-          s"stores.$checkpoint.changelog" -> s"${base.system}.$checkpoint",
-          s"stores.$checkpoint.factory" -> "org.apache.samza.storage.kv.inmemory.InMemoryKeyValueStorageEngineFactory"
+          s"stores.$checkpoint.changelog" -> s"${base.system}.$checkpoint"
         )
       }
 
