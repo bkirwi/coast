@@ -10,13 +10,12 @@ libraryDependencies ++= Seq(
   "ch.qos.logback" % "logback-classic" % "1.1.2",
   // TODO: integration tests only
   samzaDep("samza-kv-inmemory") exclude ("com.google.guava", "guava"),
-  samzaDep("samza-kafka") exclude("org.slf4j", "slf4j-log4j12"),
-  "org.slf4j" % "log4j-over-slf4j" % "1.7.6",
-  "org.apache.kafka" %% "kafka" % "0.8.2.0" classifier "test"
-    exclude("javax.jms", "jms") exclude("com.sun.jdmk", "jmxtools") exclude("com.sun.jmx", "jmxri") exclude("org.slf4j", "slf4j-log4j12")
+  samzaDep("samza-kafka") exclude("org.slf4j", "slf4j-log4j12") exclude("org.apache.zookeeper", "zookeeper"),
+  "org.slf4j" % "log4j-over-slf4j" % "1.7.6"
 )
 
 libraryDependencies ++= Seq(
+  "org.apache.kafka" %% "kafka" % "0.8.2.1" classifier "test", // TODO: scope under IntegrationTest
   "org.specs2" %% "specs2" % "2.4.15" % "it",
   "org.scalacheck" %% "scalacheck" % "1.12.1" % "it"
 )
