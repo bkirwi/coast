@@ -3,6 +3,7 @@ package samza
 
 import com.monovore.coast
 import com.monovore.coast.flow.{Flow, Topic}
+import org.apache.samza.storage.kv.inmemory.InMemoryKeyValueStorageEngineFactory
 
 import org.specs2.ScalaCheck
 import org.specs2.mutable._
@@ -24,7 +25,11 @@ class SamzaSpec extends Specification with ScalaCheck {
         Flow.source(source).fold(0) { _ + _ }.updates
       }
 
-      val configs = samza.SafeBackend().configure(sampleFlow)
+      val backend = samza.SafeBackend(baseConfig = SamzaConfig.from(
+        "coast.default.stores.factory" -> SamzaConfig.className[InMemoryKeyValueStorageEngineFactory[_, _]]
+      ))
+
+      val configs = backend.configure(sampleFlow)
 
       configs must haveSize(1)
 
@@ -32,7 +37,7 @@ class SamzaSpec extends Specification with ScalaCheck {
 
       val config = configs("bigger-ints")
 
-      config.get(samza.TaskName) must_== "bigger-ints"
+      config.get(SamzaConfig.TaskName) must_== "bigger-ints"
 
       config.get("stores.bigger-ints.factory") must_!= null
     }

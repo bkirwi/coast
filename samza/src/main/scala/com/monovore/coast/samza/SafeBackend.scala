@@ -3,13 +3,12 @@ package samza
 
 import com.google.common.base.Charsets
 import model._
-import org.apache.samza.{SamzaException, Partition}
 import org.apache.samza.config.{Config, JobConfig, MapConfig, TaskConfig}
 import org.apache.samza.storage.kv.KeyValueStore
-import org.apache.samza.storage.kv.inmemory.InMemoryKeyValueStorageEngineFactory
 import org.apache.samza.system.{SystemStream, SystemStreamPartition}
 import org.apache.samza.task.TaskContext
 import org.apache.samza.util.Logging
+import org.apache.samza.{Partition, SamzaException}
 import safe._
 
 import collection.JavaConverters._
@@ -209,6 +208,7 @@ class SafeConfigGenerator(baseConfig: Config = new MapConfig()) extends ConfigGe
         TaskConfig.TASK_CLASS -> className[CoastTask],
         TaskConfig.INPUT_STREAMS -> (inputs + mergeStream).map { i => s"${base.system}.$i" }.mkString(","),
         TaskConfig.MESSAGE_CHOOSER_CLASS_NAME -> className[MergingChooserFactory],
+        TaskConfig.WINDOW_MS -> base.windowMs,
 
         // No-op checkpoints!
         "task.checkpoint.factory" -> className[NoopCheckpointManagerFactory],
@@ -240,7 +240,6 @@ class SafeConfigGenerator(baseConfig: Config = new MapConfig()) extends ConfigGe
           val factoryKey = s"stores.${storage.name}.factory"
 
           baseConfig ++ Map(
-            s"stores.${storage.name}.changelog" -> s"${base.system}.${base.changelog(storage.name)}",
             factoryKey -> className[CoastStoreFactory[_, _]],
             s"stores.${storage.name}.subfactory" -> {
               baseConfig.getOrElse(factoryKey, throw new SamzaException(s"Missing storage factory for ${storage.name}."))
@@ -257,7 +256,8 @@ class SafeConfigGenerator(baseConfig: Config = new MapConfig()) extends ConfigGe
       val checkpointConf = {
 
         base.storageConfig(Storage(checkpoint, Checkpoint.keyFormat, Checkpoint.format)) ++ Map(
-          s"stores.$checkpoint.changelog" -> s"${base.system}.$checkpoint"
+          s"stores.$checkpoint.changelog" -> s"${base.system}.$checkpoint",
+          s"stores.$checkpoint.type" -> "checkpoint"
         )
       }
 

@@ -1,7 +1,7 @@
 package com.monovore.coast.samza
 
 import com.monovore.coast.samza.ConfigGenerator.Storage
-import org.apache.samza.config.{Config, MapConfig}
+import org.apache.samza.config.{TaskConfig, Config, MapConfig}
 
 import collection.JavaConverters._
 import reflect.ClassTag
@@ -31,6 +31,8 @@ object SamzaConfig {
   case class Base(base: Config) {
 
     val system = base.get("coast.system.name", "kafka")
+
+    val windowMs = base.get(TaskConfig.WINDOW_MS, "5000")
 
     def merge(name: String) = {
       val prefix = base.get("coast.prefix.merge", "coast.mg")
@@ -62,6 +64,7 @@ object SamzaConfig {
       defaults ++ preconfigured ++ Map(
         s"stores.$name.key.serde" -> keyName,
         s"stores.$name.msg.serde" -> msgName,
+        s"stores.$name.changelog" -> s"$system.${changelog(name)}",
         s"serializers.registry.$keyName.class" -> className[CoastSerdeFactory[_]],
         s"serializers.registry.$keyName.serialized.base64" -> SerializationUtil.toBase64(keyString),
         s"serializers.registry.$msgName.class" -> className[CoastSerdeFactory[_]],

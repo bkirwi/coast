@@ -41,7 +41,7 @@ object SimpleBackend extends SamzaBackend {
           TaskConfig.TASK_CLASS -> className[CoastTask],
           TaskConfig.INPUT_STREAMS -> inputs.mkString(","),
 
-          // Kafka system
+          // System
           s"systems.${base.system}.samza.offset.default" -> "oldest",
 
           // Coast-specific
