@@ -68,7 +68,7 @@ class CoastStorageEngine[K, V](
 
       val (up, down, valueBytes) = valueFormat.read(message.getMessage.asInstanceOf[Array[Byte]])
 
-      nextOffset += up
+      nextOffset = up
 
       downstreamOffset = down
 
