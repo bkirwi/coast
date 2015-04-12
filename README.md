@@ -21,8 +21,8 @@ around the edges. If something's particularly confusing or broken, feel free to
 - **Kafkaesque:** `coast`'s core abstractions are patterned after Kafka's
   data model, and it's designed to fit comfortably in the middle of a larger
   Kafka-based infrastructure. By taking advantage of Kafka's messaging
-  guarantees, `coast` can implement [exactly-once messaging and state updates][impossible] 
-  without a heavy coordination cost.
+  guarantees, `coast` can implement [exactly-once semantics][impossible] 
+  for messages and state without a heavy coordination cost.
 
 ## Quick Introduction
 
