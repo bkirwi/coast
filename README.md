@@ -2,10 +2,6 @@
 
 In this dark stream-processing landscape, `coast` is a ray of light.
 
-**NOTE:** This is a brand-new project, and many things are still a little rough
-around the edges. If something's particularly confusing or broken, feel free to
-[open an issue][issues].
-
 ## Why `coast`?
 
 - **Simple:** `coast` provides a simple streaming model with strong ordering and
@@ -45,7 +41,7 @@ If this all sounds promising, you might want to read through the
 [heavily-commented 'Twitter reach' example][twitter-reach], or [this fork of the
 hello-samza project][hello-coast].
 
-[samza]: http://samza.incubator.apache.org/
+[samza]: http://samza.apache.org/
 [hello-coast]: https://github.com/bkirwi/incubator-samza-hello-samza/tree/hello-coast 
 [twitter-reach]: core/src/main/scala/com/monovore/example/coast/TwitterReach.scala
 [impossible]: http://ben.kirw.in/2014/11/28/kafka-patterns/
