@@ -128,8 +128,8 @@ class CoastStoreFactory[A, B] extends StorageEngineFactory[A, B] {
 
     val serialized = new SerializedKeyValueStore[A, B](underlying, keySerde, msgSerde)
 
-    val keyFormat = DataFormat.wireFormat[Array[Byte]]
-    val valueFormat = DataFormat.wireFormat[(Long, Long, Array[Byte])]
+    val keyFormat = DataFormat.binaryFormat[Array[Byte]]
+    val valueFormat = DataFormat.binaryFormat[(Long, Long, Array[Byte])]
 
     new CoastStorageEngine[A, B](serialized, keySerde, msgSerde, collector, changeLogSystemStreamPartition, keyFormat, valueFormat)
   }

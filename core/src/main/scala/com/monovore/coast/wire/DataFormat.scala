@@ -31,15 +31,13 @@ class DataBinaryFormat[A](dataFormat: DataFormat[A]) extends BinaryFormat[A] {
     val bais = new ByteArrayInputStream(bytes)
     val input = new DataInputStream(bais)
 
-    val value = dataFormat.readData(input)
-
-    value
+    dataFormat.readData(input)
   }
 }
 
 object DataFormat {
 
-  def wireFormat[A](implicit dataFormat: DataFormat[A]): BinaryFormat[A] = new DataBinaryFormat[A](dataFormat)
+  def binaryFormat[A](implicit dataFormat: DataFormat[A]): BinaryFormat[A] = new DataBinaryFormat[A](dataFormat)
 
   def readData[A](input: DataInput)(implicit reader: DataFormat[A]): A = reader.readData(input)
 

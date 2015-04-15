@@ -15,13 +15,13 @@ object Messages {
 
   object MergeInfo {
 
-    val binaryFormat = DataFormat.wireFormat[MergeInfo]
+    val binaryFormat = DataFormat.binaryFormat[MergeInfo]
   }
   
   type InternalMessage = (Qualifier, Offset, Array[Byte])
   
   object InternalMessage {
     
-    val binaryFormat = DataFormat.wireFormat[InternalMessage]
+    val binaryFormat = DataFormat.binaryFormat[InternalMessage]
   }
 }

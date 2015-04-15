@@ -32,7 +32,7 @@ object TwitterReach extends ExampleMain {
    * them.
    *
    * First, we'll define a few `Topic`s. A `Topic` corresponds closely to a topic
-   * in Kafka; it groups together the topic name (a `String`) and the types of the
+   * in Kafka; it groups together the topic name and the types of the
    * partition keys and messages.
    *
    * Both our inputs are partitioned by user ID. Every time the user sends a
@@ -57,7 +57,7 @@ object TwitterReach extends ExampleMain {
    * your data. Don't be frightened! It's both safer and less verbose than using
    * configuration or a global registry, and the error messages are better.
    *
-   * For now, I'm importing `flow.wire.ugly._`, which uses `Object.hashCode`
+   * For now, I'm importing `coast.wire.ugly._`, which uses `Object.hashCode`
    * for partitioning and java serialization on the wire. I suggest not doing
    * this in production, but it's handy for experimenting.
    */

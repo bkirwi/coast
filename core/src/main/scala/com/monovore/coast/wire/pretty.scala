@@ -16,21 +16,21 @@ object pretty {
     override def read(bytes: Array[Byte]): Int = new String(bytes, UTF_8).toInt
   }
 
-  implicit val IntPartitioner: Partitioner[Int] = Partitioner.default
+  implicit val IntPartitioner: Partitioner[Int] = Partitioner.byHashCode
 
   implicit object StringFormat extends BinaryFormat[String] {
     override def write(value: String): Array[Byte] = value.getBytes(UTF_8)
     override def read(bytes: Array[Byte]): String = new String(bytes, UTF_8)
   }
 
-  implicit val StringPartitioner: Partitioner[String] = Partitioner.default
+  implicit val StringPartitioner: Partitioner[String] = Partitioner.byHashCode
 
   implicit object LongFormat extends BinaryFormat[Long] {
     override def write(value: Long): Array[Byte] = value.toString.getBytes(UTF_8)
     override def read(bytes: Array[Byte]): Long = new String(bytes, UTF_8).toLong
   }
 
-  implicit val LongPartitioner: Partitioner[Long] = Partitioner.default
+  implicit val LongPartitioner: Partitioner[Long] = Partitioner.byHashCode
 
   implicit object UnitFormat extends BinaryFormat[Unit] {
     def unitBytes = "()".getBytes(UTF_8)
