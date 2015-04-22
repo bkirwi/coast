@@ -6,7 +6,7 @@ import scala.annotation.implicitNotFound
 class AnyGrouping
 class Grouped extends AnyGrouping
 
-@implicitNotFound("Can't prove that the stream you're working with is grouped. You may need to label it first!")
+@implicitNotFound("Can't prove that the stream you're working with is grouped.")
 trait IsGrouped[-G <: AnyGrouping] {
   def stream[A, B](s: StreamDef[G, A, B]): GroupedStream[A, B]
   def pool[A, B](p: PoolDef[G, A, B]): GroupedPool[A, B]
