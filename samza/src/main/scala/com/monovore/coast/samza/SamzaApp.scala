@@ -6,7 +6,7 @@ import java.util.Properties
 
 import com.google.common.base.Charsets
 import com.google.common.io.Files
-import com.monovore.coast.model.Graph
+import com.monovore.coast.core.Graph
 import com.monovore.coast.viz.Dot
 import org.apache.samza.config.Config
 import org.apache.samza.config.factories.PropertiesConfigFactory

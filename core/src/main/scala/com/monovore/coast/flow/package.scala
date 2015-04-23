@@ -1,7 +1,7 @@
 package com.monovore.coast
 
 import com.monovore.coast.wire.{Partitioner, BinaryFormat}
-import com.monovore.coast.model.{Source, Merge, Sink}
+import com.monovore.coast.core.{Source, Merge, Sink}
 
 package object flow {
 

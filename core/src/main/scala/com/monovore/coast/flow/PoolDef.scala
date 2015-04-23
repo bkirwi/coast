@@ -1,7 +1,7 @@
 package com.monovore.coast
 package flow
 
-import com.monovore.coast.model._
+import com.monovore.coast.core._
 import com.monovore.coast.wire.BinaryFormat
 
 class PoolDef[+G <: AnyGrouping, A, +B](

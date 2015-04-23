@@ -3,7 +3,7 @@ package viz
 
 import java.util.concurrent.atomic.AtomicInteger
 
-import com.monovore.coast.model._
+import com.monovore.coast.core._
 
 object Dot {
 

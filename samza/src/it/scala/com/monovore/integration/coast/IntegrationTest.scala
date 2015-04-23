@@ -7,7 +7,7 @@ import java.util.Properties
 import com.monovore.coast
 import coast.samza.{SamzaConfig, SafeBackend, SimpleBackend}
 import com.monovore.coast.flow.Topic
-import com.monovore.coast.model.Graph
+import com.monovore.coast.core.Graph
 import com.monovore.coast.wire.{BinaryFormat, Partitioner}
 import kafka.api.{FetchRequest, PartitionFetchInfo, TopicMetadataRequest}
 import kafka.common.TopicAndPartition

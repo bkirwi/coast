@@ -4,7 +4,7 @@ package machine
 import com.monovore.coast
 import coast.flow
 import com.monovore.coast.flow.{Flow, Topic}
-import com.monovore.coast.model.Graph
+import com.monovore.coast.core.Graph
 
 import com.twitter.algebird.Semigroup
 import org.scalacheck.Prop

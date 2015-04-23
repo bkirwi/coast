@@ -1,7 +1,18 @@
-package com.monovore.coast.model
+package com.monovore.coast
+package core
 
+/**
+ * A trait that captures a stream transformation from A to B, with a state of S.
+ *
+ * Transformers are very composable: it's possible to build up a complex
+ * transformer by plugging simpler transformers together.
+ */
 trait Transformer[S, -A, +B] {
 
+  /**
+   * Given the current state and a new input, it returns an updated state and a
+   * sequence of outputs.
+   */
   def transform(state: S, input: A): (S, Seq[B])
 
   def map[B0](mapFn: B => B0): Transformer[S, A, B0] =

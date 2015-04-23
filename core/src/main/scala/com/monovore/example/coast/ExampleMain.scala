@@ -5,7 +5,7 @@ import java.io.File
 import com.google.common.base.Charsets
 import com.google.common.io.Files
 import com.monovore.coast.viz.Dot
-import com.monovore.coast.model.Graph
+import com.monovore.coast.core.Graph
 
 /**
  * A simple main method for running the example jobs. At the moment, it just

@@ -2,7 +2,7 @@ package com.monovore.coast
 package flow
 
 import com.monovore.coast.wire.{Partitioner, BinaryFormat}
-import model._
+import core._
 
 /**
  * A mechanism for maintaining name bindings.

@@ -2,7 +2,7 @@ package com.monovore.coast
 package samza
 
 import com.google.common.base.Charsets
-import model._
+import core._
 import org.apache.samza.config.{Config, JobConfig, MapConfig, TaskConfig}
 import org.apache.samza.storage.kv.KeyValueStore
 import org.apache.samza.system.{SystemStream, SystemStreamPartition}

@@ -2,7 +2,7 @@ package com.monovore.coast
 package samza
 package safe
 
-import com.monovore.coast.model._
+import com.monovore.coast.core._
 import com.monovore.coast.samza.Path
 
 private[samza] object TaskCompiler {

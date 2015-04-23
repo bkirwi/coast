@@ -1,5 +1,5 @@
 package com.monovore.coast
-package model
+package core
 
 import com.monovore.coast.wire.{Partitioner, BinaryFormat}
 

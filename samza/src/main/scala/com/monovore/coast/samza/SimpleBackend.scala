@@ -1,7 +1,7 @@
 package com.monovore.coast
 package samza
 
-import com.monovore.coast.model._
+import com.monovore.coast.core._
 import com.twitter.algebird.Monoid
 import org.apache.samza.config.{Config, JobConfig, MapConfig, TaskConfig}
 import org.apache.samza.storage.kv.KeyValueStorageEngine

@@ -2,7 +2,7 @@ package com.monovore.coast
 package machine
 
 import com.monovore.coast.flow._
-import com.monovore.coast.model._
+import com.monovore.coast.core._
 
 import com.twitter.algebird.Semigroup
 

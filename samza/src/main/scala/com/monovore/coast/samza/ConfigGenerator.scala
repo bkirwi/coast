@@ -1,7 +1,7 @@
 package com.monovore.coast
 package samza
 
-import com.monovore.coast.model._
+import com.monovore.coast.core._
 import org.apache.samza.config.Config
 import wire.BinaryFormat
 
