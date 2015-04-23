@@ -29,12 +29,3 @@ object Partitioner {
     }
   }
 }
-
-/**
- * A partitioner that uses the given Guava hash function and funnel.
- */
-case class GuavaPartitioner[-A](hashFunction: HashFunction, funnel: Funnel[_ >: A]) extends Partitioner[A] {
-
-  override def partition(a: A, numPartitions: Int): Int =
-    UnsignedInts.remainder(hashFunction.hashObject(a, funnel).asInt(), numPartitions)
-}
