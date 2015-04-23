@@ -211,7 +211,8 @@ class SafeConfigGenerator(baseConfig: Config = new MapConfig()) extends ConfigGe
         TaskConfig.WINDOW_MS -> base.windowMs,
 
         // No-op checkpoints!
-        "task.checkpoint.factory" -> className[NoopCheckpointManagerFactory],
+        TaskConfig.CHECKPOINT_MANAGER_FACTORY -> className[NoopCheckpointManagerFactory],
+        TaskConfig.COMMIT_MS -> "-1",
 
         // Kafka system
         s"systems.${base.system}.samza.offset.default" -> "oldest",
