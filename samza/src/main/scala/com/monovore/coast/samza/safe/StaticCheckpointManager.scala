@@ -17,17 +17,19 @@ class StaticCheckpointManager extends CheckpointManager with Logging {
   override def register(taskName: TaskName): Unit = {}
 
   override def writeCheckpoint(taskName: TaskName, checkpoint: SamzaCheckpoint): Unit = {
-    warn(s"Ignoring checkpoint for $taskName; you may want to disable checkpointing or use a real checkpoint manager")
+    warn(s"Ignoring checkpoint for $taskName; you probably want to disable checkpointing for this job.")
   }
 
   override def readLastCheckpoint(taskName: TaskName): SamzaCheckpoint =
     new SamzaCheckpoint(util.Collections.emptyMap())
 
-  // FIXME: review / document this
-
   override def writeChangeLogPartitionMapping(mapping: util.Map[TaskName, Integer]): Unit = {}
 
   override def readChangeLogPartitionMapping(): util.Map[TaskName, Integer] = {
+
+    val maxPartitions = 1000
+
+    info(s"Returning partition mapping for $maxPartitions static partitions. If you have more than $maxPartitions partitions, this might not work!")
 
     val map = new util.HashMap[TaskName, Integer]()
 
@@ -39,6 +41,6 @@ class StaticCheckpointManager extends CheckpointManager with Logging {
   }
 }
 
-class NoopCheckpointManagerFactory extends CheckpointManagerFactory {
+class StaticCheckpointManagerFactory extends CheckpointManagerFactory {
   override def getCheckpointManager(config: Config, registry: MetricsRegistry): CheckpointManager = new StaticCheckpointManager
 }
