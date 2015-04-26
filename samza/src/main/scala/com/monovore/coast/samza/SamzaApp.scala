@@ -23,28 +23,7 @@ import scala.collection.JavaConverters._
  */
 abstract class SamzaApp(backend: SamzaBackend) extends Logging {
 
-  val helpText =
-    """
-      |Try one of the following commands:
-      |
-      |  print-dot
-      |    Prints out a representation of the job graph in GraphViz's 'dot' format.
-      |
-      |  save-dot <filename>
-      |    Writes a representation of the job graph in GraphViz's 'dot' format to the specified file.
-      |
-      |  gen-config <base config path> <output dir>
-      |    Writes the generated config for the job to the given output directory.
-      |
-      |  run <base config path>
-      |    Launches all of the Samza jobs.
-      |
-      |  run-only <base config path> [<job names>]
-      |    Launches only the specified Samza job(s).
-      |
-      |  info <base config path>
-      |    Prints a summary of inputs, outputs, and internal state.
-    """.stripMargin
+  import SamzaApp._
 
   /**
    * The dataflow graph for this job.
@@ -79,79 +58,104 @@ abstract class SamzaApp(backend: SamzaBackend) extends Logging {
           new JobRunner(config).run()
         }
       }
+      case "help" :: Nil => println(helpText)
       case "info" :: basePath :: Nil => {
-
-        // TODO: less manual way to get this information!
-
-        val ChangelogKey = "stores\\.(.+)\\.changelog".r
-        val MergeKey = "systems\\.([^\\.]+)\\.streams\\.(.+)\\.merge".r
-        val CheckpointKey = "stores\\.(.+)\\.type".r
-
         val configs = withBaseConfig(basePath)
-
-        val CoastStream = s"[^\\.]+\\.(.+)".r
-
         for ((name, config) <- configs) {
-
-          val pairs = config.asScala.toSeq.sortBy { _._1 }
-
-          val mergeStream = pairs
-            .collectFirst { case (MergeKey(_, stream), _) => stream }
-
-          val checkpointStream = pairs
-            .collectFirst { case (CheckpointKey(store), "checkpoint") =>
-              pairs.collectFirst { case (ChangelogKey(`store`), CoastStream(value)) => value }
-            }
-            .flatten
-
-          val changelogs = pairs
-            .collect {
-              case (ChangelogKey(store), CoastStream(value)) => store -> value
-            }
-            .filterNot { case (_, stream) => checkpointStream.exists { _ == stream } }
-
-          val inputs = config.get("task.inputs", "").split(",")
-            .filter { _.nonEmpty }
-            .collect { case CoastStream(name) => name }
-            .filterNot { stream => mergeStream.exists { _ == stream } }
-
-          println(
-            s"""
-               |$name:
-               |
-               |  input streams:
-               |    ${inputs.mkString("\n    ")}
-               |
-               |  output stream:
-               |    $name
-               |
-               |  merge stream:
-               |    ${mergeStream.getOrElse("<none>")}
-               |
-               |  checkpoint stream:
-               |    ${checkpointStream.getOrElse("<none>")}
-               |
-               |  stores:
-               |    ${changelogs.map { case (store, changelog) => s"$store:\n      changelog: $changelog" }.mkString("\n    ")}
-             """.stripMargin
-          )
+          println(jobInfo(name, config))
         }
       }
-      case "help" :: Nil => println(helpText)
       case Nil => println("\nNo arguments provided!"); println(helpText)
       case unknown => println("\nUnrecognized arguments: " + unknown.mkString(" ")); println(helpText)
     }
   }
 
   private[this] def withBaseConfig(basePath: String): Map[String, Config] = {
+
     val baseConfigURI = new URI(basePath)
     val configFactory = new PropertiesConfigFactory
     val baseConfig = configFactory.getConfig(baseConfigURI)
 
     backend(baseConfig).configure(graph)
   }
+}
 
-  private[this] def generateConfigFiles(directory: File, configs: Map[String, Config]): Unit = {
+object SamzaApp {
+
+  val helpText =
+    """
+      |Try one of the following commands:
+      |
+      |  print-dot
+      |    Prints out a representation of the job graph in GraphViz's 'dot' format.
+      |
+      |  save-dot <filename>
+      |    Writes a representation of the job graph in GraphViz's 'dot' format to the specified file.
+      |
+      |  gen-config <base config path> <output dir>
+      |    Writes the generated config for the job to the given output directory.
+      |
+      |  run <base config path>
+      |    Launches all of the Samza jobs.
+      |
+      |  run-only <base config path> [<job names>]
+      |    Launches only the specified Samza job(s).
+      |
+      |  info <base config path>
+      |    Prints a summary of inputs, outputs, and internal state.
+    """.stripMargin
+
+  def jobInfo(name: String, config: Config) {
+
+    // TODO: less manual way to get this information!
+    val ChangelogKey = "stores\\.(.+)\\.changelog".r
+    val MergeKey = "systems\\.([^\\.]+)\\.streams\\.(.+)\\.merge".r
+    val CheckpointKey = "stores\\.(.+)\\.type".r
+    val CoastStream = s"[^\\.]+\\.(.+)".r
+
+    val pairs = config.asScala.toSeq.sortBy { _._1 }
+
+    val mergeStream = pairs
+      .collectFirst { case (MergeKey(_, stream), _) => stream }
+
+    val checkpointStream = pairs
+      .collectFirst { case (CheckpointKey(store), "checkpoint") =>
+        pairs.collectFirst { case (ChangelogKey(`store`), CoastStream(value)) => value }
+      }
+      .flatten
+
+    val changelogs = pairs
+      .collect {
+        case (ChangelogKey(store), CoastStream(value)) => store -> value
+      }
+      .filterNot { case (_, stream) => checkpointStream.exists { _ == stream } }
+
+    val inputs = config.get("task.inputs", "").split(",")
+      .filter { _.nonEmpty }
+      .collect { case CoastStream(name) => name }
+      .filterNot { stream => mergeStream.exists { _ == stream } }
+
+    s"""
+       |$name:
+       |
+       |  input streams:
+       |    ${inputs.mkString("\n    ")}
+       |
+       |  output stream:
+       |    $name
+       |
+       |  merge stream:
+       |    ${mergeStream.getOrElse("<none>")}
+       |
+       |  checkpoint stream:
+       |    ${checkpointStream.getOrElse("<none>")}
+       |
+       |  stores:
+       |    ${changelogs.map { case (store, changelog) => s"$store:\n      changelog: $changelog" }.mkString("\n    ")}
+     """.stripMargin
+  }
+
+  def generateConfigFiles(directory: File, configs: Map[String, Config]): Unit = {
 
     configs.foreach { case (name, config) =>
 
