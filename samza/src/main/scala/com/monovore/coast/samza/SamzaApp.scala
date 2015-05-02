@@ -1,17 +1,16 @@
 package com.monovore.coast.samza
 
 import java.io.{File, FileOutputStream}
-import java.net.URI
 import java.util.Properties
 
 import com.google.common.base.Charsets
 import com.google.common.io.Files
 import com.monovore.coast.core.Graph
 import com.monovore.coast.viz.Dot
+import joptsimple.{OptionParser, OptionSet}
 import org.apache.samza.config.Config
-import org.apache.samza.config.factories.PropertiesConfigFactory
 import org.apache.samza.job.JobRunner
-import org.apache.samza.util.Logging
+import org.apache.samza.util.{CommandLine, Logging}
 
 import scala.collection.JavaConverters._
 
@@ -33,64 +32,106 @@ abstract class SamzaApp(backend: SamzaBackend) extends Logging {
   def main(args: Array[String]): Unit = {
 
     args.toList match {
-      case "print-dot" :: Nil => {
-        println(Dot.describe(graph))
+      case "dot" :: rest => {
+
+        val dotParser = new OptionParser()
+
+        dotParser
+          .accepts("to-file", "Print the graph to the specified file, instead of stdout.")
+          .withRequiredArg()
+
+        val opts = dotParser.parse(rest: _*)
+
+        (Option(opts.valueOf("to-file")): @unchecked) match {
+          case Some(fileName: String) => Files.asCharSink(new File(fileName), Charsets.UTF_8).write(Dot.describe(graph))
+          case None => println(Dot.describe(graph))
+        }
       }
-      case "save-dot" :: fileName :: Nil => {
-        Files.asCharSink(new File(fileName), Charsets.UTF_8).write(Dot.describe(graph))
-      }
-      case "gen-config" :: basePath :: targetPath :: Nil => {
-        val configs = withBaseConfig(basePath)
-        val targetDirectory = new File(targetPath)
+      case "gen-config" :: rest => {
+
+        val opts = samzaCmd.parser.parse(rest: _*)
+        val configs = withBaseConfig(opts)
+
+        val targetDirectory = (Option(opts.valueOf("target-directory")): @unchecked) match {
+          case Some(target: String) => {
+            val targetDir = new File(target)
+            if (!targetDir.isDirectory) {
+              Console.err.println(s"Path $target is not a directory!")
+              sys.exit(1)
+            }
+            targetDir
+          }
+          case None => {
+            System.err.println("No target directory for config!")
+            samzaCmd.parser.printHelpOn(System.err)
+            sys.exit(1)
+          }
+        }
+
         generateConfigFiles(targetDirectory, configs)
       }
-      case "run" :: basePath :: Nil => {
-        val configs = withBaseConfig(basePath)
+      case "run" :: rest => {
+
+        val opts = samzaCmd.parser.parse(rest: _*)
+        val configs = withBaseConfig(opts)
+
         for ((name, config) <- configs) {
           info(s"Launching samza job: $name")
           new JobRunner(config).run()
         }
       }
-      case "run-only" :: basePath :: jobs => {
-        val configs = withBaseConfig(basePath).filterKeys(jobs.contains)
+      case "info" :: rest => {
+
+        val opts = samzaCmd.parser.parse(rest: _*)
+        val configs = withBaseConfig(opts)
+
         for ((name, config) <- configs) {
-          info(s"Launching samza job: $name")
-          new JobRunner(config).run()
+          print(jobInfo(name, config))
         }
       }
-      case "help" :: Nil => println(helpText)
-      case "info" :: basePath :: Nil => {
-        val configs = withBaseConfig(basePath)
-        for ((name, config) <- configs) {
-          println(jobInfo(name, config))
-        }
-      }
-      case Nil => println("\nNo arguments provided!"); println(helpText)
-      case unknown => println("\nUnrecognized arguments: " + unknown.mkString(" ")); println(helpText)
+      case unknown => Console.err.println("Available commands: dot, run, info, gen-config")
     }
   }
 
-  private[this] def withBaseConfig(basePath: String): Map[String, Config] = {
+  private[this] val samzaCmd = {
 
-    val baseConfigURI = new URI(basePath)
-    val configFactory = new PropertiesConfigFactory
-    val baseConfig = configFactory.getConfig(baseConfigURI)
+    val cmd = new CommandLine
+
+    cmd.parser
+      .accepts("job", "Executes the command on the Samza job with the given name. Repeat to specify multiple jobs, or omit to run on all jobs.")
+      .withRequiredArg()
+      .describedAs("job-name")
+
+    cmd.parser
+      .accepts("target-directory", "When generating config, write it to the specified directory.")
+      .withRequiredArg()
+      .describedAs("./target/directory")
+
+    cmd
+  }
+
+  private[this] def withBaseConfig(options: OptionSet): Map[String, Config] = {
+
+    val baseConfig = samzaCmd.loadConfig(options)
+
+    val jobFilter =
+      Option(options.valuesOf("job"))
+        .map { _.asScala.collect { case job: String => job }.toSet }
+        .filter { _.nonEmpty }
+        .getOrElse { _: String => true }
 
     backend(baseConfig).configure(graph)
+      .filter { case (name, _) => jobFilter(name) }
   }
 }
 
 object SamzaApp {
 
   val helpText =
-    """
-      |Try one of the following commands:
+    """Invalid arguments! Try one of the following commands:
       |
-      |  print-dot
-      |    Prints out a representation of the job graph in GraphViz's 'dot' format.
-      |
-      |  save-dot <filename>
-      |    Writes a representation of the job graph in GraphViz's 'dot' format to the specified file.
+      |  dot
+      |    Print out a representation of the job graph in GraphViz's 'dot' format.
       |
       |  gen-config <base config path> <output dir>
       |    Writes the generated config for the job to the given output directory.
@@ -98,14 +139,12 @@ object SamzaApp {
       |  run <base config path>
       |    Launches all of the Samza jobs.
       |
-      |  run-only <base config path> [<job names>]
-      |    Launches only the specified Samza job(s).
-      |
       |  info <base config path>
-      |    Prints a summary of inputs, outputs, and internal state.
+      |    Prints a summary of inputs, outputs, and internal state for every
+      |    generated Samza job.
     """.stripMargin
 
-  def jobInfo(name: String, config: Config) {
+  def jobInfo(name: String, config: Config): String = {
 
     // TODO: less manual way to get this information!
     val ChangelogKey = "stores\\.(.+)\\.changelog".r
