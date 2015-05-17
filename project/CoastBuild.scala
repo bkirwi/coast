@@ -17,7 +17,7 @@ object CoastBuild extends Build {
     scalacOptions in ThisBuild := Seq("-feature", "-language:higherKinds"),
 
     organization in ThisBuild := "com.monovore",
-    version in ThisBuild := "0.2.0-SNAPSHOT",
+    version in ThisBuild := "0.2.0",
 
     licenses in ThisBuild += ("Apache-2.0", url("https://www.apache.org/licenses/LICENSE-2.0.html")),
 
@@ -26,6 +26,7 @@ object CoastBuild extends Build {
 
     // No tests in aggregate project
     test := (),
+    publish := (),
 
     libraryDependencies in ThisBuild ++= Seq(
       "org.specs2" %% "specs2" % "2.4.15" % "test",
