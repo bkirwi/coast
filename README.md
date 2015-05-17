@@ -38,13 +38,39 @@ unit-test your logic using a simple in-memory implementation, or compile the
 graph to multiple [Samza jobs][samza] and run it on a cluster.
 
 If this all sounds promising, you might want to read through the
-[heavily-commented 'Twitter reach' example][twitter-reach], or [this fork of the
-hello-samza project][hello-coast].
+[heavily-commented 'Twitter reach' example][twitter-reach],
+check out [this fork of the `hello-samza` project][hello-coast],
+or peruse [the wiki][wiki].
 
 [samza]: http://samza.apache.org/
 [hello-coast]: https://github.com/bkirwi/incubator-samza-hello-samza/tree/hello-coast 
 [twitter-reach]: core/src/main/scala/com/monovore/example/coast/TwitterReach.scala
 [impossible]: http://ben.kirw.in/2014/11/28/kafka-patterns/
+[wiki]: https://github.com/bkirwi/coast/wiki
+
+## Getting Started
+
+The 0.2.0 release is published on Bintray.
+If you're using maven, you'll want to point your `pom.xml` at the repo:
+
+```xml
+<repository>
+  <id>bintray-coast</id>
+  <url>https://dl.bintray.com/bkirwi/maven</url>
+</repository>
+```
+
+...and add `coast` to your dependencies:
+
+```xml
+<dependency>
+  <groupId>com.monovore</groupId>
+  <artifactId>coast-samza_2.10</artifactId>
+  <version>0.2.0</version>
+</dependency>
+```
+
+*Mutatis mutandis*, the same goes for SBT and Gradle.
 
 ## Mandatory Word Count Example
 
@@ -68,9 +94,10 @@ val graph = for {
 } yield ()
 ```
 
-## Missing Pieces
+## Future Work
 
-There's a lot of work do still; if you're interested, have a look at the [open
-issues][issues], or check back in a few weeks.
+If you're interested in what the future holds for `coast` --
+or have questions or bugs to report -- 
+come on over to the [issue tracker][issues].
 
 [issues]: https://github.com/bkirwi/coast/issues
