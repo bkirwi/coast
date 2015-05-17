@@ -125,6 +125,9 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
         }
       }
   }
+
+  def zipWithKey: StreamDef[G, A, (A, B)] =
+    stream.withKeys.map { k => v => (k, v) }
 }
 
 class StreamDef[+G <: AnyGrouping, A, +B](element: Node[A, B])
