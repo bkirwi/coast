@@ -132,8 +132,7 @@ object IntegrationTest {
           "systems.toy-kafka.producer.metadata.broker.list" -> config.getProperty("metadata.broker.list"),
           "systems.toy-kafka.producer.bootstrap.servers" -> config.getProperty("metadata.broker.list"),
           // config template for storage
-          "coast.default.stores.changelog.replication.factor" -> "1",
-          "coast.default.stores.factory" -> SamzaConfig.className[InMemoryKeyValueStorageEngineFactory[_,_]]
+          "coast.default.stores.changelog.replication.factor" -> "1"
         )
 
         val backend = if (simple) SimpleBackend else SafeBackend

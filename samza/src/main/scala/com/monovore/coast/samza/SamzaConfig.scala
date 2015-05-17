@@ -53,6 +53,10 @@ object SamzaConfig {
 
       import storage._
 
+      val basic = Map(
+        s"stores.$name.factory" -> className[org.apache.samza.storage.kv.inmemory.InMemoryKeyValueStorageEngineFactory[_,_]]
+      )
+
       val defaults = base.subset("coast.default.stores.").asScala.toMap
         .map { case (key, value) => s"stores.$name.$key" -> value }
 
@@ -61,7 +65,7 @@ object SamzaConfig {
       val keyName = s"coast.key.$name"
       val msgName = s"coast.msg.$name"
 
-      defaults ++ preconfigured ++ Map(
+      basic ++ defaults ++ preconfigured ++ Map(
         s"stores.$name.key.serde" -> keyName,
         s"stores.$name.msg.serde" -> msgName,
         s"stores.$name.changelog" -> s"$system.${changelog(name)}",
