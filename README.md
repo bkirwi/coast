@@ -11,7 +11,7 @@ In this dark stream-processing landscape, `coast` is a ray of light.
 
 - **Easy:** Streams are built up and wired together using a concise, idiomatic
   Scala API. These dataflow graphs can be as small or as large as you like:
-  there's no pressure to cram all your logic in one big job, or to write a bunch
+  no need to cram all your logic in one big job, or to write a bunch
   of single-stage jobs and track their relationships by hand.
 
 - **Kafkaesque:** `coast`'s core abstractions are patterned after Kafka's
