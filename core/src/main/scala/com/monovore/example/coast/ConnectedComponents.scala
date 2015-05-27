@@ -1,119 +1,107 @@
 package com.monovore.example.coast
 
-import com.monovore.coast.core.Transformer
-import com.monovore.coast.flow.{Flow, GroupedStream}
+import com.monovore.coast.flow.{GroupedPool, Flow, GroupedStream}
 import com.monovore.coast.wire.BinaryFormat
 
 import scala.collection.immutable.SortedSet
 
+/**
+ * An implementation of connected components: given a stream of new edges, we
+ * incrementally maintain a mapping of node id to component id -- where the id
+ * for the component is the smallest id of any node in that component.
+ *
+ * This cribs heavily of the MR-based implementation presented here:
+ *
+ * http://mmds-data.org/presentations/2014_/vassilvitskii_mmds14.pdf
+ */
 object ConnectedComponents {
 
   import com.monovore.coast.wire.pretty._
 
   type NodeID = Long
 
-  /**
-   * A node is either the label for its component, or labelled with another node
-   * in the same component.
-   */
-  sealed trait LabelState
-  case class IsLabel(others: SortedSet[NodeID] = SortedSet.empty) extends LabelState
-  case class HasLabel(label: NodeID) extends LabelState
-
-  /**
-   * We send a couple events whenever we pick a new label for a node: one grouped
-   * under the node id that contains the new label, and one grouped under the
-   * label with the new node for that component.
-   */
-  sealed trait Event
-  case class ConnectedTo(other: NodeID) extends Event
-  case class SetLabel(label: NodeID) extends Event
-
-  implicit val labelStateFormat = BinaryFormat.javaSerialization[LabelState]
-  implicit val eventFormat = BinaryFormat.javaSerialization[Event]
+  implicit val eventFormat = BinaryFormat.javaSerialization[SortedSet[NodeID]]
 
   /**
    * Given a stream of graph edges, returns a stream of (node, component label) pairs,
    * where the label for a component is the smallest id of any node in that component.
-   *
-   * The edges in the input stream should be keyed by the larger of the two ids.
    */
   def findComponents(
-    stream: GroupedStream[NodeID, NodeID]
+    input: GroupedStream[NodeID, NodeID]
   ): Flow[GroupedStream[NodeID, NodeID]] = {
 
-    /**
-     * This cycle is the engine of the algorithm, which is loosely based on the
-     * standard union-find approach. Since we need to write out a new message
-     * every time the label for some node changes, we collapse the union and
-     * find operations together.
-     *
-     * In the first phase, we send a series of ConnectedTo messages, 'walking'
-     * up the tree to find the root for each of the two nodes. If they have
-     * different roots, phase two involves setting all the nodes in one component
-     * to the newly-discovered minimum.
-     */
-    val components = Flow.cycle[NodeID, Event]("component-loop") { components =>
+    // tiny helper to create two directed edges from a single pair of nodes
+    def connect(one: NodeID, other: NodeID) = Seq(one -> other, other -> one)
 
-      Flow.merge("input" -> stream.map(ConnectedTo), "components" -> components)
-        .zipWithKey
-        .transformWith(IsLabel(): LabelState) {
+    // the large-star step: connect all larger neighbours to the least neighbour
+    def doLargeStar(smallStar: GroupedStream[NodeID, NodeID]) =
+      smallStar
+        .withKeys.transform(SortedSet.empty[NodeID]) { node => (neighbours, newEdge) =>
 
-          def relabelComponent(members: SortedSet[NodeID], newLabel: NodeID) = {
+          val all = neighbours + node
+          val least = all.min
+          val newNeigbours = neighbours + newEdge
 
-            val relabeled =
-              members.toSeq.map { member => newLabel -> ConnectedTo(member) }
-
-            Transformer.setState[LabelState](HasLabel(newLabel)) andThen
-              Transformer.outputEach(relabeled)
+          if (newEdge < least) {
+            val larger = neighbours.toSeq.filter {_ > node}
+            newNeigbours -> larger.flatMap { connect(_, newEdge) }
           }
-
-          Transformer.onInput {
-            case (source, ConnectedTo(target)) => {
-              if (source == target) Transformer.skip
-              else if (source > target) {
-                Transformer.onState {
-                  case HasLabel(label) => {
-                    if (target == label) Transformer.skip
-                    else if (target > label) Transformer.output(target -> ConnectedTo(label))
-                    else {
-                      Transformer.setState[LabelState](HasLabel(target)) andThen
-                        Transformer.output(label -> ConnectedTo(target))
-                    }
-                  }
-                  case IsLabel(members) => relabelComponent(members + source, target)
-                }
-              }
-              else Transformer.onState {
-                case HasLabel(repr) => Transformer.output(repr -> ConnectedTo(target))
-                case IsLabel(members) => {
-                  Transformer.setState[LabelState](IsLabel(members + target)) andThen
-                    Transformer.output(target -> SetLabel(source))
-                }
-              }
-            }
-            case (source, SetLabel(target)) => Transformer.onState {
-              case HasLabel(label) => {
-                if (label > target) Transformer.setState(HasLabel(target))
-                else Transformer.skip
-              }
-              case IsLabel(members) => {
-                sys.error(s"Tried to set label for $source to $target, but $source is already the label!")
-              }
-            }
-          }
+          else if (newEdge < node || all.contains(newEdge)) newNeigbours -> Nil
+          else newNeigbours -> connect(newEdge, least)
         }
         .groupByKey
 
-    }
+    // the small-star step: connect all smaller (or equal) neighbours to the least neighbour
+    def doSmallStar(largeStar: GroupedStream[NodeID, NodeID]) =
+      largeStar
+        .withKeys
+        .transform(SortedSet.empty[NodeID]) { node => (neighbours, newEdge) =>
 
-    components.map { stream =>
-      stream
-        .collect { case SetLabel(other) => other }
-        .transform(Long.MaxValue) { (label, update) =>
-          if (label <= update) label -> Nil
-          else update -> Seq(update)
+          val all = (neighbours + node)
+          val least = all.min
+
+          if (node < newEdge || all.contains(newEdge)) neighbours -> Nil
+          else if (least < newEdge) SortedSet(newEdge) -> connect(newEdge, least)
+          else SortedSet(newEdge) -> all.toSeq.flatMap(connect(_, newEdge))
         }
-    }
+        .groupByKey
+
+    for {
+
+      // group the input both directions
+      connectedInput <- Flow.stream("connected-input") {
+        input.withKeys.flatMap { one => other => connect(one, other) }.groupByKey
+      }
+
+      // this subgraph contains the core algorithm
+      // large-star messages go to small-star, and vice-versa
+      largeStar <- Flow.cycle[NodeID, NodeID]("large-star") { largeStar =>
+
+        for {
+
+          smallStar <- Flow.stream("small-star") {
+            val inputs = Flow.merge("large" -> largeStar, "input" -> connectedInput)
+            doSmallStar(inputs)
+          }
+
+          largeStar = {
+            doLargeStar(smallStar)
+          }
+
+        } yield largeStar
+      }
+
+      // finally, we take the least message we've seen for each component
+      leastComponent = {
+        largeStar
+          .withKeys.transform(Long.MaxValue) { node => (currentOrMax, next) =>
+            val current = currentOrMax min node
+            val min = current min next
+            if (min < current) min -> Seq(min)
+            else current -> Nil
+          }
+      }
+
+    } yield leastComponent
   }
 }
