@@ -42,8 +42,8 @@ class ConnectedComponentsSpec extends Specification with ScalaCheck {
 
       val gen = for {
         x <- Gen.choose(0L, 9L)
-        n <- Gen.choose(1, 3)
-        ys <- Gen.listOfN(n, Gen.choose(0L, x-1))
+        n <- Gen.choose(1, 5)
+        ys <- Gen.listOfN(n, Gen.choose(0L, 9L))
       } yield (x -> ys)
 
       Prop.forAll(Gen.mapOf(gen)) { inputs =>
