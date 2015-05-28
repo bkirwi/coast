@@ -10,7 +10,7 @@ import scala.collection.immutable.SortedSet
  * incrementally maintain a mapping of node id to component id -- where the id
  * for the component is the smallest id of any node in that component.
  *
- * This cribs heavily of the MR-based implementation presented here:
+ * This cribs heavily off the MR-based implementation presented here:
  *
  * http://mmds-data.org/presentations/2014_/vassilvitskii_mmds14.pdf
  */
@@ -31,7 +31,7 @@ object ConnectedComponents {
   ): Flow[GroupedStream[NodeID, NodeID]] = {
 
     // tiny helper to create two directed edges from a single pair of nodes
-    def connect(one: NodeID, other: NodeID) = Seq(one -> other, other -> one)
+    def connect(a: NodeID, b: NodeID) = Seq(a -> b, b -> a)
 
     // the large-star step: connect all larger neighbours to the least neighbour
     def doLargeStar(smallStar: GroupedStream[NodeID, NodeID]) =
@@ -73,7 +73,7 @@ object ConnectedComponents {
         input.withKeys.flatMap { one => other => connect(one, other) }.groupByKey
       }
 
-      // this subgraph contains the core algorithm
+      // this cycle handles the core loop of the algorithm
       // large-star messages go to small-star, and vice-versa
       largeStar <- Flow.cycle[NodeID, NodeID]("large-star") { largeStar =>
 
