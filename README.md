@@ -37,16 +37,22 @@ use the resulting graphs in multiple ways: print it out as a GraphViz image,
 unit-test your logic using a simple in-memory implementation, or compile the 
 graph to multiple [Samza jobs][samza] and run it on a cluster.
 
-If this all sounds promising, you might want to read through the
-[heavily-commented 'Twitter reach' example][twitter-reach],
-check out [this fork of the `hello-samza` project][hello-coast],
-or peruse [the wiki][wiki].
+Sound promising? You might be interested in:
+- The [heavily-commented 'Twitter reach' example][twitter-reach],
+  which walks through all the pieces of a real job.
+- A [fork of the `hello-samza` project][hello-coast] with setup and deployment instructions.
+- Some [wiki documentation][wiki] on [the core concepts][wiki-overview],
+  nuances of the [graph-builder API][wiki-flow],
+  or [details on the Samza integration][wiki-samza].
 
 [samza]: http://samza.apache.org/
 [hello-coast]: https://github.com/bkirwi/incubator-samza-hello-samza/tree/hello-coast 
 [twitter-reach]: core/src/main/scala/com/monovore/example/coast/TwitterReach.scala
 [impossible]: http://ben.kirw.in/2014/11/28/kafka-patterns/
 [wiki]: https://github.com/bkirwi/coast/wiki
+[wiki-overview]: https://github.com/bkirwi/coast/wiki/Overview
+[wiki-flow]: https://github.com/bkirwi/coast/wiki/Flow
+[wiki-samza]: https://github.com/bkirwi/coast/wiki/Samza
 
 ## Getting Started
 
