@@ -32,6 +32,10 @@ object Dot {
         val label = Label(Public(name), name)
         Seq(Edge(label, downstream))
       }
+      case Clock(seconds) => {
+        val id = newID(s"clock [$seconds seconds]")
+        Seq(Edge(id, downstream))
+      }
       case PureTransform(upstream, _) => {
         val id = newID("transform")
         sources(id, upstream) ++ Seq(Edge(id, downstream))

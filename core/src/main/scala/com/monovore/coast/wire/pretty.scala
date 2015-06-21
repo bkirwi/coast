@@ -37,4 +37,8 @@ object pretty {
     override def write(value: Unit): Array[Byte] = unitBytes
     override def read(bytes: Array[Byte]): Unit = require(util.Arrays.equals(unitBytes, bytes))
   }
+
+  implicit object UnitPartitioner extends Partitioner[Unit] {
+    override def partition(a: Unit, numPartitions: Int): Int = 0
+  }
 }
