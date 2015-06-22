@@ -52,7 +52,7 @@ object Flow {
   def source[A : BinaryFormat, B : BinaryFormat](topic: Topic[A,B]): GroupedStream[A, B] =
     new StreamDef[Grouped, A, B](Source[A, B](topic.name))
 
-  def clock(seconds: Long) = new StreamDef[Grouped, Unit, Unit](Clock(seconds))
+  def clock(seconds: Long) = new StreamDef[Grouped, Unit, Long](Clock(seconds))
 
   def sink[A : BinaryFormat : Partitioner, B : BinaryFormat](topic: Topic[A, B])(flow: FlowLike[GroupedStream[A, B]]): Flow[Unit] = {
     flow.toFlow.flatMap { stream => Flow(Seq(topic.name -> Sink(stream.element)), ()) }

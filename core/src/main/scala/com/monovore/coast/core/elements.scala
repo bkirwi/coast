@@ -12,7 +12,7 @@ case class Source[A, B](
   val valueFormat: BinaryFormat[B]
 ) extends Node[A, B]
 
-case class Clock(seconds: Long) extends Node[Unit, Unit]
+case class Clock(seconds: Long) extends Node[Unit, Long]
 
 case class StatefulTransform[S, A, B0, +B](
   upstream: Node[A, B0],
