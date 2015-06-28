@@ -14,7 +14,7 @@ class DenormalizeSpec extends Specification with ScalaCheck {
   import Denormalize._
 
   // we have a lot of nested collections, so let's keep things reasonable here
-  implicit val scalacheck = Parameters(maxSize = 15)
+  implicit val scalacheck = Parameters(maxSize = 10)
 
   "Denormalize example" should {
 
@@ -35,10 +35,9 @@ class DenormalizeSpec extends Specification with ScalaCheck {
       } yield Denormalize.Group(name)
     }
 
+    val compiled = Machine.compile(Denormalize.graph)
 
     "never output a group if no groups are added" in {
-
-      val compiled = Machine.compile(Denormalize.graph)
 
       prop { input: Map[ID, Seq[Option[User]]] =>
 
@@ -52,6 +51,28 @@ class DenormalizeSpec extends Specification with ScalaCheck {
             values.flatten must beEmpty
           }
         }
+      }
+    }
+
+    "keep an accurate count of members" in {
+
+      val users = Messages.from(Users, Map(
+        ID(0) -> Seq(Some(User("Robert", groupIDs = SortedSet(ID(5), ID(6))))),
+        ID(1) -> Seq(Some(User("Wilhelm", SortedSet(ID(5))))),
+        ID(2) -> Seq(Some(User("Temp", SortedSet(ID(5)))), None)
+      ))
+
+      val groups = Messages.from(Groups, Map(
+        ID(5) -> Seq(Some(Group("Club Mate")))
+      ))
+
+      val thing = compiled.push(users ++ groups)
+
+      Prop.forAll(Sample.complete(thing)) { output =>
+
+        output(Denormalized)(ID(5)).last must_== Some(
+          DenormalizedGroup("Club Mate", 2)
+        )
       }
     }
   }

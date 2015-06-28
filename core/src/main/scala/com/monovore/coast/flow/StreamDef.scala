@@ -128,6 +128,23 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
 
   def zipWithKey: StreamDef[G, A, (A, B)] =
     stream.withKeys.map { k => v => (k, v) }
+
+  def whistler[A0](implicit
+    asMap: B <:< Map[A0, Int],
+    grouped: IsGrouped[G],
+    keyFormat: BinaryFormat[A],
+    ordering: Ordering[A0],
+    mapFormat: BinaryFormat[Seq[(A0, Int)]]
+  ): AnyStream[A0, Int] = {
+
+    grouped.stream(stream)
+      .map { current => asMap(current).toSeq.sorted }
+      .transform(Seq.empty[(A0, Int)]) { (previous, input) =>
+        val what = previous ++ input
+        input.map { case (k, v) => (k, -v) } -> what
+      }
+      .groupByKey
+  }
 }
 
 class StreamDef[+G <: AnyGrouping, A, +B](element: Node[A, B])
