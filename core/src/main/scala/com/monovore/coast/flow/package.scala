@@ -1,7 +1,6 @@
 package com.monovore.coast
 
-import com.monovore.coast.wire.{Partitioner, BinaryFormat}
-import com.monovore.coast.core.{Source, Merge, Sink}
+import com.monovore.coast.wire.{BinaryFormat, Partitioner}
 
 package object flow {
 
@@ -11,7 +10,9 @@ package object flow {
   type AnyPool[A, +B] = PoolDef[AnyGrouping, A, B]
   type GroupedPool[A, +B] = PoolDef[Grouped, A, B]
 
-  case class Topic[A, B](name: String)
+  case class Topic[A, B](name: String) {
+    def asSource(implicit af: BinaryFormat[A], bf: BinaryFormat[B]): GroupedStream[A, B] = Flow.source(this)
+  }
 
   private[coast] type Id[+A] = A
 
