@@ -2,7 +2,7 @@ package com.monovore.coast
 package flow
 
 import com.monovore.coast.core._
-import com.monovore.coast.wire.BinaryFormat
+import com.monovore.coast.wire.{Partitioner, BinaryFormat}
 import com.twitter.algebird.{Monoid, MonoidAggregator}
 
 class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
@@ -128,6 +128,21 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
 
   def zipWithKey: StreamDef[G, A, (A, B)] =
     stream.withKeys.map { k => v => (k, v) }
+
+
+  // Builder-related methods
+
+  def streamAs[B0 >: B](name: String)(
+    implicit keyFormat: BinaryFormat[A], partitioner: Partitioner[A], valueFormat: BinaryFormat[B0], builder: GraphBuilder
+  ): GroupedStream[A, B0] = {
+    builder.add(Flow.stream[A, B0](name)(stream))
+  }
+
+  def sinkTo[B0 >: B](topic: Topic[A, B0])(
+    implicit keyFormat: BinaryFormat[A], partitioner: Partitioner[A], valueFormat: BinaryFormat[B0], grouped: IsGrouped[G], builder: GraphBuilder
+  ): Unit = {
+    builder.add(Flow.sink(topic)(grouped.stream(stream)))
+  }
 }
 
 class StreamDef[+G <: AnyGrouping, A, +B](element: Node[A, B])
