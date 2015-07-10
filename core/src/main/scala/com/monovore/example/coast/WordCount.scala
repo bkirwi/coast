@@ -1,7 +1,7 @@
 package com.monovore.example.coast
 
 import com.monovore.coast
-import com.monovore.coast.flow.{Flow, Topic}
+import com.monovore.coast.flow.{GraphBuilder, Flow, Topic}
 
 object WordCount extends ExampleMain {
 
@@ -13,20 +13,13 @@ object WordCount extends ExampleMain {
 
   import coast.wire.pretty._
 
-  val graph = for {
+  implicit val graph = new GraphBuilder
 
-    words <- Flow.stream("words") {
-
-      Flow.source(Sentences)
-        .flatMap { _.split("\\s+") }
-        .map { _ -> 1 }
-        .groupByKey
-    }
-
-    _ <- Flow.sink(WordCounts) {
-      words.sum.updates
-    }
-
-  } yield ()
-
+  Sentences.asSource
+    .flatMap { _.split("\\s+") }
+    .map { _ -> 1 }
+    .groupByKey
+    .streamAs("words")
+    .sum.updates
+    .sinkTo(WordCounts)
 }

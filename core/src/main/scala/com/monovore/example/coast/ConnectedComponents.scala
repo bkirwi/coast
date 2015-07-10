@@ -1,6 +1,6 @@
 package com.monovore.example.coast
 
-import com.monovore.coast.flow.{GroupedPool, Flow, GroupedStream}
+import com.monovore.coast.flow._
 import com.monovore.coast.wire.BinaryFormat
 
 import scala.collection.immutable.SortedSet
@@ -14,7 +14,7 @@ import scala.collection.immutable.SortedSet
  *
  * http://mmds-data.org/presentations/2014_/vassilvitskii_mmds14.pdf
  */
-object ConnectedComponents {
+object ConnectedComponents extends ExampleMain {
 
   import com.monovore.coast.wire.pretty._
 
@@ -22,40 +22,26 @@ object ConnectedComponents {
 
   implicit val eventFormat = BinaryFormat.javaSerialization[SortedSet[NodeID]]
 
-  /**
-   * Given a stream of graph edges, returns a stream of (node, component label) pairs,
-   * where the label for a component is the smallest id of any node in that component.
-   */
-  def findComponents(
-    input: GroupedStream[NodeID, NodeID]
-  ): Flow[GroupedStream[NodeID, NodeID]] = {
+  val Edges = Topic[Long, Long]("edges")
 
-    // tiny helper to create two directed edges from a single pair of nodes
-    def connect(a: NodeID, b: NodeID) = Seq(a -> b, b -> a)
+  val Components = Topic[Long, Long]("components")
 
-    // the large-star step: connect all larger neighbours to the least neighbour
-    def doLargeStar(smallStar: GroupedStream[NodeID, NodeID]) =
-      smallStar
+  implicit val graph = new GraphBuilder
+
+  def connect(a: NodeID, b: NodeID) = Seq(a -> b, b -> a)
+
+  val connected =
+    Edges.asSource
+      .zipWithKey
+      .flatMap { case (one, other) => connect(one, other) }
+      .groupByKey
+      .streamAs("connected-input")
+
+  val largeStar = graph.addCycle[NodeID, NodeID]("large-star") { largeStar =>
+
+    val smallStar =
+      Flow.merge("large" -> largeStar, "input" -> connected)
         .withKeys.transform(SortedSet.empty[NodeID]) { node => (neighbours, newEdge) =>
-
-          val all = neighbours + node
-          val least = all.min
-          val newNeigbours = neighbours + newEdge
-
-          if (newEdge < least) {
-            val larger = neighbours.toSeq.filter {_ > node}
-            newNeigbours -> larger.flatMap { connect(_, newEdge) }
-          }
-          else if (newEdge < node || all.contains(newEdge)) newNeigbours -> Nil
-          else newNeigbours -> connect(newEdge, least)
-        }
-        .groupByKey
-
-    // the small-star step: connect all smaller (or equal) neighbours to the least neighbour
-    def doSmallStar(largeStar: GroupedStream[NodeID, NodeID]) =
-      largeStar
-        .withKeys
-        .transform(SortedSet.empty[NodeID]) { node => (neighbours, newEdge) =>
 
           val all = (neighbours + node)
           val least = all.min
@@ -65,43 +51,31 @@ object ConnectedComponents {
           else SortedSet(newEdge) -> all.toSeq.flatMap(connect(_, newEdge))
         }
         .groupByKey
+        .streamAs("small-star")
 
-    for {
+    smallStar
+      .withKeys.transform(SortedSet.empty[NodeID]) { node => (neighbours, newEdge) =>
 
-      // group the input both directions
-      connectedInput <- Flow.stream("connected-input") {
-        input.withKeys.flatMap { one => other => connect(one, other) }.groupByKey
+        val all = neighbours + node
+        val least = all.min
+        val newNeigbours = neighbours + newEdge
+
+        if (newEdge < least) {
+          val larger = neighbours.toSeq.filter {_ > node}
+          newNeigbours -> larger.flatMap { connect(_, newEdge) }
+        }
+        else if (newEdge < node || all.contains(newEdge)) newNeigbours -> Nil
+        else newNeigbours -> connect(newEdge, least)
       }
-
-      // this cycle handles the core loop of the algorithm
-      // large-star messages go to small-star, and vice-versa
-      largeStar <- Flow.cycle[NodeID, NodeID]("large-star") { largeStar =>
-
-        for {
-
-          smallStar <- Flow.stream("small-star") {
-            val inputs = Flow.merge("large" -> largeStar, "input" -> connectedInput)
-            doSmallStar(inputs)
-          }
-
-          largeStar = {
-            doLargeStar(smallStar)
-          }
-
-        } yield largeStar
-      }
-
-      // finally, we take the least message we've seen for each component
-      leastComponent = {
-        largeStar
-          .withKeys.transform(Long.MaxValue) { node => (currentOrMax, next) =>
-            val current = currentOrMax min node
-            val min = current min next
-            if (min < current) min -> Seq(min)
-            else current -> Nil
-          }
-      }
-
-    } yield leastComponent
+      .groupByKey
   }
+
+  largeStar
+    .withKeys.transform(Long.MaxValue) { node => (currentOrMax, next) =>
+      val current = currentOrMax min node
+      val min = current min next
+      if (min < current) min -> Seq(min)
+      else current -> Nil
+    }
+    .sinkTo(Components)
 }

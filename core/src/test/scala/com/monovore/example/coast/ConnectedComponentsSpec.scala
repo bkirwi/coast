@@ -13,15 +13,7 @@ class ConnectedComponentsSpec extends Specification with ScalaCheck {
 
   "connected-components finder" should {
 
-    import com.monovore.coast.wire.ugly._
-
-    val Edges = Topic[Long, Long]("edges")
-
-    val Components = Topic[Long, Long]("more-components")
-
-    val graph = Flow.sink(Components) {
-      ConnectedComponents.findComponents(Flow.source(Edges))
-    }
+    import ConnectedComponents._
 
     "find correct label for linear graph" in {
 
