@@ -14,7 +14,7 @@ case class Source[A, B](
 
 case class StatefulTransform[S, A, B0, +B](
   upstream: Node[A, B0],
-  init: S,
+  init: A => S,
   transformer: A => (S, B0) => (S, Seq[B])
 )(
   implicit val keyFormat: BinaryFormat[A],
@@ -23,7 +23,7 @@ case class StatefulTransform[S, A, B0, +B](
 
 sealed trait Transform[S, A, B0, +B] extends Node[A, B] {
   def upstream: Node[A, B0]
-  def init: S
+  def init: A => S
   def transformer: A => (S, B0) => (S, Seq[B])
 }
 
@@ -32,7 +32,7 @@ case class PureTransform[A, B0, B](
   function: A => B0 => Seq[B]
 ) extends Transform[Unit, A, B0, B] {
 
-  override val init: Unit = ()
+  override val init: (A => Unit) = { _ => () }
 
   override val transformer: (A) => (Unit, B0) => (Unit, Seq[B]) = {
     a => {
@@ -44,11 +44,11 @@ case class PureTransform[A, B0, B](
 }
 
 object Transform {
-  def unapply[S, A, B0, B](t: Transform[S, A, B0, B]): Option[(Node[A, B0], S, A => (S, B0) => (S, Seq[B]))] =
+  def unapply[S, A, B0, B](t: Transform[S, A, B0, B]): Option[(Node[A, B0], A => S, A => (S, B0) => (S, Seq[B]))] =
     Some((t.upstream, t.init, t.transformer))
 
   def apply[S : BinaryFormat, A: BinaryFormat, B0, B](e: Node[A, B0], i: S, t: A => (S, B0) => (S, Seq[B])): Transform[S, A, B0, B] =
-    StatefulTransform(e, i, t)
+    StatefulTransform(e, _ => i, t)
 }
 
 case class Merge[A, +B](upstreams: Seq[String -> Node[A, B]]) extends Node[A, B]

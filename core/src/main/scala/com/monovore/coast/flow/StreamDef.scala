@@ -30,21 +30,21 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
       { b => if (func.isDefinedAt(b)) Seq(func(b)) else Seq.empty }
     })
 
-  def transform[S, B0](init: S)(func: WithKey[(S, B) => (S, Seq[B0])])(
+  def transform[S, B0](init: WithKey[S])(func: WithKey[(S, B) => (S, Seq[B0])])(
     implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], stateFormat: BinaryFormat[S]
   ): GroupedStream[A, B0] = {
 
-    new StreamDef(StatefulTransform[S, A, B, B0](self.element, init, context.unwrap(func)))
+    new StreamDef(StatefulTransform[S, A, B, B0](self.element, context.unwrap(init), context.unwrap(func)))
   }
 
-  def transformWith[S, B0](init: S)(trans: WithKey[Transformer[S, B, B0]])(
+  def transformWith[S, B0](init: WithKey[S])(trans: WithKey[Transformer[S, B, B0]])(
     implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], stateFormat: BinaryFormat[S]
   ): GroupedStream[A, B0] = {
 
     transform(init)(context.map(trans) { _.transform })
   }
 
-  def fold[B0](init: B0)(func: WithKey[(B0, B) => B0])(
+  def fold[B0](init: WithKey[B0])(func: WithKey[(B0, B) => B0])(
     implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], stateFormat: BinaryFormat[B0]
   ): GroupedPool[A, B0] = {
 
@@ -84,7 +84,7 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
     }
   }
 
-  def latestOr[B0 >: B](init: B0): PoolDef[G, A, B0] =
+  def latestOr[B0 >: B](init: WithKey[B0]): PoolDef[G, A, B0] =
     new PoolDef(init, element)
 
   def latestOption: PoolDef[G, A, Option[B]] =
