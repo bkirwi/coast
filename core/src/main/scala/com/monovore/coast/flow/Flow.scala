@@ -74,6 +74,29 @@ object Flow {
       Flow(Seq(label -> Sink(cycled.element)), stream)
     }
   }
+
+  def context(): Context = new Context()
+
+  class Context private[Flow](private[Flow] var _bindings: Seq[(String, Sink[_, _])] = Nil) extends Graph {
+
+    def add[A](flow: Flow[A]): A = {
+      val updated = Flow(_bindings, ()).flatMap { _ => flow }
+      _bindings = updated.bindings
+      updated.value
+    }
+
+    def addCycle[A:BinaryFormat:Partitioner, B:BinaryFormat](name: String)(function: GroupedStream[A, B] => AnyStream[A, B]): GroupedStream[A, B] = {
+      add(Flow.cycle(name)(function))
+    }
+
+    override def bindings: Seq[(String, Sink[_, _])] = _bindings
+  }
+
+  def build[A](fn: Context => A): Flow[A] = {
+    val builder = new Context()
+    val out = fn(builder)
+    Flow(builder.bindings, out)
+  }
 }
 
 trait FlowLike[+A] {

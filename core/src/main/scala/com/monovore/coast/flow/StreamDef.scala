@@ -132,16 +132,16 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
 
   // Builder-related methods
 
-  def streamAs[B0 >: B](name: String)(
-    implicit keyFormat: BinaryFormat[A], partitioner: Partitioner[A], valueFormat: BinaryFormat[B0], builder: GraphBuilder
+  def addStream[B0 >: B](name: String)(
+    implicit keyFormat: BinaryFormat[A], partitioner: Partitioner[A], valueFormat: BinaryFormat[B0], ctx: Flow.Context
   ): GroupedStream[A, B0] = {
-    builder.add(Flow.stream[A, B0](name)(stream))
+    ctx.add(Flow.stream[A, B0](name)(stream))
   }
 
-  def sinkTo[B0 >: B](topic: Topic[A, B0])(
-    implicit keyFormat: BinaryFormat[A], partitioner: Partitioner[A], valueFormat: BinaryFormat[B0], grouped: IsGrouped[G], builder: GraphBuilder
+  def addSink[B0 >: B](topic: Topic[A, B0])(
+    implicit keyFormat: BinaryFormat[A], partitioner: Partitioner[A], valueFormat: BinaryFormat[B0], grouped: IsGrouped[G], ctx: Flow.Context
   ): Unit = {
-    builder.add(Flow.sink(topic)(grouped.stream(stream)))
+    ctx.add(Flow.sink(topic)(grouped.stream(stream)))
   }
 }
 
