@@ -45,6 +45,7 @@ class TaskCompiler(context: TaskCompiler.Context) {
 
       Seq(thing)
     }
+    case clock: Clock => sys.error("Clocks not implemented yet!")
     case merge: Merge[A, B] => {
 
       var maxOffset: Long = 0L

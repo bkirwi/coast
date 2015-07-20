@@ -107,6 +107,7 @@ object SimpleBackend extends SamzaBackend {
           val compiled = merge.upstreams.map { case (branch, node) => compileNode(node, path / branch, send) }
           Monoid.sum(compiled)
         }
+        case clock: Clock => sys.error("Clocks not implemented yet!")
       }
 
       val finalSink: Send[A, B] = { (key, value) =>
