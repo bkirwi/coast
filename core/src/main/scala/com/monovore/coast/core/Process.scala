@@ -1,6 +1,8 @@
 package com.monovore.coast
 package core
 
+import com.twitter.algebird.Aggregator
+
 /**
  * A trait that captures a stream transformation from A to B, with a state of S.
  *
@@ -75,4 +77,10 @@ object Process {
 
   def setState[S](s: S) =
     Process[S, Any, Nothing] { (_: S, _: Any) => (s, Nil) }
+
+  def fromAggregator[S, A, B](aggregator: Aggregator[A, S, B]) =
+    Process { (s: S, a: A) =>
+      val reduced = aggregator.append(s, a)
+      (reduced -> Seq(aggregator.present(reduced)))
+    }
 }
