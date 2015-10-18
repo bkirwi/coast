@@ -1,5 +1,6 @@
 package com.monovore.example.coast
 
+import com.monovore.coast.core.Process
 import com.monovore.coast.flow._
 import com.monovore.coast.wire.BinaryFormat
 
@@ -41,31 +42,42 @@ object ConnectedComponents extends ExampleMain {
 
     val smallStar =
       Flow.merge("large" -> largeStar, "input" -> connected)
-        .withKeys.transform(SortedSet.empty[NodeID]) { node => (neighbours, newEdge) =>
+        .withKeys.process(SortedSet.empty[NodeID]) { node =>
 
-          val all = (neighbours + node)
-          val least = all.min
+          Process.on { (neighbours, newEdge) =>
 
-          if (node < newEdge || all.contains(newEdge)) neighbours -> Nil
-          else if (least < newEdge) SortedSet(newEdge) -> connect(newEdge, least)
-          else SortedSet(newEdge) -> all.toSeq.flatMap(connect(_, newEdge))
+            val all = (neighbours + node)
+            val least = all.min
+
+            if (node < newEdge || all.contains(newEdge)) Process.skip
+            else {
+              Process.setState(SortedSet(newEdge)) andThen {
+                if (least < newEdge) Process.outputEach(connect(newEdge, least))
+                else Process.outputEach(all.toSeq.flatMap(connect(_, newEdge)))
+              }
+            }
+          }
         }
         .groupByKey
         .addStream("small-star")
 
     smallStar
-      .withKeys.transform(SortedSet.empty[NodeID]) { node => (neighbours, newEdge) =>
+      .withKeys.process(SortedSet.empty[NodeID]) { node =>
 
-        val all = neighbours + node
-        val least = all.min
-        val newNeigbours = neighbours + newEdge
+        Process.on { (neighbours, newEdge) =>
+          val all = neighbours + node
+          val least = all.min
 
-        if (newEdge < least) {
-          val larger = neighbours.toSeq.filter {_ > node}
-          newNeigbours -> larger.flatMap {connect(_, newEdge)}
+          Process.setState(neighbours + newEdge) andThen {
+
+            if (newEdge < least) {
+              val larger = neighbours.toSeq.filter {_ > node}
+              Process.outputEach(larger.flatMap {connect(_, newEdge)})
+            }
+            else if (newEdge < node || all.contains(newEdge)) Process.skip
+            else Process.outputEach(connect(newEdge, least))
+          }
         }
-        else if (newEdge < node || all.contains(newEdge)) newNeigbours -> Nil
-        else newNeigbours -> connect(newEdge, least)
       }
       .groupByKey
   }
