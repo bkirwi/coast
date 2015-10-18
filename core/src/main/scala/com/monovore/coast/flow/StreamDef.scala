@@ -37,11 +37,11 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
     new StreamDef(StatefulTransform[S, A, B, B0](self.element, init, context.unwrap(func)))
   }
 
-  def transformWith[S, B0](init: S)(trans: WithKey[Transformer[S, B, B0]])(
+  def process[S, B0](init: S)(trans: WithKey[Process[S, B, B0]])(
     implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], stateFormat: BinaryFormat[S]
   ): GroupedStream[A, B0] = {
 
-    transform(init)(context.map(trans) { _.transform })
+    transform(init)(context.map(trans) { _.apply })
   }
 
   def fold[B0](init: B0)(func: WithKey[(B0, B) => B0])(
