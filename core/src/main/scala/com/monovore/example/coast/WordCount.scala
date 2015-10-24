@@ -13,14 +13,14 @@ object WordCount extends ExampleMain {
 
   import coast.wire.pretty._
 
-  val graph = Flow.build { implicit context =>
+  val graph = Flow.build { implicit builder =>
 
     Sentences.asSource
-      .flatMap {_.split("\\s+")}
-      .map {_ -> 1}
+      .flatMap { _.split("\\s+") }
+      .map { _ -> 1 }
       .groupByKey
-      .addStream("words")
+      .streamTo("words")
       .sum.updates
-      .addSink(WordCounts)
+      .sinkTo(WordCounts)
   }
 }

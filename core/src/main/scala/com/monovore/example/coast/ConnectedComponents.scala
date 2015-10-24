@@ -29,14 +29,14 @@ object ConnectedComponents extends ExampleMain {
 
   def connect(a: NodeID, b: NodeID) = Seq(a -> b, b -> a)
 
-  implicit val graph = Flow.context()
+  implicit val graph = Flow.builder()
 
   val connected =
     Edges.asSource
       .zipWithKey
       .flatMap { case (one, other) => connect(one, other) }
       .groupByKey
-      .addStream("connected-input")
+      .streamTo("connected-input")
 
   val largeStar = graph.addCycle[NodeID, NodeID]("large-star") { largeStar =>
 
@@ -59,7 +59,7 @@ object ConnectedComponents extends ExampleMain {
           }
         }
         .groupByKey
-        .addStream("small-star")
+        .streamTo("small-star")
 
     smallStar
       .withKeys.process(SortedSet.empty[NodeID]) { node =>
@@ -89,5 +89,5 @@ object ConnectedComponents extends ExampleMain {
       if (min < current) min -> Seq(min)
       else current -> Nil
     }
-    .addSink(Components)
+    .sinkTo(Components)
 }

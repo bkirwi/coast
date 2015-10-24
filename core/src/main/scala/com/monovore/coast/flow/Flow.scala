@@ -77,9 +77,9 @@ object Flow {
     }
   }
 
-  def context(): Context = new Context()
+  def builder(): Builder = new Builder()
 
-  class Context private[Flow](private[Flow] var _bindings: Seq[(String, Sink[_, _])] = Nil) extends Graph {
+  class Builder private[Flow](private[Flow] var _bindings: Seq[(String, Sink[_, _])] = Nil) extends Graph {
 
     def add[A](flow: Flow[A]): A = {
       val updated = Flow(_bindings, ()).flatMap { _ => flow }
@@ -92,10 +92,12 @@ object Flow {
     }
 
     override def bindings: Seq[(String, Sink[_, _])] = _bindings
+
+    def toFlow: Flow[Unit] = Flow(bindings, ())
   }
 
-  def build[A](fn: Context => A): Flow[A] = {
-    val builder = new Context()
+  def build[A](fn: Builder => A): Flow[A] = {
+    val builder = new Builder()
     val out = fn(builder)
     Flow(builder.bindings, out)
   }

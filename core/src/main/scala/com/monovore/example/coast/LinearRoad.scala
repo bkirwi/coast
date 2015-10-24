@@ -33,36 +33,27 @@ object LinearRoad extends ExampleMain {
   val PositionReports = Topic[VehicleID, (PlaceAndTime, Double)]("position-reports")
   val TotalTolls = Topic[VehicleID, Double]("total-tolls")
 
-  val graph: Graph = for {
+  val graph = Flow.build { implicit builder =>
 
-    vehicleSpeeds <- Flow.stream("reports-by-position") {
-      Flow.source(PositionReports).invert
-    }
+    PositionReports.asSource
+      .invert
+      .streamTo("reports-by-position")
+      .map { case (vehicle, speed) => Summary(Set(vehicle), AveragedValue(speed)) }
+      .sum
+      .updates
+      .flatMap { summary =>
 
-    tolls <- Flow.stream("summaries") {
+        val toll = if (summary.averageSpeed.value < 40) 3.0 else 0.0
 
-      vehicleSpeeds
-        .map { case (vehicle, speed) => Summary(Set(vehicle), AveragedValue(speed)) }
-        .sum
-        .updates
-        .flatMap { summary =>
-
-          val toll = if (summary.averageSpeed.value < 40) 3.0 else 0.0
-
-          summary.vehicles
-            .toSeq.sorted
-            .map { _ -> toll }
-        }
-        .invert
-    }
-
-    _ <- Flow.sink(TotalTolls) {
-
-      tolls
-        .fold(Map.empty[PlaceAndTime, Double]) { _ + _ }
-        .map { _.values.sum }
-        .updates
-    }
-
-  } yield ()
+        summary.vehicles
+          .toSeq.sorted
+          .map { _ -> toll }
+      }
+      .invert
+      .streamTo("summaries")
+      .fold(Map.empty[PlaceAndTime, Double]) { _ + _ }
+      .map { _.values.sum }
+      .updates
+      .sinkTo(TotalTolls)
+  }
 }
