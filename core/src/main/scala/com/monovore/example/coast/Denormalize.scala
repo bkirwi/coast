@@ -36,55 +36,27 @@ object Denormalize extends ExampleMain {
   
   val Denormalized = Topic[GroupID, Option[DenormalizedGroup]]("denormalized-groups")
 
-  val graph = for {
+  val graph = Flow.build { implicit builder =>
 
-    // Roll up 'users' under their group id
-    usersByKey <- Flow.stream[GroupID, (UserID, Option[String])]("users-pool") {
-
+    val usersPool =
       Flow.source(Users)
-        .latestOr(None)
-        .updatedPairs
-        .flatMap {
-          case (None, Some(User(name, groups))) => {
-            groups.map { _ -> Some(name) }.toSeq
-          }
-          case (Some(User(oldName, oldGroups)), Some(User(newName, newGroups))) => {
-
-            val toAdd = if (oldName == newName) newGroups -- oldGroups else newGroups
-            val toRemove = oldGroups -- newGroups
-
-            toAdd.toSeq.map { _ -> Some(newName) } ++
-              toRemove.toSeq.map { _ -> None }
-          }
-          case (Some(User(_, groups)), None) => {
-            groups.map { _ -> None }.toSeq
-          }
-          case (None, None) => Seq.empty
+        .map { userOpt =>
+          userOpt
+            .map { user =>
+              user.groupIDs.map { _ -> user.name }.toMap
+            }
+            .getOrElse(Map.empty)
         }
-    }
+        .latestByKey[GroupID, String]("users-pool")
 
-    // Join, and a trivial transformation
-    _ <- Flow.sink(Denormalized) {
+    val groups = Flow.source(Groups).latestOr(None)
 
-      val groups = Flow.source(Groups).latestOr(None)
-
-      val usersPool = usersByKey
-        .fold(Map.empty[UserID, String]) { (state, newInfo) =>
-
-          val (id, nameOpt) = newInfo
-
-          nameOpt
-            .map { name => state.updated(id, name) }
-            .getOrElse { state - id }
+    (groups join usersPool)
+      .map { case (groupOption, members) =>
+        for (group <- groupOption) yield {
+          DenormalizedGroup(group.name, members.values.toSet)
         }
-
-      (groups join usersPool)
-        .map { case (groupOption, members) =>
-          for (group <- groupOption) yield {
-            DenormalizedGroup(group.name, members.values.toSet)
-          }
-        }
-        .updates
-    }
-  } yield ()
+      }
+      .updates
+  }
 }

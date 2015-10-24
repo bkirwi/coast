@@ -143,6 +143,45 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
   ): Unit = {
     ctx.add(Flow.sink(topic)(grouped.stream(stream)))
   }
+
+  def latestByKey[K, V](
+    name: String
+  )(implicit
+    ctx: Flow.Builder,
+    partitioner: Partitioner[K],
+    ordering: Ordering[K],
+    isGrouped: IsGrouped[G],
+    keyFormat: BinaryFormat[A],
+    newKeyFormat: BinaryFormat[K],
+    messageFormat: BinaryFormat[(A, Option[V])],
+    whateverFormat: BinaryFormat[Map[A, V]],
+    stateFmt: BinaryFormat[Seq[K]],
+    isMap: B <:< Map[K, V]
+  ): GroupedPool[K, Map[A, V]] = {
+    stream
+      .transform(Seq.empty[K]) { (last, next) =>
+
+        val asMap = isMap(next)
+
+        val remove =
+          last.filterNot(asMap.contains).map { _ -> None }
+
+        val add =
+          asMap.toSeq
+            .sortBy { _._1 }
+            .map { case (k, v) => k -> Some(v) }
+
+        add.map { _._1 } -> (remove ++ add)
+      }
+      .invert
+      .streamTo(name)
+      .fold(Map.empty[A, V]) { (map, update) =>
+        update match {
+          case (k, None) => map - k
+          case (k, Some(v)) => map.updated(k, v)
+        }
+      }
+  }
 }
 
 class StreamDef[+G <: AnyGrouping, A, +B](element: Node[A, B])
