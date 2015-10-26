@@ -153,11 +153,12 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
     isGrouped: IsGrouped[G],
     keyFormat: BinaryFormat[A],
     newKeyFormat: BinaryFormat[K],
-    messageFormat: BinaryFormat[(A, Option[V])],
-    whateverFormat: BinaryFormat[Map[A, V]],
-    stateFmt: BinaryFormat[Seq[K]],
+    messageFormat: BinaryFormat[V],
     isMap: B <:< Map[K, V]
   ): GroupedPool[K, Map[A, V]] = {
+
+    import BinaryFormat.defaults._
+
     stream
       .transform(Seq.empty[K]) { (last, next) =>
 
