@@ -45,6 +45,22 @@ trait DefaultBinaryFormats {
     }
   }
 
+  implicit def optionFormat[A](implicit format: BinaryFormat[A]): BinaryFormat[Option[A]] = new BinaryFormat[Option[A]] {
+
+    override def writeData(output: DataOutputStream, value: Option[A]): Unit = value match{
+      case Some(a) => {
+        output.writeBoolean(true)
+        format.writeData(output, a)
+      }
+      case None => output.writeBoolean(false)
+    }
+
+    override def readData(input: DataInputStream): Option[A] = {
+      if (input.readBoolean()) Some(format.readData(input))
+      else None
+    }
+  }
+
   implicit def tuple2Format[A : BinaryFormat, B : BinaryFormat] = new BinaryFormat[(A, B)] {
 
     override def writeData(output: DataOutputStream, value: (A, B)): Unit = {
