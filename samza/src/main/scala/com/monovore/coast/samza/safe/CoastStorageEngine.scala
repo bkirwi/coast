@@ -3,7 +3,7 @@ package com.monovore.coast.samza.safe
 import java.io.File
 import java.util
 
-import com.monovore.coast.wire.{BinaryFormat, DataFormat}
+import com.monovore.coast.wire.{BinaryFormat, BinaryFormat$}
 import org.apache.samza.container.SamzaContainerContext
 import org.apache.samza.metrics.MetricsRegistry
 import org.apache.samza.serializers.Serde
@@ -128,8 +128,10 @@ class CoastStoreFactory[A, B] extends StorageEngineFactory[A, B] {
 
     val serialized = new SerializedKeyValueStore[A, B](underlying, keySerde, msgSerde)
 
-    val keyFormat = DataFormat.binaryFormat[Array[Byte]]
-    val valueFormat = DataFormat.binaryFormat[(Long, Long, Array[Byte])]
+    import com.monovore.coast.wire.pretty._
+
+    val keyFormat = implicitly[BinaryFormat[Array[Byte]]]
+    val valueFormat = implicitly[BinaryFormat[(Long, Long, Array[Byte])]]
 
     new CoastStorageEngine[A, B](serialized, keySerde, msgSerde, collector, changeLogSystemStreamPartition, keyFormat, valueFormat)
   }

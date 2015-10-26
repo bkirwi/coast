@@ -1,38 +1,57 @@
 package com.monovore.coast.wire
 
-import java.io.{ObjectInputStream, ByteArrayInputStream, ObjectOutputStream, ByteArrayOutputStream}
+import java.io._
 
-import scala.annotation.implicitNotFound
+import scala.language.implicitConversions
 
-
-@implicitNotFound("No binary format in scope for type ${A}")
+/**
+ * Manages reading and writing data to Java's standard Data{Input,Output} classes.
+ */
 trait BinaryFormat[A] extends Serializable {
-  def write(value: A): Array[Byte]
-  def read(bytes: Array[Byte]): A
+
+  def writeData(output: DataOutputStream, value: A): Unit
+
+  def readData(input: DataInputStream): A
+
+  def write(value: A): Array[Byte] = {
+    val baos = new ByteArrayOutputStream()
+    val dos = new DataOutputStream(baos)
+    writeData(dos, value)
+    baos.close()
+    baos.toByteArray
+  }
+
+  def read(bytes: Array[Byte]): A = {
+    val bais = new ByteArrayInputStream(bytes)
+    val dis = new DataInputStream(bais)
+    val value = readData(dis)
+    dis.close()
+    value
+  }
 }
 
 object BinaryFormat {
 
-  def write[A](value: A)(implicit fmt: BinaryFormat[A]): Array[Byte] = fmt.write(value)
+  def readData[A](input: DataInputStream)(implicit reader: BinaryFormat[A]): A = reader.readData(input)
 
-  def read[A](bytes: Array[Byte])(implicit fmt: BinaryFormat[A]): A = fmt.read(bytes)
+  def writeData[A](output: DataOutputStream, value: A)(implicit writer: BinaryFormat[A]) = writer.writeData(output, value)
+
+  def read[A](input: Array[Byte])(implicit reader: BinaryFormat[A]): A = reader.read(input)
+
+  def write[A](value: A)(implicit writer: BinaryFormat[A]): Array[Byte] = writer.write(value)
 
   def javaSerialization[A] = new BinaryFormat[A] {
 
-    override def write(value: A): Array[Byte] = {
-      val baos = new ByteArrayOutputStream()
-      val oos = new ObjectOutputStream(baos)
+    override def writeData(output: DataOutputStream, value: A) {
+      val oos = new ObjectOutputStream(output)
       oos.writeObject(value)
-      oos.close()
-      baos.toByteArray
     }
 
-    override def read(bytes: Array[Byte]): A = {
-      val bais = new ByteArrayInputStream(bytes)
-      val ois = new ObjectInputStream(bais)
-      val value = ois.readObject().asInstanceOf[A]
-      ois.close()
-      value
+    override def readData(input: DataInputStream): A = {
+      val ois = new ObjectInputStream(input)
+      ois.readObject().asInstanceOf[A]
     }
   }
+
+  object defaults extends DefaultBinaryFormats
 }

@@ -1,8 +1,10 @@
 package com.monovore.coast.samza.safe
 
-import com.monovore.coast.wire.DataFormat
+import com.monovore.coast.wire.BinaryFormat
 
 object Messages {
+
+  import com.monovore.coast.wire.pretty._
 
   type StreamName = String
   type Partition = Int
@@ -15,13 +17,13 @@ object Messages {
 
   object MergeInfo {
 
-    val binaryFormat = DataFormat.binaryFormat[MergeInfo]
+    val binaryFormat = implicitly[BinaryFormat[MergeInfo]]
   }
   
   type InternalMessage = (Qualifier, Offset, Array[Byte])
   
   object InternalMessage {
     
-    val binaryFormat = DataFormat.binaryFormat[InternalMessage]
+    val binaryFormat = implicitly[BinaryFormat[InternalMessage]]
   }
 }

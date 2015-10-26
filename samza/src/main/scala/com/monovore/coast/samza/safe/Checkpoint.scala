@@ -21,14 +21,5 @@ object Checkpoint {
   // FIXME: real serialization format for this. (JSON?)
   val format: BinaryFormat[Checkpoint] = BinaryFormat.javaSerialization[Checkpoint]
 
-  val keyFormat: BinaryFormat[Unit] = new BinaryFormat[Unit] {
-
-    // non-empty key to prevent compacting it away
-    private[this] val singleByte = Array(0.toByte)
-
-    override def write(value: Unit): Array[Byte] = singleByte
-
-    override def read(bytes: Array[Byte]): Unit = ()
-  }
-
+  val keyFormat: BinaryFormat[Unit] = BinaryFormat.defaults.unitFormat
 }
