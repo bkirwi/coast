@@ -3,7 +3,7 @@ package flow
 
 import com.monovore.coast.core._
 import com.monovore.coast.wire.{Protocol, Partitioner, Serializer}
-import com.twitter.algebird.{Monoid, MonoidAggregator}
+import com.twitter.algebird.{Semigroup, Group, Monoid, MonoidAggregator}
 
 class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
   private[coast] val context: Context[A, WithKey],
@@ -144,6 +144,33 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
     ctx.add(Flow.sink(topic)(grouped.stream(stream)))
   }
 
+  def sumByKey[K, V](
+    name: String
+  )(implicit
+    isMap: B <:< Map[K, V],
+    ctx: Flow.Builder,
+    partitioner: Partitioner[K],
+    ordering: Ordering[K],
+    vGroup: Group[V],
+    isGrouped: IsGrouped[G],
+    keyFormat: Serializer[A],
+    newKeyFormat: Serializer[K],
+    messageFormat: Serializer[V]
+  ): GroupedPool[K, V] = {
+
+    import Protocol.common._
+
+    stream
+      .transform(Map.empty[K, V]) { (undoPrevious, next) =>
+        val asMap = isMap(next)
+        val messages = Semigroup.plus(undoPrevious, asMap).toSeq.sortBy { _._1 }
+        Group.negate(asMap) -> messages
+      }
+      .groupByKey
+      .streamTo(name)
+      .sum
+  }
+
   def latestByKey[K, V](
     name: String
   )(implicit
@@ -161,17 +188,9 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
 
     stream
       .transform(Seq.empty[K]) { (last, next) =>
-
         val asMap = isMap(next)
-
-        val remove =
-          last.filterNot(asMap.contains).map { _ -> None }
-
-        val add =
-          asMap.toSeq
-            .sortBy { _._1 }
-            .map { case (k, v) => k -> Some(v) }
-
+        val remove = last.filterNot(asMap.contains).map { _ -> None }
+        val add = asMap.mapValues(Some(_)).toSeq.sortBy {_._1 }
         add.map { _._1 } -> (remove ++ add)
       }
       .invert

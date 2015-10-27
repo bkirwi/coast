@@ -8,11 +8,6 @@ import scala.collection.immutable.SortedSet
 /**
  * A sketch of a denormalization flow -- normalized models come in at the top,
  * and denormalized versions appear at the bottom.
- *
- * This is not super appealing at the moment, courtesy of the delete handling.
- * I suspect there's a pattern that could be abstracted out here,
- * but I'd like more examples of this relational-style manipulation before I
- * take a stab at it.
  */
 object Denormalize extends ExampleMain {
 

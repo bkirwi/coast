@@ -40,18 +40,11 @@ object LinearRoad extends ExampleMain {
       .map { case (vehicle, speed) => Summary(Set(vehicle), AveragedValue(speed)) }
       .sum
       .updates
-      .flatMap { summary =>
-
+      .map { summary =>
         val toll = if (summary.averageSpeed.value < 40) 3.0 else 0.0
-
-        summary.vehicles
-          .toSeq.sorted
-          .map { _ -> toll }
+        summary.vehicles.map { _ -> toll }.toMap
       }
-      .invert
-      .streamTo("summaries")
-      .fold(Map.empty[PlaceAndTime, Double]) { _ + _ }
-      .map { _.values.sum }
+      .sumByKey("summaries")
       .updates
       .sinkTo(TotalTolls)
   }
