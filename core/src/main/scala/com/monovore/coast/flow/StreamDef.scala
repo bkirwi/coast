@@ -147,14 +147,14 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
   def latestByKey[K, V](
     name: String
   )(implicit
+    isMap: B <:< Map[K, V],
     ctx: Flow.Builder,
     partitioner: Partitioner[K],
     ordering: Ordering[K],
     isGrouped: IsGrouped[G],
     keyFormat: Serializer[A],
     newKeyFormat: Serializer[K],
-    messageFormat: Serializer[V],
-    isMap: B <:< Map[K, V]
+    messageFormat: Serializer[V]
   ): GroupedPool[K, Map[A, V]] = {
 
     import Protocol.common._

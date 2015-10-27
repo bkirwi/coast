@@ -46,7 +46,7 @@ object Denormalize extends ExampleMain {
             }
             .getOrElse(Map.empty)
         }
-        .latestByKey[GroupID, String]("users-pool")
+        .latestByKey("users-pool")
 
     val groups = Flow.source(Groups).latestOr(None)
 
