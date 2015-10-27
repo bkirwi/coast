@@ -3,7 +3,7 @@ package com.monovore.coast.samza.safe
 import java.io.File
 import java.util
 
-import com.monovore.coast.wire.{BinaryFormat, BinaryFormat$}
+import com.monovore.coast.wire.{Protocol, Serializer}
 import org.apache.samza.container.SamzaContainerContext
 import org.apache.samza.metrics.MetricsRegistry
 import org.apache.samza.serializers.Serde
@@ -13,7 +13,7 @@ import org.apache.samza.system.{IncomingMessageEnvelope, OutgoingMessageEnvelope
 import org.apache.samza.task.MessageCollector
 import org.apache.samza.util.Logging
 
-import collection.JavaConverters._
+import scala.collection.JavaConverters._
 
 trait CoastState[K, V] {
   
@@ -50,8 +50,8 @@ class CoastStorageEngine[K, V](
   valueSerde: Serde[V],
   collector: MessageCollector,
   ssp: SystemStreamPartition,
-  keyFormat: BinaryFormat[Array[Byte]],
-  valueFormat: BinaryFormat[(Long, Long, Array[Byte])]
+  keyFormat: Serializer[Array[Byte]],
+  valueFormat: Serializer[(Long, Long, Array[Byte])]
 ) extends StorageEngine with Logging { store =>
 
   val partitionID: Int = ssp.getPartition.getPartitionId
@@ -64,9 +64,9 @@ class CoastStorageEngine[K, V](
 
     for (message <- messages.asScala) {
 
-      val keyBytes = keyFormat.read(message.getKey.asInstanceOf[Array[Byte]])
+      val keyBytes = keyFormat.fromArray(message.getKey.asInstanceOf[Array[Byte]])
 
-      val (up, down, valueBytes) = valueFormat.read(message.getMessage.asInstanceOf[Array[Byte]])
+      val (up, down, valueBytes) = valueFormat.fromArray(message.getMessage.asInstanceOf[Array[Byte]])
 
       nextOffset = up
 
@@ -92,8 +92,8 @@ class CoastStorageEngine[K, V](
       store.downstreamOffset = downstream
       store.underlying.put(key, value)
 
-      val keyBytes = keyFormat.write(keySerde.toBytes(key))
-      val valueBytes = valueFormat.write(upstream, downstream, valueSerde.toBytes(value))
+      val keyBytes = keyFormat.toArray(keySerde.toBytes(key))
+      val valueBytes = valueFormat.toArray(upstream, downstream, valueSerde.toBytes(value))
       collector.send(new OutgoingMessageEnvelope(ssp, store.partitionID, keyBytes, valueBytes))
     }
   }
@@ -128,10 +128,10 @@ class CoastStoreFactory[A, B] extends StorageEngineFactory[A, B] {
 
     val serialized = new SerializedKeyValueStore[A, B](underlying, keySerde, msgSerde)
 
-    import com.monovore.coast.wire.pretty._
+    import Protocol.common._
 
-    val keyFormat = implicitly[BinaryFormat[Array[Byte]]]
-    val valueFormat = implicitly[BinaryFormat[(Long, Long, Array[Byte])]]
+    val keyFormat = implicitly[Serializer[Array[Byte]]]
+    val valueFormat = implicitly[Serializer[(Long, Long, Array[Byte])]]
 
     new CoastStorageEngine[A, B](serialized, keySerde, msgSerde, collector, changeLogSystemStreamPartition, keyFormat, valueFormat)
   }

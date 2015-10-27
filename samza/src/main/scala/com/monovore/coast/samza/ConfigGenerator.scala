@@ -3,7 +3,7 @@ package samza
 
 import com.monovore.coast.core._
 import org.apache.samza.config.Config
-import wire.BinaryFormat
+import wire.Serializer
 
 import scala.language.existentials
 
@@ -44,5 +44,5 @@ object ConfigGenerator {
     case GroupBy(up, _) => sourcesFor(up)
   }
 
-  case class Storage(name: String, keyString: BinaryFormat[_], valueString: BinaryFormat[_])
+  case class Storage(name: String, keyString: Serializer[_], valueString: Serializer[_])
 }

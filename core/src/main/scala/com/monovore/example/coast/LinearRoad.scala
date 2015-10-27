@@ -1,9 +1,8 @@
 package com.monovore.example.coast
 
-import com.monovore.coast
 import com.monovore.coast.flow.{Flow, Topic}
-import com.monovore.coast.core.Graph
-import com.twitter.algebird.{Monoid, AveragedValue}
+import com.monovore.coast.wire.Protocol
+import com.twitter.algebird.{AveragedValue, Monoid}
 
 /**
  * Starting to stub out the standard linear road example, based on the
@@ -17,7 +16,7 @@ import com.twitter.algebird.{Monoid, AveragedValue}
  */
 object LinearRoad extends ExampleMain {
 
-  import coast.wire.ugly._
+  import Protocol.native._
 
   type VehicleID = Long
 

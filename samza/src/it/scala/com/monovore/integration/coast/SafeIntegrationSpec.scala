@@ -1,7 +1,7 @@
 package com.monovore.integration.coast
 
-import com.monovore.coast
 import com.monovore.coast.flow.{Flow, Topic}
+import com.monovore.coast.wire.Protocol
 import org.specs2.ScalaCheck
 import org.specs2.mutable._
 
@@ -15,7 +15,7 @@ class SafeIntegrationSpec extends Specification with ScalaCheck {
 
   "a running samza-based job" should {
 
-    import coast.wire.pretty._
+    import Protocol.common._
 
     val Foo = Topic[String, Int]("foo")
 

@@ -2,10 +2,11 @@ package com.monovore.example.coast
 
 import com.monovore.coast.core.Graph
 import com.monovore.coast.flow.{Topic, Flow}
+import com.monovore.coast.wire.Protocol
 
 object Scheduler extends ExampleMain {
 
-  import com.monovore.coast.wire.ugly._
+  import Protocol.native._
 
   val Requests = Topic[Long, String]("requests")
 

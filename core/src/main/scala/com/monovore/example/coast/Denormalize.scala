@@ -1,8 +1,7 @@
 package com.monovore.example.coast
 
-import com.monovore.coast
-import coast.flow
 import com.monovore.coast.flow.{Flow, Topic}
+import com.monovore.coast.wire.Protocol
 
 import scala.collection.immutable.SortedSet
 
@@ -17,7 +16,7 @@ import scala.collection.immutable.SortedSet
  */
 object Denormalize extends ExampleMain {
 
-  import coast.wire.ugly._
+  import Protocol.native._
 
   case class ID(value: Long)
   type GroupID = ID

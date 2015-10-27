@@ -3,6 +3,7 @@ package com.monovore.example.coast
 import com.monovore.coast
 import coast.flow
 import com.monovore.coast.flow.{Flow, Topic}
+import com.monovore.coast.wire.Protocol
 
 /**
  * Based on the discussion in this thread:
@@ -11,7 +12,7 @@ import com.monovore.coast.flow.{Flow, Topic}
  */
 object CustomerTransactions extends ExampleMain {
 
-  import coast.wire.ugly._
+  import Protocol.native._
 
   type CustomerID = String
   type TransactionID = String

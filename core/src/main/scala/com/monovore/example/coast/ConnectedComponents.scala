@@ -2,7 +2,7 @@ package com.monovore.example.coast
 
 import com.monovore.coast.core.Process
 import com.monovore.coast.flow._
-import com.monovore.coast.wire.BinaryFormat
+import com.monovore.coast.wire.{Protocol, Serializer}
 
 import scala.collection.immutable.SortedSet
 
@@ -17,11 +17,11 @@ import scala.collection.immutable.SortedSet
  */
 object ConnectedComponents extends ExampleMain {
 
-  import com.monovore.coast.wire.pretty._
+  import Protocol.common._
 
   type NodeID = Long
 
-  implicit val eventFormat = BinaryFormat.javaSerialization[SortedSet[NodeID]]
+  implicit val eventFormat = Serializer.fromJavaSerialization[SortedSet[NodeID]]
 
   val Edges = Topic[Long, Long]("edges")
 

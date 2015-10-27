@@ -2,7 +2,7 @@ package com.monovore.coast
 package flow
 
 import com.monovore.coast.core._
-import com.monovore.coast.wire.BinaryFormat
+import com.monovore.coast.wire.Serializer
 
 class PoolDef[+G <: AnyGrouping, A, +B](
   private[coast] val initial: B,
@@ -12,7 +12,7 @@ class PoolDef[+G <: AnyGrouping, A, +B](
   def updates: StreamDef[G, A, B] = new StreamDef(element)
 
   def updatedPairs[B0 >: B](
-    implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], valueFormat: BinaryFormat[B0]
+    implicit isGrouped: IsGrouped[G], keyFormat: Serializer[A], valueFormat: Serializer[B0]
   ): GroupedStream[A, (B0, B0)] =
     updates.transform(initial: B0) { (last, current) =>
       current -> Seq(last -> current)
@@ -22,7 +22,7 @@ class PoolDef[+G <: AnyGrouping, A, +B](
     updates.map(function).latestOr(function(initial))
 
   def join[B0 >: B, B1](other: GroupedPool[A, B1])(
-    implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], pairFormat: BinaryFormat[(B0, B1)]
+    implicit isGrouped: IsGrouped[G], keyFormat: Serializer[A], pairFormat: Serializer[(B0, B1)]
   ): PoolDef[Grouped, A, (B0, B1)] = {
 
     val merged = Flow.merge(

@@ -1,14 +1,11 @@
 package com.monovore.coast
 package samza
 
-import com.monovore.coast
 import com.monovore.coast.flow.{Flow, Topic}
+import com.monovore.coast.wire.Protocol
 import org.apache.samza.storage.kv.inmemory.InMemoryKeyValueStorageEngineFactory
-
 import org.specs2.ScalaCheck
 import org.specs2.mutable._
-
-import collection.JavaConverters._
 
 class SamzaSpec extends Specification with ScalaCheck {
 
@@ -16,7 +13,7 @@ class SamzaSpec extends Specification with ScalaCheck {
 
     "compile a flow" in {
 
-      import coast.wire.pretty._
+      import Protocol.common._
 
       val source = Topic[String, Int]("ints")
       val sink = Topic[String, Int]("bigger-ints")

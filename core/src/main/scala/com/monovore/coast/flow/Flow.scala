@@ -1,7 +1,7 @@
 package com.monovore.coast
 package flow
 
-import com.monovore.coast.wire.{Partitioner, BinaryFormat}
+import com.monovore.coast.wire.{Partitioner, Serializer}
 import core._
 
 /**
@@ -49,26 +49,26 @@ object Flow {
     new StreamDef[G, A, B](Merge(upstreams.map { case (name, stream) => name -> stream.element}))
   }
 
-  def source[A : BinaryFormat, B : BinaryFormat](topic: Topic[A,B]): GroupedStream[A, B] =
+  def source[A : Serializer, B : Serializer](topic: Topic[A,B]): GroupedStream[A, B] =
     new StreamDef[Grouped, A, B](Source[A, B](topic.name))
 
   def clock(seconds: Long) = new StreamDef[Grouped, Unit, Long](Clock(seconds))
 
-  def sink[A : BinaryFormat : Partitioner, B : BinaryFormat](topic: Topic[A, B])(flow: FlowLike[GroupedStream[A, B]]): Flow[Unit] = {
+  def sink[A : Serializer : Partitioner, B : Serializer](topic: Topic[A, B])(flow: FlowLike[GroupedStream[A, B]]): Flow[Unit] = {
     flow.toFlow.flatMap { stream => Flow(Seq(topic.name -> Sink(stream.element)), ()) }
   }
 
-  def stream[A : BinaryFormat : Partitioner, B : BinaryFormat](label: String)(stream: FlowLike[AnyStream[A, B]]): Flow[GroupedStream[A, B]] =
+  def stream[A : Serializer : Partitioner, B : Serializer](label: String)(stream: FlowLike[AnyStream[A, B]]): Flow[GroupedStream[A, B]] =
     stream.toFlow.flatMap { stream =>
       Flow(Seq(label -> Sink(stream.element)), new StreamDef[Grouped, A, B](Source[A, B](label)))
     }
 
-  def pool[A : BinaryFormat : Partitioner, B : BinaryFormat](label: String)(pool: FlowLike[AnyPool[A, B]]): Flow[GroupedPool[A, B]] =
+  def pool[A : Serializer : Partitioner, B : Serializer](label: String)(pool: FlowLike[AnyPool[A, B]]): Flow[GroupedPool[A, B]] =
     pool.toFlow.flatMap { pool =>
       Flow(Seq(label -> Sink(pool.element)), new PoolDef[Grouped, A, B](pool.initial, Source[A, B](label)))
     }
 
-  def cycle[A : BinaryFormat : Partitioner, B : BinaryFormat](label: String)(cycle: GroupedStream[A, B] => FlowLike[AnyStream[A, B]]): Flow[GroupedStream[A, B]] = {
+  def cycle[A : Serializer : Partitioner, B : Serializer](label: String)(cycle: GroupedStream[A, B] => FlowLike[AnyStream[A, B]]): Flow[GroupedStream[A, B]] = {
 
     val stream = new StreamDef[Grouped, A, B](Source[A, B](label))
 
@@ -87,7 +87,7 @@ object Flow {
       updated.value
     }
 
-    def addCycle[A:BinaryFormat:Partitioner, B:BinaryFormat](name: String)(function: GroupedStream[A, B] => AnyStream[A, B]): GroupedStream[A, B] = {
+    def addCycle[A:Serializer:Partitioner, B:Serializer](name: String)(function: GroupedStream[A, B] => AnyStream[A, B]): GroupedStream[A, B] = {
       add(Flow.cycle(name)(function))
     }
 

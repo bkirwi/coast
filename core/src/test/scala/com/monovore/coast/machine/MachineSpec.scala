@@ -5,6 +5,7 @@ import com.monovore.coast
 import coast.flow
 import com.monovore.coast.flow.{Flow, Topic}
 import com.monovore.coast.core.Graph
+import com.monovore.coast.wire.Protocol
 
 import com.twitter.algebird.Semigroup
 import org.scalacheck.Prop
@@ -16,7 +17,7 @@ class MachineSpec extends Specification with ScalaCheck {
   // Tweak me
   val InputSize = 10
 
-  import coast.wire.ugly._
+  import Protocol.common._
 
   "a compiled flow" should {
 

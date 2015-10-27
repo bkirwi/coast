@@ -37,8 +37,8 @@ class TaskCompiler(context: TaskCompiler.Context) {
 
       val thing = Dispatch(source.source, downstreamPath, { (offset: Long, key: Array[Byte], value: Array[Byte]) =>
 
-        val a = source.keyFormat.read(key)
-        val b = source.valueFormat.read(value)
+        val a = source.keyFormat.fromArray(key)
+        val b = source.valueFormat.fromArray(value)
 
         sink(offset, a, b)
       })

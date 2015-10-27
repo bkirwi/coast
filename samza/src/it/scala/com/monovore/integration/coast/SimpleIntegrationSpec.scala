@@ -1,9 +1,9 @@
 package com.monovore.integration.coast
 
-import com.monovore.coast
+import com.monovore.coast.wire.Protocol
 import org.scalacheck.Gen
-import org.specs2.mutable._
 import org.specs2.ScalaCheck
+import org.specs2.mutable._
 
 class SimpleIntegrationSpec extends Specification with ScalaCheck {
 
@@ -14,7 +14,7 @@ class SimpleIntegrationSpec extends Specification with ScalaCheck {
     "count words" in {
 
       import com.monovore.example.coast.WordCount._
-      import coast.wire.pretty._
+      import Protocol.common._
 
       val words = Gen.oneOf("testing", "scandal", "riviera", "salad", "Thursday")
       val sentences = Gen.listOf(words).map { _.mkString(" ") }

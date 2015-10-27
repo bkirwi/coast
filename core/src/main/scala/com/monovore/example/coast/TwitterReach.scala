@@ -1,8 +1,10 @@
 package com.monovore.example.coast
 
-import com.monovore.coast
-import com.monovore.coast.flow.{Flow, Topic}
 import java.net.URI
+
+import com.monovore.coast.flow.{Flow, Topic}
+import com.monovore.coast.wire.Protocol
+
 import scala.util.Try
 
 /* This streaming job is loosely based on Trident's 'Twitter reach' example
@@ -57,12 +59,12 @@ object TwitterReach extends ExampleMain {
    * your data. Don't be frightened! It's both safer and less verbose than using
    * configuration or a global registry, and the error messages are better.
    *
-   * For now, I'm importing `coast.wire.ugly._`, which uses `Object.hashCode`
+   * For now, I'm importing `Protocol.native._`, which uses `Object.hashCode`
    * for partitioning and java serialization on the wire. I suggest not doing
    * this in production, but it's handy for experimenting.
    */
 
-  import coast.wire.ugly._
+  import Protocol.native._
 
   /* Now we come to the job logic. We're building up a `Flow` object here; this
    * defines the stream-processing graph and associates topic names with the

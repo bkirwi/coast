@@ -2,7 +2,7 @@ package com.monovore.integration.coast
 
 import com.monovore.coast.flow.Topic
 import com.monovore.coast.samza.safe.CoastKafkaSystem
-import com.monovore.coast.wire.BinaryFormat
+import com.monovore.coast.wire.{Protocol, Serializer}
 import kafka.producer.{Producer, ProducerConfig}
 import org.apache.samza.system.{OutgoingMessageEnvelope, SystemStream}
 import org.specs2.ScalaCheck
@@ -16,7 +16,7 @@ class CoastKafkaSystemSpec extends Specification with ScalaCheck {
 
   "a ratcheted kafka producer" should {
 
-    import com.monovore.coast.wire.pretty._
+    import Protocol.common._
 
     def stream(name: String) = Topic[String, Int](name)
 
@@ -43,8 +43,8 @@ class CoastKafkaSystemSpec extends Specification with ScalaCheck {
           new OutgoingMessageEnvelope(
             new SystemStream("producer-test", "test"),
             "empty".##,
-            BinaryFormat.write("empty"),
-            BinaryFormat.write(i)
+            Serializer.toArray("empty"),
+            Serializer.toArray(i)
           )
         }
 
@@ -87,8 +87,8 @@ class CoastKafkaSystemSpec extends Specification with ScalaCheck {
           new OutgoingMessageEnvelope(
             new SystemStream("producer-test", if (i % 2 == 0) "even" else "odd"),
             "empty".##,
-            BinaryFormat.write("empty"),
-            BinaryFormat.write(i)
+            Serializer.toArray("empty"),
+            Serializer.toArray(i)
           )
         }
 

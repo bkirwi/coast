@@ -53,7 +53,7 @@ class MergingChooser(config: Config) extends MessageChooser with Logging {
         pendingMerge.dequeue()
 
         val (streamName, partition, offset) =
-          Messages.MergeInfo.binaryFormat.read(message.getMessage.asInstanceOf[Array[Byte]])
+          Messages.MergeInfo.binaryFormat.fromArray(message.getMessage.asInstanceOf[Array[Byte]])
 
         val systemStream = merged(streamName)
 

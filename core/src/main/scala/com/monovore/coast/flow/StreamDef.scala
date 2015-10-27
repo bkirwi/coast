@@ -2,7 +2,7 @@ package com.monovore.coast
 package flow
 
 import com.monovore.coast.core._
-import com.monovore.coast.wire.{Partitioner, BinaryFormat}
+import com.monovore.coast.wire.{Protocol, Partitioner, Serializer}
 import com.twitter.algebird.{Monoid, MonoidAggregator}
 
 class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
@@ -31,21 +31,21 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
     })
 
   def transform[S, B0](init: S)(func: WithKey[(S, B) => (S, Seq[B0])])(
-    implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], stateFormat: BinaryFormat[S]
+    implicit isGrouped: IsGrouped[G], keyFormat: Serializer[A], stateFormat: Serializer[S]
   ): GroupedStream[A, B0] = {
 
     new StreamDef(StatefulTransform[S, A, B, B0](self.element, init, context.unwrap(func)))
   }
 
   def process[S, B0](init: S)(trans: WithKey[Process[S, B, B0]])(
-    implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], stateFormat: BinaryFormat[S]
+    implicit isGrouped: IsGrouped[G], keyFormat: Serializer[A], stateFormat: Serializer[S]
   ): GroupedStream[A, B0] = {
 
     transform(init)(context.map(trans) { _.apply })
   }
 
   def fold[B0](init: B0)(func: WithKey[(B0, B) => B0])(
-    implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], stateFormat: BinaryFormat[B0]
+    implicit isGrouped: IsGrouped[G], keyFormat: Serializer[A], stateFormat: Serializer[B0]
   ): GroupedPool[A, B0] = {
 
     val transformer = context.map(func) { fn =>
@@ -60,7 +60,7 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
   }
 
   def aggregate[S, B0](aggregator: MonoidAggregator[B, S, B0])(
-    implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], stateFormat: BinaryFormat[S]
+    implicit isGrouped: IsGrouped[G], keyFormat: Serializer[A], stateFormat: Serializer[S]
   ): GroupedPool[A, B0] = {
 
     implicit val stateMonoid = aggregator.monoid
@@ -72,7 +72,7 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
   }
 
   def grouped[B0 >: B](size: Int)(
-    implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], stateFormat: BinaryFormat[Seq[B0]]
+    implicit isGrouped: IsGrouped[G], keyFormat: Serializer[A], stateFormat: Serializer[Seq[B0]]
   ): GroupedStream[A, Seq[B0]] = {
 
     require(size > 0, "Expected a positive group size")
@@ -108,13 +108,13 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
   def flattenOption[B0](implicit func: B <:< Option[B0]) = stream.flatMap(func andThen { _.toSeq })
 
   def sum[B0 >: B](
-    implicit monoid: Monoid[B0], isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], valueFormat: BinaryFormat[B0]
+    implicit monoid: Monoid[B0], isGrouped: IsGrouped[G], keyFormat: Serializer[A], valueFormat: Serializer[B0]
   ): GroupedPool[A, B0] = {
     stream.fold(monoid.zero)(monoid.plus)
   }
 
   def join[B0](pool: GroupedPool[A, B0])(
-    implicit isGrouped: IsGrouped[G], keyFormat: BinaryFormat[A], b0Format: BinaryFormat[B0]
+    implicit isGrouped: IsGrouped[G], keyFormat: Serializer[A], b0Format: Serializer[B0]
   ): GroupedStream[A, (B, B0)] = {
 
     Flow.merge("stream" -> isGrouped.stream(this.stream).map(Right(_)), "pool" -> pool.updates.map(Left(_)))
@@ -133,13 +133,13 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
   // Builder-related methods
 
   def streamTo[B0 >: B](name: String)(
-    implicit keyFormat: BinaryFormat[A], partitioner: Partitioner[A], valueFormat: BinaryFormat[B0], ctx: Flow.Builder
+    implicit keyFormat: Serializer[A], partitioner: Partitioner[A], valueFormat: Serializer[B0], ctx: Flow.Builder
   ): GroupedStream[A, B0] = {
     ctx.add(Flow.stream[A, B0](name)(stream))
   }
 
   def sinkTo[B0 >: B](topic: Topic[A, B0])(
-    implicit keyFormat: BinaryFormat[A], partitioner: Partitioner[A], valueFormat: BinaryFormat[B0], grouped: IsGrouped[G], ctx: Flow.Builder
+    implicit keyFormat: Serializer[A], partitioner: Partitioner[A], valueFormat: Serializer[B0], grouped: IsGrouped[G], ctx: Flow.Builder
   ): Unit = {
     ctx.add(Flow.sink(topic)(grouped.stream(stream)))
   }
@@ -151,13 +151,13 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
     partitioner: Partitioner[K],
     ordering: Ordering[K],
     isGrouped: IsGrouped[G],
-    keyFormat: BinaryFormat[A],
-    newKeyFormat: BinaryFormat[K],
-    messageFormat: BinaryFormat[V],
+    keyFormat: Serializer[A],
+    newKeyFormat: Serializer[K],
+    messageFormat: Serializer[V],
     isMap: B <:< Map[K, V]
   ): GroupedPool[K, Map[A, V]] = {
 
-    import BinaryFormat.defaults._
+    import Protocol.common._
 
     stream
       .transform(Seq.empty[K]) { (last, next) =>

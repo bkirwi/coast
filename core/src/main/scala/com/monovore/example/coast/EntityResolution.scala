@@ -1,7 +1,7 @@
 package com.monovore.example.coast
 
-import com.monovore.coast
 import com.monovore.coast.flow.{AnyStream, Flow, Topic}
+import com.monovore.coast.wire.Protocol
 
 import scala.annotation.tailrec
 
@@ -10,7 +10,7 @@ import scala.annotation.tailrec
  */
 object EntityResolution extends ExampleMain {
 
-  import coast.wire.ugly._
+  import Protocol.native._
 
   // Basic entity resolution / 'swoosh' setup
 

@@ -1,15 +1,15 @@
 package com.monovore.coast
 package core
 
-import com.monovore.coast.wire.{Partitioner, BinaryFormat}
+import com.monovore.coast.wire.{Partitioner, Serializer}
 
 sealed trait Node[A, +B]
 
 case class Source[A, B](
   source: String
 )(
-  implicit val keyFormat: BinaryFormat[A],
-  val valueFormat: BinaryFormat[B]
+  implicit val keyFormat: Serializer[A],
+  val valueFormat: Serializer[B]
 ) extends Node[A, B]
 
 case class Clock(seconds: Long) extends Node[Unit, Long]
@@ -19,8 +19,8 @@ case class StatefulTransform[S, A, B0, +B](
   init: S,
   transformer: A => (S, B0) => (S, Seq[B])
 )(
-  implicit val keyFormat: BinaryFormat[A],
-  val stateFormat: BinaryFormat[S]
+  implicit val keyFormat: Serializer[A],
+  val stateFormat: Serializer[S]
 ) extends Transform[S, A, B0, B]
 
 sealed trait Transform[S, A, B0, +B] extends Node[A, B] {
@@ -49,7 +49,7 @@ object Transform {
   def unapply[S, A, B0, B](t: Transform[S, A, B0, B]): Option[(Node[A, B0], S, A => (S, B0) => (S, Seq[B]))] =
     Some((t.upstream, t.init, t.transformer))
 
-  def apply[S : BinaryFormat, A: BinaryFormat, B0, B](e: Node[A, B0], i: S, t: A => (S, B0) => (S, Seq[B])): Transform[S, A, B0, B] =
+  def apply[S : Serializer, A: Serializer, B0, B](e: Node[A, B0], i: S, t: A => (S, B0) => (S, Seq[B])): Transform[S, A, B0, B] =
     StatefulTransform(e, i, t)
 }
 
@@ -58,8 +58,8 @@ case class Merge[A, +B](upstreams: Seq[String -> Node[A, B]]) extends Node[A, B]
 case class GroupBy[A, B, A0](upstream: Node[A0, B], groupBy: A0 => B => A) extends Node[A, B]
 
 case class Sink[A, B](element: Node[A, B])(
-  implicit val keyFormat: BinaryFormat[A],
-  val valueFormat: BinaryFormat[B],
+  implicit val keyFormat: Serializer[A],
+  val valueFormat: Serializer[B],
   val keyPartitioner: Partitioner[A]
 )
 

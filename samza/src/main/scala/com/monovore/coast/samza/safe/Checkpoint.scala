@@ -2,7 +2,7 @@ package com.monovore.coast.samza.safe
 
 import com.monovore.coast.samza.Path
 import com.monovore.coast.samza.safe.Checkpoint._
-import com.monovore.coast.wire.BinaryFormat
+import com.monovore.coast.wire.{Protocol, Serializer}
 
 case class Checkpoint(
   inputStreams: Map[(String, Int), InputState],
@@ -19,7 +19,7 @@ object Checkpoint {
   }
 
   // FIXME: real serialization format for this. (JSON?)
-  val format: BinaryFormat[Checkpoint] = BinaryFormat.javaSerialization[Checkpoint]
+  val format: Serializer[Checkpoint] = Serializer.fromJavaSerialization[Checkpoint]
 
-  val keyFormat: BinaryFormat[Unit] = BinaryFormat.defaults.unitFormat
+  val keyFormat: Serializer[Unit] = Protocol.common.unitFormat
 }

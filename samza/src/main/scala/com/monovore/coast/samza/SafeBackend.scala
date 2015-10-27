@@ -48,14 +48,14 @@ object SafeBackend extends SamzaBackend {
 
       val finalSink = (offset: Long, key: A, value: B) => {
 
-        val keyBytes = sinkNode.keyFormat.write(key)
-        val valueBytes = sinkNode.valueFormat.write(value)
+        val keyBytes = sinkNode.keyFormat.toArray(key)
+        val valueBytes = sinkNode.valueFormat.toArray(value)
 
         if (offset >= offsetThreshold) {
 
           if (regroupedStreams(streamName)) {
             val qualifier = partitionIndex.toString.getBytes(Charsets.UTF_8)
-            val payload = Messages.InternalMessage.binaryFormat.write(qualifier, offset, valueBytes)
+            val payload = Messages.InternalMessage.binaryFormat.toArray(qualifier, offset, valueBytes)
             val newPartition = sinkNode.keyPartitioner.partition(key, partitions.size)
             whatSink.send(new SystemStream(system, streamName), newPartition, -1, keyBytes, payload)
           }
@@ -108,13 +108,13 @@ object SafeBackend extends SamzaBackend {
 
               if (mergeTip <= checkpoint.mergeOffset) {
 
-                val mergeMessage = Messages.MergeInfo.binaryFormat.write(stream, partition, offset)
+                val mergeMessage = Messages.MergeInfo.binaryFormat.toArray(stream, partition, offset)
 
                 whatSink.send(new SystemStream(system, mergeStream), partitionIndex, checkpoint.mergeOffset, Array.empty, mergeMessage)
               }
 
               val (qualifier, qualifierOffset, message) =
-                if (regroupedStreams(stream)) Messages.InternalMessage.binaryFormat.read(value)
+                if (regroupedStreams(stream)) Messages.InternalMessage.binaryFormat.fromArray(value)
                 else (Array.empty[Byte], offset, value)
 
               val qualifierThreshold = state.qualifiers.getOrElse(qualifier, 0L)

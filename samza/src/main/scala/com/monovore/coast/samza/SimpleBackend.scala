@@ -74,7 +74,7 @@ object SimpleBackend extends SamzaBackend {
 
       def compileNode[A, B](node: Node[A, B], path: Path, send: Send[A, B]): Map[String, Send[Array[Byte], Array[Byte]]] = node match {
         case src: Source[A, B] => Map(src.source -> { (key, value) =>
-          send(src.keyFormat.read(key), src.valueFormat.read(value))
+          send(src.keyFormat.fromArray(key), src.valueFormat.fromArray(value))
         })
         case pure: PureTransform[A, b0, B] => {
 
@@ -116,8 +116,8 @@ object SimpleBackend extends SamzaBackend {
           new SystemStream(system, outputStream),
           sink.keyPartitioner.partition(key, numPartitions),
           -1,
-          sink.keyFormat.write(key),
-          sink.valueFormat.write(value)
+          sink.keyFormat.toArray(key),
+          sink.valueFormat.toArray(value)
         )
       }
 

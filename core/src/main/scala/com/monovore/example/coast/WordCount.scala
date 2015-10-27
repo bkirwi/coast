@@ -1,17 +1,17 @@
 package com.monovore.example.coast
 
-import com.monovore.coast
 import com.monovore.coast.flow._
+import com.monovore.coast.wire.Protocol
 
 object WordCount extends ExampleMain {
+
+  import Protocol.common._
 
   type Source = Long
 
   val Sentences = Topic[Source, String]("sentences")
 
   val WordCounts = Topic[String, Int]("word-counts")
-
-  import coast.wire.pretty._
 
   val graph = Flow.build { implicit builder =>
 

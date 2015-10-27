@@ -2,7 +2,7 @@ package com.monovore.coast.samza.safe
 
 import com.monovore.coast.flow.{Flow, Topic}
 import com.monovore.coast.samza.Path
-import com.monovore.coast.wire.BinaryFormat
+import com.monovore.coast.wire.{Protocol, Serializer}
 import org.specs2.ScalaCheck
 import org.specs2.mutable._
 
@@ -10,7 +10,7 @@ class TaskCompilerSpec extends Specification with ScalaCheck {
 
   "a task compiler" should {
 
-    import com.monovore.coast.wire.pretty._
+    import Protocol.common._
 
     val compiler = new TaskCompiler(new TaskCompiler.Context {
       override def getStore[A, B](path: String, default: B): CoastState[A, B] = new CoastState[A, B] {
@@ -59,7 +59,7 @@ class TaskCompilerSpec extends Specification with ScalaCheck {
       compiled.inputStream must_== Input.name
       compiled.downstreamPath must_== Path("output")
 
-      compiled.handler(0, BinaryFormat.write("car"), BinaryFormat.write(3))
+      compiled.handler(0, Serializer.toArray("car"), Serializer.toArray(3))
       sink.captured must_== Seq("car" -> 3, "car" -> 3)
     }
 
@@ -76,16 +76,16 @@ class TaskCompilerSpec extends Specification with ScalaCheck {
       compiled.inputStream must_== Input.name
       compiled.downstreamPath must_== Path("output").next
 
-      compiled.handler(0, BinaryFormat.write("car"), BinaryFormat.write(3))
+      compiled.handler(0, Serializer.toArray("car"), Serializer.toArray(3))
       sink.captured must_== Seq("car" -> 3)
 
-      compiled.handler(0, BinaryFormat.write("car"), BinaryFormat.write(3))
+      compiled.handler(0, Serializer.toArray("car"), Serializer.toArray(3))
       sink.captured must_== Seq("car" -> 3)
 
-      compiled.handler(1, BinaryFormat.write("car"), BinaryFormat.write(3))
+      compiled.handler(1, Serializer.toArray("car"), Serializer.toArray(3))
       sink.captured must_== Seq("car" -> 3, "car" -> 6)
 
-      compiled.handler(2, BinaryFormat.write("dog"), BinaryFormat.write(3))
+      compiled.handler(2, Serializer.toArray("dog"), Serializer.toArray(3))
       sink.captured must_== Seq("car" -> 3, "car" -> 6, "dog" -> 3)
     }
 
@@ -109,8 +109,8 @@ class TaskCompilerSpec extends Specification with ScalaCheck {
       second.inputStream must_== Second.name
       second.downstreamPath must_== Path("output")
 
-      first.handler(0, BinaryFormat.write("car"), BinaryFormat.write(1))
-      second.handler(0, BinaryFormat.write("car"), BinaryFormat.write(2))
+      first.handler(0, Serializer.toArray("car"), Serializer.toArray(1))
+      second.handler(0, Serializer.toArray("car"), Serializer.toArray(2))
 
       sink.captured must_== Seq("car" -> 1, "car" -> 2)
     }
