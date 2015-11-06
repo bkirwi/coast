@@ -43,6 +43,15 @@ object CoastBuild extends Build {
     bintrayPublishSettings: _*
   )
 
+  lazy val standalone = Project(
+    id = "coast-standalone",
+    base = file("standalone")
+  ) dependsOn (
+    core
+  ) settings (
+    bintrayPublishSettings: _*
+  )
+
   lazy val samza = Project(
     id = "coast-samza",
     base = file("samza")
