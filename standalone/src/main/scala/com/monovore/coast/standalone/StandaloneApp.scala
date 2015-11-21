@@ -11,13 +11,13 @@ import scala.collection.JavaConverters._
 
 trait StandaloneApp {
 
-  def app: String = { this.getClass.getSimpleName.stripSuffix("$") }
+  def appName: String = { this.getClass.getSimpleName.stripSuffix("$") }
 
   implicit val builder = Flow.builder()
 
   def main(args: Array[String]): Unit = {
 
-    println(app)
+    println(appName)
 
     val flow = builder.toFlow
 
@@ -25,7 +25,7 @@ trait StandaloneApp {
 
     val consumer = new KafkaConsumer(
       Map[String, AnyRef](
-        "group.id" -> app,
+        "group.id" -> s"coast-$appName",
         "bootstrap.servers" -> "localhost:9092"
       ).asJava,
       new ByteArrayDeserializer,
