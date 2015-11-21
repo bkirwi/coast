@@ -2,8 +2,8 @@ package com.monovore.coast
 package flow
 
 import com.monovore.coast.core._
-import com.monovore.coast.wire.{Protocol, Partitioner, Serializer}
-import com.twitter.algebird.{Semigroup, Group, Monoid, MonoidAggregator}
+import com.monovore.coast.wire._
+import com.twitter.algebird.{Group, Monoid, MonoidAggregator, Semigroup}
 
 class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
   private[coast] val context: Context[A, WithKey],
@@ -158,6 +158,10 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
     messageFormat: Serializer[V]
   ): GroupedPool[K, V] = {
 
+    implicit val c = StreamFormat.fromSerializer(keyFormat)
+    implicit val a = StreamFormat.fromSerializer(newKeyFormat)
+    implicit val b = StreamFormat.fromSerializer(messageFormat)
+
     import Protocol.common._
 
     stream
@@ -183,6 +187,10 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
     newKeyFormat: Serializer[K],
     messageFormat: Serializer[V]
   ): GroupedPool[K, Map[A, V]] = {
+
+    implicit val c = StreamFormat.fromSerializer(keyFormat)
+    implicit val a = StreamFormat.fromSerializer(newKeyFormat)
+    implicit val b = StreamFormat.fromSerializer(messageFormat)
 
     import Protocol.common._
 

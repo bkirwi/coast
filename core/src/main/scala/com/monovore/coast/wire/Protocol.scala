@@ -1,118 +1,57 @@
 package com.monovore.coast.wire
 
-import java.io.{DataInputStream, DataOutputStream}
+import java.io.{ByteArrayInputStream, DataInputStream, DataOutputStream, ByteArrayOutputStream}
+
+import com.google.common.base.Charsets
 
 object Protocol {
 
+  object simple {
+
+    implicit val utf8: Serializer[String] = new Serializer[String] {
+      override def toArray(value: String): Array[Byte] = value.getBytes(Charsets.UTF_8)
+      override def fromArray(bytes: Array[Byte]): String = new String(bytes, Charsets.UTF_8)
+    }
+
+    implicit val longFormat: Serializer[Long] = new Serializer[Long] {
+      override def toArray(value: Long): Array[Byte] = value.toString.getBytes(Charsets.US_ASCII)
+      override def fromArray(bytes: Array[Byte]): Long = new String(bytes, Charsets.US_ASCII).toLong
+    }
+
+    implicit val intFormat: Serializer[Int] = new Serializer[Int] {
+      override def toArray(value: Int): Array[Byte] = value.toString.getBytes(Charsets.US_ASCII)
+      override def fromArray(bytes: Array[Byte]): Int = new String(bytes, Charsets.US_ASCII).toInt
+    }
+
+    implicit val unit: Serializer[Unit] = new Serializer[Unit] {
+      private[this] val empty: Array[Byte] = Array.ofDim(0)
+      override def toArray(value: Unit): Array[Byte] = empty
+      override def fromArray(bytes: Array[Byte]): Unit = {
+        require(bytes.length == 0, "Expecting empty byte array.")
+      }
+    }
+
+    implicit val intPartitioner: Partitioner[Int] = Partitioner.byHashCode
+
+    implicit val stringPartitioner: Partitioner[String] = Partitioner.byHashCode
+
+    implicit val longPartitioner: Partitioner[Long] = Partitioner.byHashCode
+
+    implicit object unitPartitioner extends Partitioner[Unit] {
+      override def partition(a: Unit, numPartitions: Int): Int = 0
+    }
+  }
+
   object common {
-    implicit object longFormat extends Serializer[Long] {
-      override def write(output: DataOutputStream, value: Long): Unit = output.writeLong(value)
-      override def read(input: DataInputStream): Long = input.readLong()
-    }
 
-    implicit object intFormat extends Serializer[Int] {
-      override def write(output: DataOutputStream, value: Int): Unit = output.writeInt(value)
-      override def read(input: DataInputStream): Int = input.readInt()
-    }
-
-    implicit object stringFormat extends Serializer[String] {
-      override def write(output: DataOutputStream, value: String): Unit = output.writeUTF(value)
-      override def read(input: DataInputStream): String = input.readUTF()
-    }
-
-    implicit object unitFormat extends Serializer[Unit] {
-      override def write(output: DataOutputStream, value: Unit): Unit = {}
-      override def read(input: DataInputStream): Unit = {}
-    }
-
-    implicit val bytesFormat: Serializer[Array[Byte]] = new Serializer[Array[Byte]] {
-
-      override def write(output: DataOutputStream, value: Array[Byte]): Unit = {
-        output.writeInt(value.length)
-        output.write(value)
+    implicit def streamFormatSerializer[A](implicit format: StreamFormat[A]): Serializer[A] = new Serializer[A] {
+      override def toArray(value: A): Array[Byte] = {
+        val baos = new ByteArrayOutputStream()
+        format.write(new DataOutputStream(baos), value)
+        baos.toByteArray
       }
-
-      override def read(input: DataInputStream): Array[Byte] = {
-        val size = input.readInt()
-        val bytes = Array.ofDim[Byte](size)
-        input.readFully(bytes)
-        bytes
-      }
-    }
-
-    implicit def optionFormat[A](implicit format: Serializer[A]): Serializer[Option[A]] = new Serializer[Option[A]] {
-
-      override def write(output: DataOutputStream, value: Option[A]): Unit = value match{
-        case Some(a) => {
-          output.writeBoolean(true)
-          format.write(output, a)
-        }
-        case None => output.writeBoolean(false)
-      }
-
-      override def read(input: DataInputStream): Option[A] = {
-        if (input.readBoolean()) Some(format.read(input))
-        else None
-      }
-    }
-
-    implicit def tuple2Format[A : Serializer, B : Serializer] = new Serializer[(A, B)] {
-
-      override def write(output: DataOutputStream, value: (A, B)): Unit = {
-        Serializer.write(output, value._1)
-        Serializer.write(output, value._2)
-      }
-
-      override def read(input: DataInputStream): (A, B) = {
-        val a = Serializer.read[A](input)
-        val b = Serializer.read[B](input)
-        (a, b)
-      }
-    }
-
-    implicit def tuple3Format[A : Serializer, B : Serializer, C : Serializer] = new Serializer[(A, B, C)] {
-
-      override def write(output: DataOutputStream, value: (A, B, C)): Unit = {
-        Serializer.write(output, value._1)
-        Serializer.write(output, value._2)
-        Serializer.write(output, value._3)
-      }
-
-      override def read(input: DataInputStream): (A, B, C) = {
-        val a = Serializer.read[A](input)
-        val b = Serializer.read[B](input)
-        val c = Serializer.read[C](input)
-        (a, b, c)
-      }
-    }
-
-    implicit def seqFormat[A : Serializer] = new Serializer[Seq[A]] {
-
-      override def write(output: DataOutputStream, value: Seq[A]): Unit = {
-        output.writeInt(value.size)
-        value.foreach(Serializer.write(output, _))
-      }
-
-      override def read(input: DataInputStream): Seq[A] = {
-        val size = input.readInt()
-        Seq.fill(size)(Serializer.read[A](input))
-      }
-    }
-
-    implicit def mapFormat[A : Serializer, B : Serializer] = new Serializer[Map[A, B]] {
-
-      override def write(output: DataOutputStream, value: Map[A, B]): Unit = {
-        output.writeInt(value.size)
-        value.foreach { case (k, v) =>
-          Serializer.write(output, k)
-          Serializer.write(output, v)
-        }
-      }
-
-      override def read(input: DataInputStream): Map[A, B] = {
-        val size = input.readInt()
-        Iterator.fill(size)(Serializer.read[A](input) -> Serializer.read[B](input))
-          .toMap
+      override def fromArray(bytes: Array[Byte]): A = {
+        format.read(new DataInputStream(new ByteArrayInputStream(bytes)))
       }
     }
 

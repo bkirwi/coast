@@ -9,46 +9,28 @@ import scala.language.implicitConversions
  */
 trait Serializer[A] extends Serializable {
 
-  def write(output: DataOutputStream, value: A): Unit
+  def toArray(value: A): Array[Byte]
 
-  def read(input: DataInputStream): A
-
-  def toArray(value: A): Array[Byte] = {
-    val baos = new ByteArrayOutputStream()
-    val dos = new DataOutputStream(baos)
-    write(dos, value)
-    baos.close()
-    baos.toByteArray
-  }
-
-  def fromArray(bytes: Array[Byte]): A = {
-    val bais = new ByteArrayInputStream(bytes)
-    val dis = new DataInputStream(bais)
-    val value = read(dis)
-    dis.close()
-    value
-  }
+  def fromArray(bytes: Array[Byte]): A
 }
 
 object Serializer {
-
-  def read[A](input: DataInputStream)(implicit reader: Serializer[A]): A = reader.read(input)
-
-  def write[A](output: DataOutputStream, value: A)(implicit writer: Serializer[A]) = writer.write(output, value)
 
   def fromArray[A](input: Array[Byte])(implicit reader: Serializer[A]): A = reader.fromArray(input)
 
   def toArray[A](value: A)(implicit writer: Serializer[A]): Array[Byte] = writer.toArray(value)
 
   def fromJavaSerialization[A] = new Serializer[A] {
-
-    override def write(output: DataOutputStream, value: A) {
-      val oos = new ObjectOutputStream(output)
+    override def toArray(value: A): Array[Byte] = {
+      val baos = new ByteArrayOutputStream()
+      val oos = new ObjectOutputStream(baos)
       oos.writeObject(value)
+      oos.close()
+      baos.toByteArray
     }
-
-    override def read(input: DataInputStream): A = {
-      val ois = new ObjectInputStream(input)
+    override def fromArray(bytes: Array[Byte]): A = {
+      val bais = new ByteArrayInputStream(bytes)
+      val ois = new ObjectInputStream(bais)
       ois.readObject().asInstanceOf[A]
     }
   }

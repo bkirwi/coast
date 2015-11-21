@@ -5,7 +5,7 @@ import com.monovore.coast.wire.Protocol
 
 object WordCount extends ExampleMain {
 
-  import Protocol.common._
+  import Protocol.simple._
 
   type Source = Long
 

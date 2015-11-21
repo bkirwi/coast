@@ -21,5 +21,5 @@ object Checkpoint {
   // FIXME: real serialization format for this. (JSON?)
   val format: Serializer[Checkpoint] = Serializer.fromJavaSerialization[Checkpoint]
 
-  val keyFormat: Serializer[Unit] = Protocol.common.unitFormat
+  val keyFormat: Serializer[Unit] = Protocol.simple.unit
 }
