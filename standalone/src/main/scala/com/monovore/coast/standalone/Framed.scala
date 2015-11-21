@@ -6,7 +6,7 @@ import com.monovore.coast.wire.StreamFormat
 
 object Framed {
 
-  case class Key[A](source: Seq[Byte], key: A)
+  case class Key[A](source: String, key: A)
 
   object Key {
     implicit def keyFormat[A:StreamFormat] = new StreamFormat[Key[A]] {
@@ -15,7 +15,7 @@ object Framed {
         StreamFormat.write(output, value.key)
       }
       override def read(input: DataInputStream): Key[A] = {
-        val source = StreamFormat.read[Seq[Byte]](input)
+        val source = StreamFormat.read[String](input)
         val key = StreamFormat.read[A](input)
         Key(source, key)
       }
