@@ -1,10 +1,14 @@
 package com.monovore.coast.standalone
 
+import java.util
+
 import com.monovore.coast.core.{PureTransform, Sink, Source, Node}
 import com.monovore.coast.flow.{Topic, Flow}
+import com.monovore.coast.standalone.kafka.CoastAssignor
 import com.monovore.coast.wire.Protocol
-import org.apache.kafka.clients.consumer.{ConsumerRecord, KafkaConsumer}
-import org.apache.kafka.clients.producer.{ProducerRecord, KafkaProducer}
+import org.apache.kafka.clients.consumer.{ConsumerRebalanceListener, ConsumerConfig, ConsumerRecord, KafkaConsumer}
+import org.apache.kafka.clients.producer.{ProducerConfig, ProducerRecord, KafkaProducer}
+import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.{ByteArraySerializer, ByteArrayDeserializer}
 
 import scala.collection.JavaConverters._
@@ -23,18 +27,30 @@ trait StandaloneApp {
 
     println(flow.bindings)
 
+    val groups = CoastAssignor.topicGroups(flow)
+
+    val groupConfig = groups.map{ case (k, v) => s"coast.topics.$k" -> v.mkString(",") }
+
     val consumer = new KafkaConsumer(
-      Map[String, AnyRef](
-        "group.id" -> s"coast-$appName",
-        "bootstrap.servers" -> "localhost:9092"
-      ).asJava,
+      (groupConfig ++ Map[String, AnyRef](
+        ConsumerConfig.GROUP_ID_CONFIG -> s"coast.$appName",
+        ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG -> "localhost:9092",
+        ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG -> "false",
+        ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG -> "30000",
+        ConsumerConfig.PARTITION_ASSIGNMENT_STRATEGY_CONFIG -> classOf[CoastAssignor].getName
+      )).asJava,
       new ByteArrayDeserializer,
       new ByteArrayDeserializer
     )
 
+    val allTopics = consumer.listTopics().asScala.toMap
+
+    groups.foreach { case (group, x) => println(allTopics.get(group)) }
+
     val producer = new KafkaProducer(
       Map[String, AnyRef](
-        "bootstrap.servers" -> "localhost:9092"
+        ProducerConfig.BOOTSTRAP_SERVERS_CONFIG -> "localhost:9092",
+        ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION -> "1"
       ).asJava,
       new ByteArraySerializer,
       new ByteArraySerializer
@@ -54,7 +70,7 @@ trait StandaloneApp {
           def comp[A, B](node: Node[A, B], out: (A, B) => Unit): Erp = node match {
             case src: Source[A, B] => Map(
               src.source -> { record =>
-                val key = Option(record.key()).map(src.keyFormat.fromArray(_)).getOrElse(record.partition().asInstanceOf[A])
+                val key = Option(record.key()).map(src.keyFormat.fromArray).getOrElse(record.partition().asInstanceOf[A])
                 val value = src.valueFormat.fromArray(record.value())
                 out(key, value)
               }
@@ -78,7 +94,14 @@ trait StandaloneApp {
       }
       .reduce { _ ++ _ }
 
-    consumer.subscribe(map.keys.toSeq.asJava)
+    consumer.subscribe(map.keys.toSeq.asJava, new ConsumerRebalanceListener {
+      override def onPartitionsAssigned(partitions: util.Collection[TopicPartition]): Unit = {
+        println("ADDINED", partitions.asScala.toList)
+      }
+      override def onPartitionsRevoked(partitions: util.Collection[TopicPartition]): Unit = {
+        println("REVOKKED", partitions.asScala.toList)
+      }
+    })
 
     while(true) {
       println("polling...")

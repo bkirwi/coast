@@ -22,6 +22,7 @@ object CoastBuild extends Build {
     licenses in ThisBuild += ("Apache-2.0", url("https://www.apache.org/licenses/LICENSE-2.0.html")),
 
     // make it possible to cancel forked processes with ctrl-c
+    fork in run in Global :=  true,
     cancelable in Global := true,
 
     // No tests in aggregate project
