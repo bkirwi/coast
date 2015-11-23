@@ -45,6 +45,8 @@ trait StandaloneApp {
 
     val allTopics = consumer.listTopics().asScala.toMap
 
+    val topics  = groups.flatMap { case (k, v) => v + k }.toSet
+
     groups.foreach { case (group, x) => println(allTopics.get(group)) }
 
     val producer = new KafkaProducer(
@@ -94,7 +96,7 @@ trait StandaloneApp {
       }
       .reduce { _ ++ _ }
 
-    consumer.subscribe(map.keys.toSeq.asJava, new ConsumerRebalanceListener {
+    consumer.subscribe(topics.toSeq.asJava, new ConsumerRebalanceListener {
       override def onPartitionsAssigned(partitions: util.Collection[TopicPartition]): Unit = {
         println("ADDINED", partitions.asScala.toList)
       }

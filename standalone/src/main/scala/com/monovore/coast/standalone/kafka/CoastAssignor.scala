@@ -46,7 +46,7 @@ class CoastAssignor extends PartitionAssignor with Configurable {
     val topixx =
       whatever
         .map { case (topix, values) =>
-            val x: Int = metadata.partitionCountForTopic(topix)
+            val x: Int = Option(metadata.partitionCountForTopic(topix)).getOrElse(sys.error(topix))
 
             for (v <- values) {
               require(x == metadata.partitionCountForTopic(v))
@@ -85,7 +85,7 @@ object CoastAssignor {
 
 
     graph.bindings
-      .map { case (name, sink) => s"coast.backing.$name" -> sources(sink.element) }
+      .map { case (name, sink) => s"coast.log.$name" -> sources(sink.element) }
       .toMap
   }
 }
