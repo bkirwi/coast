@@ -32,3 +32,21 @@ This means it needs to manually set those streams
 to specific offsets in the rebalance callback,
 but it needs to do lots of work in that callback anyways.
 
+## Structure
+
+Each task has a log, and stores checkpointed offsets in the offset metadata.
+
+This includes:
+
+- The offsets of all inputs.
+  - The per-'source' offsets too.
+- The offsets of all outputs.
+- Offsets of all state
+
+The task log is the coordination point for the task;
+
+Order:
+- Publish to log
+- Publish task output, blocking until log is written
+- Persist state, blocking on output
+- Persist checkpoint

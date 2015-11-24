@@ -45,28 +45,37 @@ class CoastAssignor extends PartitionAssignor with Configurable {
 
     val topixx =
       whatever
-        .map { case (topix, values) =>
+        .flatMap { case (topix, values) =>
             val x: Int = Option(metadata.partitionCountForTopic(topix)).getOrElse(sys.error(topix))
 
             for (v <- values) {
               require(x == metadata.partitionCountForTopic(v))
             }
 
-            for {
-              topic <- topix +: values
-              i <- 0 until x
-            } yield new TopicPartition(topic, i)
+            for (i <- 0 until x) yield {
+              for (topic <- topix +: values) yield new TopicPartition(topic, i)
+            }
         }
 
-    println(topixx)
+    println("EEEEEEE", topixx)
 
-    topixx.zipWithIndex
-      .groupBy { _._2 % subscriptions.size }
-      .map { case (_, all) => new Assignment(all.flatMap { _._1 }.toSeq.asJava) }
-      .zip(subscriptions.keySet.asScala)
-      .map { _.swap }
-      .toMap
-      .asJava
+    val ass =
+      topixx.zipWithIndex
+        .groupBy { _._2 % subscriptions.size }
+        .values
+        .map { _.flatMap { _._1 }.toSeq }
+        .zip(subscriptions.keySet.asScala)
+        .map { _.swap }
+        .toMap
+
+    val ass2 =
+      ass
+        .mapValues { ut => new Assignment(ut.asJava) }
+        .asJava
+
+    println("ASSIGN", ass)
+
+    ass2
   }
 
   override def onAssignment(assignment: Assignment): Unit = {}
@@ -82,7 +91,6 @@ object CoastAssignor {
       case Merge(all) => all.flatMap { case (k, v) => sources(v) }.toSet
       case GroupBy(upstream, _) => sources(upstream)
     }
-
 
     graph.bindings
       .map { case (name, sink) => s"coast.log.$name" -> sources(sink.element) }

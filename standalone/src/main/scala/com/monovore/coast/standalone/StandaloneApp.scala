@@ -2,14 +2,13 @@ package com.monovore.coast.standalone
 
 import java.util
 
-import com.monovore.coast.core.{PureTransform, Sink, Source, Node}
-import com.monovore.coast.flow.{Topic, Flow}
+import com.monovore.coast.core.{Node, PureTransform, Sink, Source}
+import com.monovore.coast.flow.Flow
 import com.monovore.coast.standalone.kafka.CoastAssignor
-import com.monovore.coast.wire.Protocol
-import org.apache.kafka.clients.consumer.{ConsumerRebalanceListener, ConsumerConfig, ConsumerRecord, KafkaConsumer}
-import org.apache.kafka.clients.producer.{ProducerConfig, ProducerRecord, KafkaProducer}
+import org.apache.kafka.clients.consumer._
+import org.apache.kafka.clients.producer.{KafkaProducer, ProducerConfig, ProducerRecord}
 import org.apache.kafka.common.TopicPartition
-import org.apache.kafka.common.serialization.{ByteArraySerializer, ByteArrayDeserializer}
+import org.apache.kafka.common.serialization.{ByteArrayDeserializer, ByteArraySerializer}
 
 import scala.collection.JavaConverters._
 
@@ -29,14 +28,14 @@ trait StandaloneApp {
 
     val groups = CoastAssignor.topicGroups(flow)
 
-    val groupConfig = groups.map{ case (k, v) => s"coast.topics.$k" -> v.mkString(",") }
+    val groupConfig = groups.map { case (k, v) => s"coast.topics.$k" -> v.mkString(",") }
 
     val consumer = new KafkaConsumer(
       (groupConfig ++ Map[String, AnyRef](
         ConsumerConfig.GROUP_ID_CONFIG -> s"coast.$appName",
         ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG -> "localhost:9092",
         ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG -> "false",
-        ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG -> "30000",
+        ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG -> "8000",
         ConsumerConfig.PARTITION_ASSIGNMENT_STRATEGY_CONFIG -> classOf[CoastAssignor].getName
       )).asJava,
       new ByteArrayDeserializer,
@@ -98,7 +97,11 @@ trait StandaloneApp {
 
     consumer.subscribe(topics.toSeq.asJava, new ConsumerRebalanceListener {
       override def onPartitionsAssigned(partitions: util.Collection[TopicPartition]): Unit = {
-        println("ADDINED", partitions.asScala.toList)
+
+        val taskLogs = partitions.asScala.toList.filter { tp => groups.contains(tp.topic) }
+        val state = taskLogs.map { x => Option(consumer.committed(x)) }
+
+        println("ADDINED", partitions.asScala.toList, state)
       }
       override def onPartitionsRevoked(partitions: util.Collection[TopicPartition]): Unit = {
         println("REVOKKED", partitions.asScala.toList)
@@ -111,18 +114,7 @@ trait StandaloneApp {
 
         map(record.topic())(record)
       }
+      Thread.sleep(1000)
     }
   }
-}
-
-object Demo extends StandaloneApp {
-
-  import Protocol.common._
-
-  val Sentences = Topic[Int, String]("sentences")
-  val Words = Topic[Int, String]("words")
-
-  Sentences.asSource
-    .flatMap { _.split("\\s+") }
-    .sinkTo(Words)
 }
