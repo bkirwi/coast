@@ -2,25 +2,30 @@ package com.monovore.coast.standalone
 
 import java.util
 
-import com.monovore.coast.core.{Node, PureTransform, Sink, Source}
+import com.lmax.disruptor.EventFactory
+import com.monovore.coast.core._
 import com.monovore.coast.flow.Flow
 import com.monovore.coast.standalone.kafka.CoastAssignor
 import org.apache.kafka.clients.consumer._
-import org.apache.kafka.clients.producer.{KafkaProducer, ProducerConfig, ProducerRecord}
+import org.apache.kafka.clients.producer.{Producer, KafkaProducer, ProducerConfig}
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.{ByteArrayDeserializer, ByteArraySerializer}
+import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable
 
-trait StandaloneApp {
+abstract class StandaloneApp {
 
   def appName: String = { this.getClass.getSimpleName.stripSuffix("$") }
+
+  private[this] val logger = LoggerFactory.getLogger(this.getClass.toString.stripSuffix("$"))
 
   implicit val builder = Flow.builder()
 
   def main(args: Array[String]): Unit = {
 
-    println(appName)
+    logger.info(s"Starting application $appName")
 
     val flow = builder.toFlow
 
@@ -36,6 +41,7 @@ trait StandaloneApp {
         ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG -> "localhost:9092",
         ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG -> "false",
         ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG -> "8000",
+        ConsumerConfig.AUTO_OFFSET_RESET_CONFIG -> "earliest",
         ConsumerConfig.PARTITION_ASSIGNMENT_STRATEGY_CONFIG -> classOf[CoastAssignor].getName
       )).asJava,
       new ByteArrayDeserializer,
@@ -62,59 +68,118 @@ trait StandaloneApp {
 
     println(topicSizes)
 
-    val map = flow.bindings
-      .map { case (name, sink) =>
+    val taskPartitions = CoastAssignor.partitionAssignments(groups, topicSizes)
 
-        type Erp = Map[String, ConsumerRecord[Array[Byte], Array[Byte]] => Unit]
-        def doSink[A, B](sink: Sink[A, B]): Erp = {
-
-          def comp[A, B](node: Node[A, B], out: (A, B) => Unit): Erp = node match {
-            case src: Source[A, B] => Map(
-              src.source -> { record =>
-                val key = Option(record.key()).map(src.keyFormat.fromArray).getOrElse(record.partition().asInstanceOf[A])
-                val value = src.valueFormat.fromArray(record.value())
-                out(key, value)
-              }
-            )
-            case pur: PureTransform[A, b0, B] => comp[A, b0](pur.upstream, { (a, b) =>
-              pur.function(a)(b).foreach { b => println(b); out(a, b) }
-            })
-          }
-
-          comp[A, B](sink.element, { (key, value) =>
-            producer.send(new ProducerRecord(
-              name,
-              sink.keyPartitioner.partition(key, topicSizes(name)),
-              sink.keyFormat.toArray(key),
-              sink.valueFormat.toArray(value)
-            ))
-          })
-        }
-
-        doSink(sink)
-      }
-      .reduce { _ ++ _ }
+    val taskState = mutable.Map.empty[TopicPartition, Unit]
 
     consumer.subscribe(topics.toSeq.asJava, new ConsumerRebalanceListener {
       override def onPartitionsAssigned(partitions: util.Collection[TopicPartition]): Unit = {
 
-        val taskLogs = partitions.asScala.toList.filter { tp => groups.contains(tp.topic) }
-        val state = taskLogs.map { x => Option(consumer.committed(x)) }
+        val assignedTasks =
+          partitions.asScala
+            .filter { tp => groups.contains(tp.topic) }
+            .toSet
 
-        println("ADDINED", partitions.asScala.toList, state)
+        val runningTasks = taskState.keySet
+
+        val removed = runningTasks -- assignedTasks
+
+        val added = assignedTasks -- runningTasks
+
+        logger.info(s"Rebalancing! Added [${added.mkString(", ")}], removed [${removed.mkString(", ")}]")
+
+        for (partition <- removed) {
+          taskState.remove(partition)
+        }
+
+        for (partition <- added) {
+
+          val checkpoint =
+            Option(consumer.committed(partition))
+              .map { _ => Checkpoint() }
+              .getOrElse(Checkpoint())
+
+          logger.info(s"Checkpoint for partition $partition: $checkpoint")
+
+          consumer.seekToEnd(partition)
+          val upcomingOffset = consumer.position(partition)
+          consumer.seek(partition, checkpoint.offset)
+
+          logger.info(s"Offset for partition $partition: $upcomingOffset")
+
+          for (source <- taskPartitions(partition)) {
+            consumer.seek(source, checkpoint.sources.getOrElse(source, 0L))
+          }
+
+          taskState.put(partition, ())
+        }
+        logger.info(s"Running tasks: [${taskState.mkString(", ")}]")
       }
       override def onPartitionsRevoked(partitions: util.Collection[TopicPartition]): Unit = {
-        println("REVOKKED", partitions.asScala.toList)
       }
     })
 
     while(true) {
       println("polling...")
-      consumer.poll(1000L).asScala foreach { record =>
+      val polled = consumer.poll(1000L)
 
-        map(record.topic())(record)
-      }
+//      polled.partitions().asScala.foreach { partition =>
+//        logger.info(s"$partition ${topicState(partition).getCursor}")
+//        polled.records(partition).asScala.foreach { record =>
+//          topicState(partition).tryPublishEvent(
+//            new EventTranslator[Record] {
+//              override def translateTo(event: Record, sequence: Long): Unit = {
+//                event.key = record.key
+//                event.value = record.value
+//              }
+//            }
+//          )
+//        }
+//      }
+
       Thread.sleep(1000)
     }
   }
 }
+
+trait Task {
+
+}
+
+object Task {
+
+  def compile(graph: Graph, producer: Producer[Array[Byte], Array[Byte]]): Map[String, Task] = {
+
+    type Sink[A, B] = (A, B) => Unit
+
+    def compileNode[A, B](node: Node[A, B], sink: Sink[A, B]): Task = node match {
+      case src: Source[A, B] => new Task {}
+      case PureTransform(upstream, fn) => ???
+    }
+
+    ???
+  }
+}
+
+case class Checkpoint(
+  offset: Long = 0L,
+  sources: Map[TopicPartition, Long] = Map.empty
+)
+
+case class Record(var key: Array[Byte], var value: Array[Byte])
+
+object Record extends EventFactory[Record] {
+  override def newInstance(): Record = Record(null, null)
+}
+//
+//class Gak(
+//  consumer: KafkaConsumer[Array[Byte], Array[Byte]],
+//  producer: KafkaProducer[Array[Byte], Array[Byte]],
+//  tasks: Map[TopicPartition, Checkpoint => Task]
+//) extends Runnable {
+//
+//  override def run(): Unit = {
+//
+//
+//  }
+//}

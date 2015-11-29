@@ -11,10 +11,9 @@ import scala.collection.JavaConverters._
 
 class CoastAssignor extends PartitionAssignor with Configurable {
 
-  type Topic = String
-  type MemberID = String
+  import CoastAssignor._
 
-  var whatever: Map[Topic, Seq[Topic]] = _
+  var whatever: Map[TopicName, Set[TopicName]] = _
 
   override def configure(configs: util.Map[String, _]): Unit = {
 
@@ -22,13 +21,13 @@ class CoastAssignor extends PartitionAssignor with Configurable {
 
     whatever =
       configs.asScala
-        .collect { case (KeyRegex(key), value: String) => key -> value.split(",").toSeq }
+        .collect { case (KeyRegex(key), value: String) => key -> value.split(",").toSet }
         .toMap
   }
 
   override val name: String = "coast"
 
-  override def subscription(topics: util.Set[Topic]): Subscription =
+  override def subscription(topics: util.Set[TopicName]): Subscription =
     new Subscription(topics.asScala.toSeq.asJava)
 
   override def assign(
@@ -36,46 +35,43 @@ class CoastAssignor extends PartitionAssignor with Configurable {
     subscriptions: util.Map[MemberID, Subscription]
   ): util.Map[MemberID, Assignment] = {
 
-    println(whatever)
+    val assignments = partitionAssignments(whatever, { topic => metadata.partitionCountForTopic(topic)})
 
-    for ((key, subs) <- subscriptions.asScala) {
-      subs.topics.asScala.foreach { topic =>
-        require(whatever.exists { case (k, v) => k == topic || v.contains(topic)}, s"Missing $topic") }
-    }
+    println(assignments)
 
-    val topixx =
+    val membersForTask =
       whatever
-        .flatMap { case (topix, values) =>
-            val x: Int = Option(metadata.partitionCountForTopic(topix)).getOrElse(sys.error(topix))
+        .map { case (task, sources) =>
+          val members =
+            subscriptions.asScala
+              .filter { case (member, subscription) =>
+                subscription.topics.contains(task) && sources.forall(subscription.topics.contains)
+              }
+              .keySet
 
-            for (v <- values) {
-              require(x == metadata.partitionCountForTopic(v))
-            }
-
-            for (i <- 0 until x) yield {
-              for (topic <- topix +: values) yield new TopicPartition(topic, i)
-            }
+          task -> members
         }
 
-    println("EEEEEEE", topixx)
+    println(membersForTask)
 
-    val ass =
-      topixx.zipWithIndex
-        .groupBy { _._2 % subscriptions.size }
-        .values
-        .map { _.flatMap { _._1 }.toSeq }
-        .zip(subscriptions.keySet.asScala)
-        .map { _.swap }
-        .toMap
+    val topicsForMember =
+      assignments.toSeq
+        .flatMap { case (log, sources) =>
+          val memberOpt = // an arbitrary but ~consistent choice, if there is one
+            membersForTask.get(log.topic)
+              .filter { _.nonEmpty }
+              .map { set => set.toIndexedSeq.sorted.apply(log.hashCode % set.size) }
 
-    val ass2 =
-      ass
-        .mapValues { ut => new Assignment(ut.asJava) }
-        .asJava
+          for (partition <- sources + log; member <- memberOpt) yield member -> partition
+        }
+        .groupBy { _._1 }
+        .mapValues { _.map { _._2 } }
 
-    println("ASSIGN", ass)
+    println(topicsForMember)
 
-    ass2
+    subscriptions.asScala
+      .map { case (k, _) => k -> new Assignment(topicsForMember.getOrElse(k, Seq.empty).asJava) }
+      .asJava
   }
 
   override def onAssignment(assignment: Assignment): Unit = {}
@@ -83,9 +79,12 @@ class CoastAssignor extends PartitionAssignor with Configurable {
 
 object CoastAssignor {
 
-  def topicGroups(graph: Graph): Map[String, Set[String]] = {
+  type TopicName = String
+  type MemberID = String
 
-    def sources[A, B](node: Node[A, B]): Set[String] = node match {
+  def topicGroups(graph: Graph): Map[TopicName, Set[TopicName]] = {
+
+    def sources[A, B](node: Node[A, B]): Set[TopicName] = node match {
       case Source(name) => Set(name)
       case Transform(upstream, _, _) => sources(upstream)
       case Merge(all) => all.flatMap { case (k, v) => sources(v) }.toSet
@@ -96,4 +95,22 @@ object CoastAssignor {
       .map { case (name, sink) => s"coast.log.$name" -> sources(sink.element) }
       .toMap
   }
+
+  def partitionAssignments(
+    topics: Map[TopicName, Set[TopicName]],
+    partitionCounts: TopicName => Int
+  ): Map[TopicPartition, Set[TopicPartition]] =
+
+    topics
+      .flatMap { case (log, sources) =>
+        val count = partitionCounts(log)
+
+        for (source <- sources) {
+          require(partitionCounts(source) == count, "Source must have the same number of partitions as the task log.")
+        }
+
+        for (i <- 0 until count) yield {
+          new TopicPartition(log, i) -> sources.map { new TopicPartition(_, i) }
+        }
+      }
 }
