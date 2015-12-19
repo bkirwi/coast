@@ -50,3 +50,42 @@ Order:
 - Publish task output, blocking until log is written
 - Persist state, blocking on output
 - Persist checkpoint
+
+## Task Rep
+
+Two-way flow of data: 
+messages flow 'down' through the tree,
+and offsets flow back up.
+
+NB: consumer forgets its offsets when rebalancing!
+This is a great reason for the tasks to store & make available the 
+'next offset wanted'.
+
+Bad: a stateful task updates state without sending output messages.
+(Without a way to rewind the state to some past time,
+there's no way to recover what it was when those messages were sent.)
+Unless we force each state impl to keep a history of all values,
+it's possible that some changes will be lost...
+either because of log compaction in Kafka,
+or because of a partial failure updating some KV store.
+When we restart from a checkpoint,
+we may need to alternate between keys that 'include' the upstream message,
+which we skip,
+and keys that don't,
+where we do the full processing.
+While that's happening,
+we need a way to tell the downstream that we're 'skipping ahead'
+a certain distance in the stream.
+
+The samza backend just returns a Long with the new downstream offset;
+we also need a channel for the 'ack' of that offset,
+since that's likely to happen asynchronously.
+
+It's really tempting to link the Kafka and Distruptor offsets,
+since juggling two sets of offsets sounds pretty messy,
+but I don't think that'll jive well with the skipping-aheads
+and other weirdness that we'll need to make work.
+
+--- 
+
+I am confused; okay

@@ -10,7 +10,5 @@ object Demo extends StandaloneApp {
   val Sentences = Topic[Int, String]("sentences")
   val Words = Topic[Int, String]("words")
 
-  Sentences.asSource
-    .flatMap { _.split("\\s+") }
-    .sinkTo(Words)
+  Sentences.asSource.sinkTo(Words)
 }

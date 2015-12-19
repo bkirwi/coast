@@ -9,7 +9,7 @@ object CoastBuild extends Build {
     id = "coast",
     base = file(".")
   ) aggregate (
-    core, samza
+    core, samza, standalone
   ) settings(
 
     // global project settings
@@ -44,15 +44,6 @@ object CoastBuild extends Build {
     bintrayPublishSettings: _*
   )
 
-  lazy val standalone = Project(
-    id = "coast-standalone",
-    base = file("standalone")
-  ) dependsOn (
-    core
-  ) settings (
-    bintrayPublishSettings: _*
-  )
-
   lazy val samza = Project(
     id = "coast-samza",
     base = file("samza")
@@ -62,5 +53,14 @@ object CoastBuild extends Build {
     IntegrationTest
   ) settings (
     bintrayPublishSettings ++ Defaults.itSettings : _*
+  )
+
+  lazy val standalone = Project(
+    id = "coast-standalone",
+    base = file("standalone")
+  ) dependsOn (
+    core
+  ) settings (
+    bintrayPublishSettings: _*
   )
 }

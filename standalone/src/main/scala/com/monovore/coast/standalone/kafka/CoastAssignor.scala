@@ -6,10 +6,13 @@ import com.monovore.coast.core._
 import org.apache.kafka.clients.consumer.internals.PartitionAssignor
 import org.apache.kafka.clients.consumer.internals.PartitionAssignor.{Assignment, Subscription}
 import org.apache.kafka.common.{TopicPartition, Cluster, Configurable}
+import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
 
 class CoastAssignor extends PartitionAssignor with Configurable {
+
+  private[this] val logger = LoggerFactory.getLogger(getClass)
 
   import CoastAssignor._
 
@@ -37,7 +40,7 @@ class CoastAssignor extends PartitionAssignor with Configurable {
 
     val assignments = partitionAssignments(whatever, { topic => metadata.partitionCountForTopic(topic)})
 
-    println(assignments)
+    logger.info(assignments.toString)
 
     val membersForTask =
       whatever
