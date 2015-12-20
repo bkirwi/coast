@@ -54,7 +54,7 @@ object Flow {
 
   def clock(seconds: Long) = new StreamDef[Grouped, Unit, Long](Clock(seconds))
 
-  def sink[A : Serializer : Partitioner, B : Serializer](topic: Topic[Grouped, A, B])(flow: FlowLike[GroupedStream[A, B]]): Flow[Unit] = {
+  def sink[G <: AnyGrouping, A : Serializer : Partitioner, B : Serializer](topic: Topic[G, A, B])(flow: FlowLike[StreamDef[G, A, B]]): Flow[Unit] = {
     flow.toFlow.flatMap { stream => Flow(Seq(topic.name -> Sink(stream.element)), ()) }
   }
 

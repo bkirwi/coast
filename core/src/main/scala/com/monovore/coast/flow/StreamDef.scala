@@ -138,10 +138,10 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
     ctx.add(Flow.stream[A, B0](name)(stream))
   }
 
-  def sinkTo[B0 >: B](topic: Topic[Grouped, A, B0])(
-    implicit keyFormat: Serializer[A], partitioner: Partitioner[A], valueFormat: Serializer[B0], grouped: IsGrouped[G], ctx: Flow.Builder
+  def sinkTo[G0 <: AnyGrouping, B0 >: B](topic: Topic[G0, A, B0])(
+    implicit keyFormat: Serializer[A], partitioner: Partitioner[A], valueFormat: Serializer[B0], ctx: Flow.Builder, up: G SameGroupingAs G0
   ): Unit = {
-    ctx.add(Flow.sink(topic)(grouped.stream(stream)))
+    ctx.add(Flow.sink(topic)(up.stream(stream)))
   }
 
   def sumByKey[K, V](
