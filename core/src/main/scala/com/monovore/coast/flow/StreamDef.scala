@@ -138,7 +138,7 @@ class StreamBuilder[WithKey[+_], +G <: AnyGrouping, A, +B](
     ctx.add(Flow.stream[A, B0](name)(stream))
   }
 
-  def sinkTo[B0 >: B](topic: Topic[A, B0])(
+  def sinkTo[B0 >: B](topic: Topic[Grouped, A, B0])(
     implicit keyFormat: Serializer[A], partitioner: Partitioner[A], valueFormat: Serializer[B0], grouped: IsGrouped[G], ctx: Flow.Builder
   ): Unit = {
     ctx.add(Flow.sink(topic)(grouped.stream(stream)))

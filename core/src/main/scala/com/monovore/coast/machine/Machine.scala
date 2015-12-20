@@ -135,7 +135,7 @@ case class Machine(system: System[Machine.Label], state: System.State[Machine.La
 
 case class Messages(messageMap: Map[String, Map[Key, Seq[Message]]]) {
 
-  def apply[A, B](name: Topic[A, B]): Map[A, Seq[B]] = {
+  def apply[A, B](name: Topic[Grouped, A, B]): Map[A, Seq[B]] = {
 
     val keyed = messageMap.getOrElse(name.name, Map.empty)
 
@@ -151,7 +151,7 @@ object Messages {
 
   val empty: Messages = Messages(Map.empty)
 
-  def from[A, B](name: Topic[A, B], messages: Map[A, Seq[B]]): Messages = {
+  def from[A, B](name: Topic[Grouped, A, B], messages: Map[A, Seq[B]]): Messages = {
 
     Messages(Map(
       name.name -> messages
