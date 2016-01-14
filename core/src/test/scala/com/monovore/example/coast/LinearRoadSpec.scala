@@ -23,7 +23,7 @@ class LinearRoadSpec extends Specification with ScalaCheck {
 
       Prop.forAll(Sample.complete(testCase)) { output =>
 
-        output(LinearRoad.TotalTolls)(vehicle).last must_== 0
+        output(LinearRoad.TotalTolls)(vehicle).lastOption.getOrElse(0L) must_== 0
       }
     }
 

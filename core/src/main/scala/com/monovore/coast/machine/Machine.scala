@@ -139,7 +139,7 @@ case class Messages(messageMap: Map[String, Map[Key, Seq[Message]]]) {
 
     val keyed = messageMap.getOrElse(name.name, Map.empty)
 
-    keyed.map { case (k -> v) => k.cast[A] -> v.map { _.cast[B] } }
+    keyed.map { case (k -> v) => k.cast[A] -> v.map { _.cast[B] } }.withDefaultValue(Nil)
   }
 
   def ++(other: Messages): Messages = Messages(Semigroup.plus(messageMap, other.messageMap))

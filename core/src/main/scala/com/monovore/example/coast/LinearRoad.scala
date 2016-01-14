@@ -24,6 +24,8 @@ object LinearRoad extends ExampleMain {
   type Segment = Int
   type TimeWindow = Long
 
+  val BaseToll = 1.0 // ???
+
   case class PlaceAndTime(segment: Segment, time: TimeWindow)
   case class Summary(vehicles: Set[VehicleID] = Set.empty, averageSpeed: AveragedValue = Monoid.zero[AveragedValue])
 
@@ -41,8 +43,10 @@ object LinearRoad extends ExampleMain {
       .sum
       .updates
       .map { summary =>
-        val toll = if (summary.averageSpeed.value < 40) 3.0 else 0.0
-        summary.vehicles.map { _ -> toll }.toMap
+        if (summary.averageSpeed.value < 40) {
+          val toll = BaseToll * math.pow(summary.vehicles.size - 150, 2)
+          summary.vehicles.map { _ -> toll }.toMap
+        } else Map.empty[VehicleID, Double]
       }
       .sumByKey("summaries")
       .updates
