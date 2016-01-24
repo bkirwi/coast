@@ -21,17 +21,15 @@ abstract class StandaloneApp {
 
   private[this] val logger = LoggerFactory.getLogger(this.getClass.toString.stripSuffix("$"))
 
-  implicit val builder = Flow.builder()
+  def graph: Graph
 
   def main(args: Array[String]): Unit = {
 
     logger.info(s"Starting application $appName")
 
-    val flow = builder.toFlow
+    println(graph.bindings)
 
-    println(flow.bindings)
-
-    val groups = CoastAssignor.topicGroups(flow)
+    val groups = CoastAssignor.topicGroups(graph)
 
     val groupConfig = groups.map { case (k, v) => s"coast.topics.$k" -> v.mkString(",") }
 
@@ -125,6 +123,8 @@ abstract class StandaloneApp {
         }
 
         override def stop(): Unit = sinkThread.interrupt()
+
+        override def position: Map[TopicPartition, Long] = ???
       }
     }
 
@@ -169,7 +169,7 @@ abstract class StandaloneApp {
 
           val sinkTo = new TopicPartition(partition.topic.split("\\.")(2), partition.partition)
 
-          taskState.put(partition, makeTask(sinkTo.topic, sinkTo.partition, flow.bindings.find { _._1 == sinkTo.topic }.get._2))
+          taskState.put(partition, makeTask(sinkTo.topic, sinkTo.partition, graph.bindings.find { _._1 == sinkTo.topic }.get._2))
         }
         logger.info(s"Running tasks: [${taskState.mkString(", ")}]")
       }
@@ -187,7 +187,7 @@ abstract class StandaloneApp {
 
 trait Task {
   def append(input: ConsumerRecords[Array[Byte], Array[Byte]])
-  def position: Map[TopicPartition, Long] = ???
+  def position: Map[TopicPartition, Long]
   def stop(): Unit
 }
 
@@ -195,3 +195,5 @@ case class Checkpoint(
   offset: Long = 0L,
   sources: Map[TopicPartition, Long] = Map.empty
 )
+
+class WuTask
