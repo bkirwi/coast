@@ -32,8 +32,20 @@ object TwitterReach extends ExampleMain {
    * `coast` jobs in the same codebase that share data formats or streams, you'd
    * probably want to pull these out to a common file so all the jobs can access
    * them.
+   */
+
+  /* `coast` uses implicits to decide how to partition and serialize
+   * your data. Don't be frightened! It's both safer and less verbose than using
+   * configuration or a global registry, and the error messages are better.
    *
-   * First, we'll define a few `Topic`s. A `Topic` corresponds closely to a topic
+   * For now, I'm importing `Protocol.native._`, which uses `Object.hashCode`
+   * for partitioning and java serialization on the wire. I suggest not doing
+   * this in production, but it's handy for experimenting.
+   */
+
+  import Protocol.native._
+
+  /* First, we'll define a few `Topic`s. A `Topic` corresponds closely to a topic
    * in Kafka; it groups together the topic name and the types of the
    * partition keys and messages.
    *
@@ -54,17 +66,6 @@ object TwitterReach extends ExampleMain {
   val Followers = Topic[UserID, FollowerID]("followers")
 
   val Reach = Topic[URI, Int]("reach")
-
-  /* `coast` uses implicit parameters to decide how to partition and serialize
-   * your data. Don't be frightened! It's both safer and less verbose than using
-   * configuration or a global registry, and the error messages are better.
-   *
-   * For now, I'm importing `Protocol.native._`, which uses `Object.hashCode`
-   * for partitioning and java serialization on the wire. I suggest not doing
-   * this in production, but it's handy for experimenting.
-   */
-
-  import Protocol.native._
 
   /* Now we come to the job logic. We're building up a `Flow` object here; this
    * defines the stream-processing graph and associates topic names with the

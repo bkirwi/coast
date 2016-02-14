@@ -49,13 +49,13 @@ object Flow {
     new StreamDef[G, A, B](Merge(upstreams.map { case (name, stream) => name -> stream.element}))
   }
 
-  def source[G <: AnyGrouping, A : Serializer, B : Serializer](topic: Topic[G, A, B]): StreamDef[G, A, B] =
-    new StreamDef[G, A, B](Source[A, B](topic.name))
+  def source[G <: AnyGrouping, A, B](topic: Topic[G, A, B]): StreamDef[G, A, B] =
+    new StreamDef[G, A, B](Source[A, B](topic.name)(topic.keySerializer, topic.valueSerializer))
 
   def clock(seconds: Long) = new StreamDef[Grouped, Unit, Long](Clock(seconds))
 
-  def sink[G <: AnyGrouping, A : Serializer : Partitioner, B : Serializer](topic: Topic[G, A, B])(flow: FlowLike[StreamDef[G, A, B]]): Flow[Unit] = {
-    flow.toFlow.flatMap { stream => Flow(Seq(topic.name -> Sink(stream.element)), ()) }
+  def sink[G <: AnyGrouping, A : Partitioner, B](topic: Topic[G, A, B])(flow: FlowLike[StreamDef[G, A, B]]): Flow[Unit] = {
+    flow.toFlow.flatMap { stream => Flow(Seq(topic.name -> Sink(stream.element)(topic.keySerializer, topic.valueSerializer, implicitly)), ()) }
   }
 
   def stream[A : Serializer : Partitioner, B : Serializer](label: String)(stream: FlowLike[AnyStream[A, B]]): Flow[GroupedStream[A, B]] =
