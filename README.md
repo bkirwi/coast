@@ -85,19 +85,16 @@ val Sentences = Topic[Source, String]("sentences")
 
 val WordCounts = Topic[String, Int]("word-counts")
 
-val graph = for {
+val graph = Flow.build { implicit builder =>
 
-  words <- Flow.stream("words") {
-    Flow.source(Sentences)
-      .flatMap { _.split("\\s+") }
-      .map { _ -> 1 }
-      .groupByKey
-  }
-
-  _ <- Flow.sink(WordCounts) {
-    words.sum.updates
-  }
-} yield ()
+  Sentences.asSource
+    .flatMap { _.split("\\s+") }
+    .map { _ -> 1 }
+    .groupByKey
+    .streamTo("words")
+    .sum.updates
+    .sinkTo(WordCounts)
+}
 ```
 
 ## Future Work
