@@ -1,6 +1,5 @@
 ---
 title: Flow API
-layout: post
 ---
 
 This page covers the Scala API used to build up a streaming graph from scratch.
