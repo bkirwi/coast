@@ -1,0 +1,24 @@
+<html>
+  <head>
+    <link type="text/css" href="http://ben.kirw.in/css/main.css" rel="stylesheet" />
+  </head>
+  <body>
+    <div class="content">
+      <header>
+        <nav>
+          <ul>
+            {% for p in site.pages %}
+            <li><a href="/coast{{ p.url }}">{{ p.title }}</a></li>
+            {% endfor %}
+          </ul>
+        </nav>
+      </header>
+      <article>
+
+<h1> {{ page.title }} </h1>
+{{ content }}
+
+      </article>
+    </div>
+  </body>
+</html>

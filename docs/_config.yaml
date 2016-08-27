@@ -1,0 +1,5 @@
+defaults:
+  - scope:
+      path: "" # everybody gets the same layout
+    values:
+      layout: "default"
